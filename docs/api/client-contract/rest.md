@@ -79,7 +79,10 @@ For Codex, `metadata.codexPromptMode` records the session's follow-up preference
 missing means `queue`. Clients honoring this preference send `deliveryMode: 'steer'`
 for ordinary immediate follow-ups while Codex is working. Explicit queue requests,
 scheduled sends, scratchlist sends and retries use `queue`. The hub accepts Codex
-steering only for sessions opted into `steer`; an omitted delivery mode queues.
+steering only for sessions opted into `steer`. When delivery mode is omitted, the
+hub uses the Codex session preference, including for `ping_peer` messages. Other
+agents still default to queue. The hub assigns a tracking ID to steer messages
+that omit `localId` so acknowledgements and uncertain outcomes remain durable.
 Native delivery targets the turn active at receipt. If that turn has ended or
 rejects the steer, the message queues. An uncertain outcome requires explicit
 resolution and must not be retried automatically. Reconnect and backfill queue

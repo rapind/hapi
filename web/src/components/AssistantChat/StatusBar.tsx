@@ -207,6 +207,7 @@ export function StatusBar(props: {
      */
     contextModel?: string | null
     model?: string | null
+    codexPromptMode?: 'queue' | 'steer'
     modelReasoningEffort?: string | null
     effort?: string | null
     serviceTier?: string | null
@@ -369,6 +370,11 @@ export function StatusBar(props: {
                     <span className="whitespace-nowrap text-xs text-[var(--app-hint)]">
                         <span className="sm:hidden">{compactReasoningLabel}</span>
                         <span className="hidden sm:inline">{reasoningLabel}</span>
+                    </span>
+                ) : null}
+                {props.agentFlavor === 'codex' && props.codexPromptMode ? (
+                    <span className="whitespace-nowrap text-xs text-[var(--app-hint)]">
+                        {t(props.codexPromptMode === 'steer' ? 'chat.codexPromptMode.steer' : 'chat.codexPromptMode.queue')}
                     </span>
                 ) : null}
                 {codexFastMode ? (
