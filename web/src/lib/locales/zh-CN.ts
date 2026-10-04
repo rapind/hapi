@@ -383,6 +383,8 @@ export default {
   'newSession.codexPromptMode.queue': '排队等待当前轮次完成',
   'newSession.codexPromptMode.steer': '引导当前轮次',
   'newSession.codexPromptMode.description': '在 Codex 工作时生效。此设备将为新会话记住此选择。',
+  'chat.codexPromptMode.toggle': '将后续消息切换为{mode}',
+  'chat.codexPromptMode.error': '无法更改后续消息模式，请重试。',
   'chat.codexPromptMode.queue': '排队',
   'chat.codexPromptMode.steer': '引导',
   'newSession.collaborationMode': '协作模式',

@@ -292,6 +292,7 @@ export function HappyComposer(props: {
     copilotAgentMode?: CopilotAgentMode
     model?: string | null
     codexPromptMode?: 'queue' | 'steer'
+    onCodexPromptModeChange?: (mode: 'queue' | 'steer') => Promise<void>
     modelReasoningEffort?: string | null
     effort?: string | null
     active?: boolean
@@ -2214,6 +2215,7 @@ export function HappyComposer(props: {
                         contextModel={contextModel}
                         model={model}
                         codexPromptMode={props.codexPromptMode}
+                        onCodexPromptModeChange={props.onCodexPromptModeChange}
                         modelReasoningEffort={modelReasoningEffort}
                         effort={effort}
                         serviceTier={serviceTier}

@@ -1278,7 +1278,8 @@ function SessionChatInner(props: SessionChatProps) {
         setModel,
         setModelReasoningEffort,
         setEffort,
-        setServiceTier
+        setServiceTier,
+        setCodexPromptMode
     } = useSessionActions(
         props.api,
         props.session.id,
@@ -2067,6 +2068,7 @@ function SessionChatInner(props: SessionChatProps) {
                         collaborationMode={codexCollaborationModeSupported ? props.session.collaborationMode : undefined}
                         copilotAgentMode={agentFlavor === 'copilot' ? props.session.copilotAgentMode : undefined}
                         model={props.session.model}
+                        onCodexPromptModeChange={setCodexPromptMode}
                         codexPromptMode={agentFlavor === 'codex' && !scratchlistMode ? (props.session.metadata?.codexPromptMode ?? 'queue') : undefined}
                         modelReasoningEffort={agentFlavor === 'codex' || agentFlavor === 'opencode' ? props.session.modelReasoningEffort : undefined}
                         effort={props.session.effort}

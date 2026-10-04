@@ -716,6 +716,13 @@ export class ApiClient {
         })
     }
 
+    async setCodexPromptMode(sessionId: string, mode: MessageDeliveryMode): Promise<void> {
+        await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/codex-prompt-mode`, {
+            method: 'POST',
+            body: JSON.stringify({ mode })
+        })
+    }
+
     async setServiceTier(sessionId: string, serviceTier: string | null): Promise<void> {
         await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/service-tier`, {
             method: 'POST',
