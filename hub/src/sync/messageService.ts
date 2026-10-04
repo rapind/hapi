@@ -124,11 +124,12 @@ function getNormalizedDeliveryMode(
         return 'queue'
     }
 
-    return isObject(metadata) && metadata.flavor === 'pi' ? 'steer' : 'queue'
+    return isObject(metadata) && (metadata.flavor === 'pi'
+        || (metadata.flavor === 'codex' && metadata.codexPromptMode === 'steer')) ? 'steer' : 'queue'
 }
 
 /**
- * Native steer is scoped to the Pi turn active at the initial live emit. Once
+ * Native steer is scoped to the turn active at the initial live emit. Once
  * a durable row is delivered through reconnect, backfill, a clear gate, or a
  * scheduled scan, that turn identity is no longer provable. Preserve stored
  * provenance for Web diagnostics, but make deferred CLI delivery an ordinary

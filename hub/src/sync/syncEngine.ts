@@ -2181,7 +2181,8 @@ export class SyncEngine {
         startingMode?: 'remote' | 'pty',
         // Required for fresh machine spawns so the runner stamps the HAPI id on
         // argv before the first webhook (#1911 Major: unreapable window).
-        namespace?: string
+        namespace?: string,
+        codexPromptMode?: 'queue' | 'steer'
     ): ReturnType<RpcGateway['spawnSession']> {
         // Fresh machine spawns historically omitted existingSessionId, so
         // buildCliArgs could not stamp --hapi-session-id / --existing-session-id.
@@ -2200,6 +2201,7 @@ export class SyncEngine {
                     path: directory,
                     host: machine?.metadata?.host ?? 'unknown',
                     flavor: agent,
+                    ...(agent === 'codex' ? { codexPromptMode: codexPromptMode ?? 'queue' } : {}),
                     machineId,
                     startedBy: 'runner',
                     startedFromRunner: true,
