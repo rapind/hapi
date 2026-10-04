@@ -385,6 +385,8 @@ export default {
   'newSession.codexPromptMode.queue': 'Queue until the current turn finishes',
   'newSession.codexPromptMode.steer': 'Steer the current turn',
   'newSession.codexPromptMode.description': 'Applies while Codex is working. Remembered for new sessions on this device.',
+  'chat.codexPromptMode.toggle': 'Switch follow-ups to {mode}',
+  'chat.codexPromptMode.error': 'Could not change follow-up mode. Try again.',
   'chat.codexPromptMode.queue': 'Queue',
   'chat.codexPromptMode.steer': 'Steer',
   'newSession.collaborationMode': 'Collaboration mode',

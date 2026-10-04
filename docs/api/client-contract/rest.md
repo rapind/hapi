@@ -83,6 +83,12 @@ steering only for sessions opted into `steer`. When delivery mode is omitted, th
 hub uses the Codex session preference, including for `ping_peer` messages. Other
 agents still default to queue. The hub assigns a tracking ID to steer messages
 that omit `localId` so acknowledgements and uncertain outcomes remain durable.
+Change an existing Codex session's preference with
+`POST /api/sessions/:id/codex-prompt-mode` and `{mode: 'queue' | 'steer'}`. This
+works for active and inactive sessions and returns `{ok: true}` after saving.
+The web chat label toggles this setting without changing the new-session default
+or redelivering queued messages.
+
 Native delivery targets the turn active at receipt. If that turn has ended or
 rejects the steer, the message queues. An uncertain outcome requires explicit
 resolution and must not be retried automatically. Reconnect and backfill queue
