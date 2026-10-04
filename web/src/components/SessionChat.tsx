@@ -1793,9 +1793,10 @@ function SessionChatInner(props: SessionChatProps) {
         // chat sends after scratchlist fallback".)
         const routedToScratchlist = shouldRouteToScratchlist(scratchlistMode, attachments, scheduledAt)
         const deliveryMode = resolveMessageDeliveryMode({
+            codexPromptMode: props.session.metadata?.codexPromptMode,
             agentFlavor,
             // Do not use assistant-ui's broader `isRunning` here: a
-            // child-agent run is not the Pi main session's steer target.
+            // child-agent run is not the main session's steer target.
             isSessionThinking: props.session.thinking,
             intent,
             scheduledAt,
@@ -1815,7 +1816,7 @@ function SessionChatInner(props: SessionChatProps) {
             updatePendingSchedule(null)
             setForceScrollToken((token) => token + 1)
         }
-    }, [agentFlavor, onSendForComposer, props.session.thinking, scratchlistMode, updatePendingSchedule])
+    }, [agentFlavor, onSendForComposer, props.session.metadata?.codexPromptMode, props.session.thinking, scratchlistMode, updatePendingSchedule])
 
     const attachmentAdapter = useMemo(() => {
         if (props.session.active && scratchlistMode) {
@@ -2010,6 +2011,12 @@ function SessionChatInner(props: SessionChatProps) {
                         />
 
                         <div className="px-3">
+                            {agentFlavor === 'codex' && !scratchlistMode ? (
+                                <div className="pb-1 text-xs text-[var(--app-hint)]">
+                                    {t(props.session.metadata?.codexPromptMode === 'steer'
+                                        ? 'chat.codexPromptMode.steer' : 'chat.codexPromptMode.queue')}
+                                </div>
+                            ) : null}
                             {/*
                              * Scratchlist drawer - composer-controlled. Only
                              * mounted when the operator clicks the notepad icon

@@ -1229,6 +1229,29 @@ describe('MessageService.sendMessage deliveryMode', () => {
         expect(gateChecks).toBe(0)
     })
 
+    it.each([
+        ['steer', 'steer', 'steer'],
+        ['steer', undefined, 'queue'],
+        ['steer', 'queue', 'queue'],
+        ['queue', 'steer', 'queue'],
+        [undefined, 'steer', 'queue']
+    ] as const)('normalizes Codex preference %s and delivery %s to %s', async (codexPromptMode, deliveryMode, expected) => {
+        const store = makeStore()
+        const session = store.sessions.getOrCreateSession('codex-delivery', {
+            path: '/tmp/codex-delivery', host: 'localhost', flavor: 'codex', codexPromptMode
+        }, null, 'default')
+        const { io, cliEmitted } = makeTrackingIo()
+        const service = new MessageService(store, io, makePublisher() as any)
+        await service.sendMessage(session.id, { text: 'follow up', localId: 'followup', deliveryMode })
+        expect(cliEmitted[0]).toMatchObject({
+            body: { message: { content: { meta: { deliveryMode: expected } } } }
+        })
+        service.replayImmediateQueuedMessages(session.id)
+        expect(cliEmitted[1]).toMatchObject({
+            body: { message: { content: { meta: { deliveryMode: 'queue' } } } }
+        })
+    })
+
     it('persists Pi steer provenance but downgrades every deferred CLI delivery to queue', async () => {
         const store = makeStore()
         const session = store.sessions.getOrCreateSession(
