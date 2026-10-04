@@ -120,12 +120,14 @@ function getNormalizedDeliveryMode(
     requestedDeliveryMode: MessageDeliveryMode | undefined,
     scheduledAt: number | null | undefined
 ): MessageDeliveryMode {
-    if (requestedDeliveryMode !== 'steer' || scheduledAt != null) {
+    if (scheduledAt != null || requestedDeliveryMode === 'queue') {
         return 'queue'
     }
-
-    return isObject(metadata) && (metadata.flavor === 'pi'
-        || (metadata.flavor === 'codex' && metadata.codexPromptMode === 'steer')) ? 'steer' : 'queue'
+    if (isObject(metadata) && metadata.flavor === 'codex' && metadata.codexPromptMode === 'steer') {
+        return 'steer'
+    }
+    return requestedDeliveryMode === 'steer' && isObject(metadata) && metadata.flavor === 'pi'
+        ? 'steer' : 'queue'
 }
 
 /**
@@ -885,7 +887,9 @@ export class MessageService {
         const inserted = this.store.addMessageForCurrentSession(
             sessionId,
             content,
-            payload.localId ?? undefined,
+            // Peer sends omit localId. Steering still needs durable acknowledgement
+            // and uncertainty tracking, including across reconnects.
+            payload.localId ?? (deliveryMode === 'steer' ? randomUUID() : undefined),
             payload.scheduledAt ?? null
         )
         const actualSessionId = inserted.sessionId

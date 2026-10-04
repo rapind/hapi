@@ -291,6 +291,7 @@ export function HappyComposer(props: {
     collaborationMode?: CodexCollaborationMode
     copilotAgentMode?: CopilotAgentMode
     model?: string | null
+    codexPromptMode?: 'queue' | 'steer'
     modelReasoningEffort?: string | null
     effort?: string | null
     active?: boolean
@@ -2212,6 +2213,7 @@ export function HappyComposer(props: {
                         contextWindow={contextWindow}
                         contextModel={contextModel}
                         model={model}
+                        codexPromptMode={props.codexPromptMode}
                         modelReasoningEffort={modelReasoningEffort}
                         effort={effort}
                         serviceTier={serviceTier}

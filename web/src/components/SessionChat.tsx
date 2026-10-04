@@ -2011,12 +2011,6 @@ function SessionChatInner(props: SessionChatProps) {
                         />
 
                         <div className="px-3">
-                            {agentFlavor === 'codex' && !scratchlistMode ? (
-                                <div className="pb-1 text-xs text-[var(--app-hint)]">
-                                    {t(props.session.metadata?.codexPromptMode === 'steer'
-                                        ? 'chat.codexPromptMode.steer' : 'chat.codexPromptMode.queue')}
-                                </div>
-                            ) : null}
                             {/*
                              * Scratchlist drawer - composer-controlled. Only
                              * mounted when the operator clicks the notepad icon
@@ -2073,6 +2067,7 @@ function SessionChatInner(props: SessionChatProps) {
                         collaborationMode={codexCollaborationModeSupported ? props.session.collaborationMode : undefined}
                         copilotAgentMode={agentFlavor === 'copilot' ? props.session.copilotAgentMode : undefined}
                         model={props.session.model}
+                        codexPromptMode={agentFlavor === 'codex' && !scratchlistMode ? (props.session.metadata?.codexPromptMode ?? 'queue') : undefined}
                         modelReasoningEffort={agentFlavor === 'codex' || agentFlavor === 'opencode' ? props.session.modelReasoningEffort : undefined}
                         effort={props.session.effort}
                         agentFlavor={agentFlavor}
