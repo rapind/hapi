@@ -23,4 +23,28 @@ describe('Codex prompt mode', () => {
             await expect(engine.setCodexPromptMode(other.id, 'steer')).rejects.toThrow('Codex')
         } finally { engine.stop(); store.close() }
     })
+
+    it('keeps a user-chosen title through both prompt modes and later automatic naming', async () => {
+        const store = new Store(':memory:')
+        const engine = new SyncEngine(store, {
+            of: () => ({ to: () => ({ emit() { } }) })
+        } as never, new RpcRegistry(), { broadcast() { } } as never)
+        try {
+            const session = engine.getOrCreateSession('protected-toggle', {
+                path: '/sports', host: 'test', flavor: 'codex'
+            }, null, 'default')
+            await engine.renameSession(session.id, 'sports')
+            for (const mode of ['steer', 'queue'] as const) {
+                await engine.setCodexPromptMode(session.id, mode)
+                const current = store.sessions.getSession(session.id)!
+                store.sessions.updateSessionMetadata(session.id, {
+                    ...current.metadata as Record<string, unknown>, name: 'Automatic title'
+                }, current.metadataVersion, 'default')
+                expect(store.sessions.getSession(session.id)?.metadata).toMatchObject({ name: 'sports', codexPromptMode: mode })
+            }
+        } finally {
+            engine.stop()
+            store.close()
+        }
+    })
 })
