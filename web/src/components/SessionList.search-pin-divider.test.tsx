@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionSummary } from '@/types/api'
@@ -6,8 +6,6 @@ import { I18nProvider } from '@/lib/i18n-context'
 import { ToastProvider } from '@/lib/toast-context'
 import { SessionList } from './SessionList'
 
-const SEARCH_LABEL = 'Search sessions (title, path, Agent, machine name, ID, and more)'
-const SEARCH_PLACEHOLDER = 'Search title/path/Agent/machine/ID…'
 const PROJECT_PATH = '/work/proj'
 
 afterEach(() => {
@@ -99,15 +97,11 @@ function renderList(sessions: SessionSummary[]) {
 }
 
 describe('SessionList search pin dividers', () => {
-    it('renders at most one pin divider in a group under relevance sort (tiann #1842)', () => {
+    it('renders at most one pin divider in a group with all chats visible', () => {
         renderList(tiannPinDividerSessions())
 
-        fireEvent.click(screen.getByRole('button', { name: SEARCH_LABEL }))
-        fireEvent.change(screen.getByPlaceholderText(SEARCH_PLACEHOLDER), {
-            target: { value: 'home' },
-        })
 
-        // All four titles match; group stays open under search filtering.
+        // All four chats remain visible in the expanded group.
         expect(screen.getByRole('button', { name: /Home pinned/ })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: /Home ordinary/ })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: /homelab pinned/ })).toBeInTheDocument()

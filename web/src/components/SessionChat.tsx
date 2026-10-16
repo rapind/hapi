@@ -36,8 +36,6 @@ import {
 import { createSerialAsyncQueue } from '@/lib/serialAsyncQueue'
 import { HappyComposer, type ComposerSendError } from '@/components/AssistantChat/HappyComposer'
 import {
-    isDictateHotkeyBlockedTarget,
-    isDictateToggleHotkey,
 } from '@/lib/composerDictateShortcut'
 import { codexModelAdvertisesFastTier, getEffectiveCodexServiceTier } from '@/components/AssistantChat/codexFastMode'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
@@ -771,7 +769,6 @@ function SessionChatInner(props: SessionChatProps) {
         if (isScratchlistParking) return
         setScratchlistMode((m) => !m)
     }, [isScratchlistParking])
-    const dictateHotkeyRef = useRef<(() => void) | null>(null)
     /**
      * Global keyboard shortcut: Ctrl/Cmd + Shift + S toggles scratchlist
      * mode (open/close drawer + flip composer routing).
@@ -805,26 +802,6 @@ function SessionChatInner(props: SessionChatProps) {
         window.addEventListener('keydown', onKeyDown)
         return () => window.removeEventListener('keydown', onKeyDown)
     }, [isScratchlistParking])
-    /**
-     * Global keyboard shortcut: Ctrl/Cmd + Shift + D toggles composer
-     * dictation (Settings → Voice mode: dictation) or voice assistant,
-     * using the same effective toggle as the mic / dictate buttons in
-     * HappyComposer. Skipped for dialog / single-line input targets;
-     * rich composer input is allowed (see isDictateHotkeyBlockedTarget).
-     */
-    useEffect(() => {
-        const onKeyDown = (e: globalThis.KeyboardEvent) => {
-            if (e.repeat) return
-            if (!isDictateToggleHotkey(e)) return
-            if (isDictateHotkeyBlockedTarget(e.target)) return
-            const invoke = dictateHotkeyRef.current
-            if (!invoke) return
-            e.preventDefault()
-            invoke()
-        }
-        window.addEventListener('keydown', onKeyDown)
-        return () => window.removeEventListener('keydown', onKeyDown)
-    }, [])
     /**
      * Global select-all takeover: see applyGlobalSelectAll. Bound at
      * window scope because the broken case is focus on the page body /
@@ -1278,7 +1255,8 @@ function SessionChatInner(props: SessionChatProps) {
         setModel,
         setModelReasoningEffort,
         setEffort,
-        setServiceTier
+        setServiceTier,
+        setCodexPromptMode
     } = useSessionActions(
         props.api,
         props.session.id,
@@ -1793,9 +1771,10 @@ function SessionChatInner(props: SessionChatProps) {
         // chat sends after scratchlist fallback".)
         const routedToScratchlist = shouldRouteToScratchlist(scratchlistMode, attachments, scheduledAt)
         const deliveryMode = resolveMessageDeliveryMode({
+            codexPromptMode: props.session.metadata?.codexPromptMode,
             agentFlavor,
             // Do not use assistant-ui's broader `isRunning` here: a
-            // child-agent run is not the Pi main session's steer target.
+            // child-agent run is not the main session's steer target.
             isSessionThinking: props.session.thinking,
             intent,
             scheduledAt,
@@ -1815,7 +1794,7 @@ function SessionChatInner(props: SessionChatProps) {
             updatePendingSchedule(null)
             setForceScrollToken((token) => token + 1)
         }
-    }, [agentFlavor, onSendForComposer, props.session.thinking, scratchlistMode, updatePendingSchedule])
+    }, [agentFlavor, onSendForComposer, props.session.metadata?.codexPromptMode, props.session.thinking, scratchlistMode, updatePendingSchedule])
 
     const attachmentAdapter = useMemo(() => {
         if (props.session.active && scratchlistMode) {
@@ -2066,6 +2045,8 @@ function SessionChatInner(props: SessionChatProps) {
                         collaborationMode={codexCollaborationModeSupported ? props.session.collaborationMode : undefined}
                         copilotAgentMode={agentFlavor === 'copilot' ? props.session.copilotAgentMode : undefined}
                         model={props.session.model}
+                        onCodexPromptModeChange={setCodexPromptMode}
+                        codexPromptMode={agentFlavor === 'codex' && !scratchlistMode ? (props.session.metadata?.codexPromptMode ?? 'queue') : undefined}
                         modelReasoningEffort={agentFlavor === 'codex' || agentFlavor === 'opencode' ? props.session.modelReasoningEffort : undefined}
                         effort={props.session.effort}
                         agentFlavor={agentFlavor}
@@ -2235,7 +2216,6 @@ function SessionChatInner(props: SessionChatProps) {
                         onScratchlistToggle={handleScratchlistToggle}
                         onParkScratchlist={onParkScratchlist}
                         onScratchlistParkingChange={setIsScratchlistParking}
-                        dictateHotkeyRef={dictateHotkeyRef}
                         sendError={props.sendError ?? null}
                         onClearSendError={handleClearSendError}
                         onSuppressSendErrorRestore={props.onSuppressSendErrorRestore}
