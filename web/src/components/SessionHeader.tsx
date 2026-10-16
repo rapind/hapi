@@ -306,7 +306,7 @@ export function SessionHeader(props: {
                     <button
                         type="button"
                         onClick={props.onBack}
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-hint)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-hint)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)] split:hidden"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
