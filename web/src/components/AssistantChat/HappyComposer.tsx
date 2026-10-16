@@ -21,15 +21,12 @@ import {
     useState
 } from 'react'
 import { useNarrowViewport } from '@/hooks/useNarrowViewport'
-import { shouldInvokeComposerDictateShortcut } from '@/lib/composerDictateShortcut'
-import { isRichComposerMentionsEnabled, resolveComposerPlaceholderKey } from '@/lib/composerSegments'
+import { isRichComposerMentionsEnabled } from '@/lib/composerSegments'
 import type { SessionMentionResolveResult } from '@/components/AssistantChat/RichComposerInput'
 import {
     RichComposerInput,
     type RichComposerInputHandle,
 } from '@/components/AssistantChat/RichComposerInput'
-import { useFue } from '@/lib/use-fue'
-import { FueCallout, FueDot } from '@/components/Fue'
 import type { AgentState, CodexCollaborationMode, PermissionMode, PiModelSummary } from '@/types/api'
 import type { Suggestion } from '@/hooks/useActiveSuggestions'
 import type { ConversationStatus } from '@/realtime/types'
@@ -65,8 +62,6 @@ import { getDisplayedCodexServiceTier } from './codexFastMode'
 import { getPiThinkingLevelOptions, getHighestThinkingLevel, isThinkingLevelSupported } from './piThinkingLevelOptions'
 import { groupModelsByProvider } from './piModelGroups'
 import type { ApiClient } from '@/api/client'
-import { useVoiceInputPreferences } from '@/hooks/useVoiceInputPreferences'
-import { useDictation } from '@/hooks/useDictation'
 import type { ComposerSendIntent } from '@/lib/messageDelivery'
 import type { MessageDeliveryMode } from '@hapi/protocol'
 import { moveAttachmentId, orderItemsById, reconcileAttachmentOrder, type AttachmentDropPosition } from '@/lib/attachmentOrder'
@@ -238,7 +233,7 @@ export function ModelEffortSettingsSection(props: {
                         controlsDisabled
                             ? 'cursor-not-allowed opacity-50'
                             : 'cursor-pointer hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-link)]'
-                    }`}
+                        }`}
                     onClick={onBack}
                     onMouseDown={(e) => e.preventDefault()}
                     aria-label={backLabel ?? t('misc.backToModelList')}
@@ -257,19 +252,19 @@ export function ModelEffortSettingsSection(props: {
                         type="button"
                         disabled={controlsDisabled}
                         className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                            controlsDisabled
+                                            controlsDisabled
                                 ? 'cursor-not-allowed opacity-50'
                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                        }`}
+                            }`}
                         onClick={() => onChange(option.value)}
                         onMouseDown={(e) => e.preventDefault()}
                     >
                         <div
                             className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                                isSelected
+                                                    isSelected
                                     ? 'border-[var(--app-link)]'
                                     : 'border-[var(--app-hint)]'
-                            }`}
+                                }`}
                         >
                             {isSelected && (
                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
@@ -371,8 +366,6 @@ export function HappyComposer(props: {
     ) => Promise<ScratchlistParkResult>
     /** Parent disables DragDropZone / scratchlist promote while park is in flight. */
     onScratchlistParkingChange?: (parking: boolean) => void
-    /** SessionChat binds Ctrl/Cmd+Shift+D; HappyComposer registers the effective voice toggle. */
-    dictateHotkeyRef?: MutableRefObject<(() => void) | null>
     // Set when the most recent send failed (4xx/5xx/network).  The composer
     // restores the original text once per `sendError.id` and renders an
     // inline error affordance until the user dismisses or starts editing.
@@ -444,10 +437,6 @@ export function HappyComposer(props: {
         terminalUnsupported = false,
         autocompletePrefixes = ['@', '/', '$'],
         autocompleteSuggestions = defaultSuggestionHandler,
-        voiceStatus = 'disconnected',
-        voiceMicMuted = false,
-        onVoiceToggle,
-        onVoiceMicToggle,
         pendingSchedule: pendingScheduleProp,
         onSchedule: onScheduleProp,
         onClearSchedule: onClearScheduleProp,
@@ -492,41 +481,6 @@ export function HappyComposer(props: {
     const orderedAttachments = orderItemsById(attachments, orderedAttachmentIds)
     const threadIsRunning = useAuiState((s) => s.thread.isRunning)
     const threadIsDisabled = useAuiState((s) => s.thread.isDisabled)
-    const composerTextRef = useRef(composerText)
-    composerTextRef.current = composerText
-    const getCurrentComposerText = useCallback(() => composerTextRef.current, [])
-    const setComposerText = useCallback((text: string) => api.composer().setText(text), [api])
-    const voiceInput = useVoiceInputPreferences(props.voiceTranscriptionApi ?? null)
-    const dictationConfig = useMemo(() => ({
-        api: props.voiceTranscriptionApi ?? null,
-        provider: voiceInput.provider,
-        mode: voiceInput.transcriptionMode,
-        getCurrentText: getCurrentComposerText,
-        onTextChange: setComposerText
-    }), [
-        props.voiceTranscriptionApi,
-        voiceInput.provider,
-        voiceInput.transcriptionMode,
-        getCurrentComposerText,
-        setComposerText
-    ])
-    const dictation = useDictation(dictationConfig)
-    const dictationActive = voiceInput.voiceMode === 'dictation'
-    const effectiveVoiceStatus = dictationActive ? dictation.status : voiceStatus
-    const effectiveVoiceToggle = dictationActive
-        ? (dictation.supported ? dictation.toggle : undefined)
-        : onVoiceToggle
-    const previousVoiceModeRef = useRef(voiceInput.voiceMode)
-    useEffect(() => {
-        if (previousVoiceModeRef.current === voiceInput.voiceMode) return
-        previousVoiceModeRef.current = voiceInput.voiceMode
-        if (dictationActive && (voiceStatus === 'connected' || voiceStatus === 'connecting')) {
-            onVoiceToggle?.()
-        } else if (!dictationActive && (dictation.status === 'connected' || dictation.status === 'connecting')) {
-            void dictation.toggle()
-        }
-    }, [dictationActive, voiceInput.voiceMode, voiceStatus, onVoiceToggle, dictation.status, dictation.toggle])
-
     const [isParkingScratchlist, setIsParkingScratchlist] = useState(false)
     const parkInFlightRef = useRef(false)
     const onScratchlistParkingChange = props.onScratchlistParkingChange
@@ -564,7 +518,6 @@ export function HappyComposer(props: {
     const [settingsSection, setSettingsSection] = useState<'model' | 'effort' | null>(null)
     const [isAborting, setIsAborting] = useState(false)
     const [isSwitching, setIsSwitching] = useState(false)
-    const [showContinueHint, setShowContinueHint] = useState(false)
     // pendingSchedule is controlled externally when onSchedule prop is provided; otherwise local state
     const [pendingScheduleLocal, setPendingScheduleLocal] = useState<PendingSchedule | null>(null)
     const isControlled = onScheduleProp !== undefined
@@ -599,7 +552,6 @@ export function HappyComposer(props: {
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const richInputRef = useRef<RichComposerInputHandle>(null)
-    const richComposerFueAnchorRef = useRef<HTMLDivElement>(null)
     const settingsButtonRef = useRef<HTMLButtonElement>(null)
     const modelValueButtonRef = useRef<HTMLButtonElement>(null)
     const effortValueButtonRef = useRef<HTMLButtonElement>(null)
@@ -620,21 +572,6 @@ export function HappyComposer(props: {
     // Kill-switch only (?richMentions=0 / localStorage=0 / VITE=false). Mount-time
     // read — hard reload required, so no per-keystroke localStorage/URL parse.
     const [richMentionsEnabled] = useState(() => isRichComposerMentionsEnabled())
-    const {
-        status: richComposerFueStatus,
-        engage: engageRichComposerFue,
-        dismiss: dismissRichComposerFue,
-    } = useFue('rich-composer-mentions')
-    const prevControlledByUser = useRef(controlledByUser)
-
-    // Composer itself is the affordance: open the FUE callout once the rich
-    // path is live. Relying on DOM focus alone is flaky (programmatic
-    // autofocus / Playwright headless often skip the focus event).
-    useEffect(() => {
-        if (!richMentionsEnabled) return
-        engageRichComposerFue()
-    }, [richMentionsEnabled, engageRichComposerFue])
-
     const recordUserEdit = useCallback(() => {
         userEditGenerationRef.current += 1
     }, [])
@@ -767,11 +704,11 @@ export function HappyComposer(props: {
         }
         const interactionChanged = guard
             ? userEditGenerationRef.current !== guard.userEditGeneration
-                || userScheduleGenerationRef.current !== guard.userScheduleGeneration
-                || userAttachmentGenerationRef.current !== guard.userAttachmentGeneration
+            || userScheduleGenerationRef.current !== guard.userScheduleGeneration
+            || userAttachmentGenerationRef.current !== guard.userAttachmentGeneration
             : userEditGenerationRef.current !== 0
-                || userScheduleGenerationRef.current !== 0
-                || userAttachmentGenerationRef.current !== 0
+            || userScheduleGenerationRef.current !== 0
+            || userAttachmentGenerationRef.current !== 0
         const textOrAttachmentChanged = composerText.length !== 0 || attachments.length !== 0
 
         if (interactionChanged || textOrAttachmentChanged) {
@@ -850,17 +787,6 @@ export function HappyComposer(props: {
             return { text: composerText, selection: { start: newPos, end: newPos } }
         })
     }, [composerText, richMentionsEnabled])
-
-    // Track one-time "continue" hint after switching from local to remote.
-    useEffect(() => {
-        if (prevControlledByUser.current === true && controlledByUser === false) {
-            setShowContinueHint(true)
-        }
-        if (controlledByUser) {
-            setShowContinueHint(false)
-        }
-        prevControlledByUser.current = controlledByUser
-    }, [controlledByUser])
 
     const { haptic: platformHaptic, isTouch } = usePlatform()
     const { isStandalone, isIOS } = usePWAInstall()
@@ -1110,7 +1036,7 @@ export function HappyComposer(props: {
                         label: option.name ?? option.value
                     }))
                 ]
-            : getClaudeComposerEffortOptions(effort),
+                : getClaudeComposerEffortOptions(effort),
         [agentFlavor, effort, selectedPiModel, availableEffortOptions]
     )
     const permissionModes = useMemo(
@@ -1289,14 +1215,12 @@ export function HappyComposer(props: {
                 if ((e.ctrlKey || e.metaKey) && !e.altKey && canSend) {
                     e.preventDefault()
                     flushAndSend()
-                    setShowContinueHint(false)
                 }
                 return
             }
             e.preventDefault()
             if (!e.ctrlKey && !e.altKey && !e.metaKey && canSend) {
                 flushAndSend()
-                setShowContinueHint(false)
             }
             return
         }
@@ -1321,14 +1245,6 @@ export function HappyComposer(props: {
         }
 
         if (key === 'Escape') {
-            // FUE callout also listens on window; dismiss it first so Escape
-            // does not also abort a running thread or collapse the editor.
-            if (richComposerFueStatus === 'engaging') {
-                e.preventDefault()
-                e.stopPropagation()
-                dismissRichComposerFue()
-                return
-            }
             const action = getComposerEscapeAction({
                 hasSuggestions: suggestions.length > 0,
                 threadIsRunning,
@@ -1368,8 +1284,6 @@ export function HappyComposer(props: {
         haptic,
         composerEnterBehavior,
         richMentionsEnabled,
-        richComposerFueStatus,
-        dismissRichComposerFue,
         flushAndSend,
         isExpanded,
         handleExpandedToggle,
@@ -1541,7 +1455,6 @@ export function HappyComposer(props: {
         if (!attachmentsReady) {
             return
         }
-        setShowContinueHint(false)
     }, [attachmentsReady])
 
     const handlePermissionChange = useCallback((mode: PermissionMode) => {
@@ -1631,74 +1544,37 @@ export function HappyComposer(props: {
         || showFastModeSettings
     )
     const showAbortButton = true
-    const voiceEnabled = Boolean(effectiveVoiceToggle)
     const routesToScratchlist = (props.scratchlistMode ?? false) && pendingSchedule == null
     const primaryFillHeight = isComposerPrimaryFillHeight({
         canSend,
-        voiceEnabled,
-        voiceStatus: effectiveVoiceStatus,
+        voiceEnabled: false,
+        voiceStatus: 'disconnected',
         routesToScratchlist,
         expanded: isExpanded,
     })
 
-    const invokeDictateHotkey = useCallback(() => {
-        if (!shouldInvokeComposerDictateShortcut({
-            controlsDisabled,
-            voiceEnabled,
-            dictationActive,
-            voiceStatus: effectiveVoiceStatus,
-            canSend,
-            routesToScratchlist,
-        })) {
-            return
-        }
-        effectiveVoiceToggle?.()
-    }, [
-        controlsDisabled,
-        voiceEnabled,
-        dictationActive,
-        effectiveVoiceStatus,
-        canSend,
-        routesToScratchlist,
-        effectiveVoiceToggle,
-    ])
-
-    useEffect(() => {
-        const ref = props.dictateHotkeyRef
-        if (!ref) return
-        ref.current = invokeDictateHotkey
-        return () => {
-            ref.current = null
-        }
-    }, [props.dictateHotkeyRef, invokeDictateHotkey])
-
-    // Generic model/effort value buttons. The current value label doubles as
-    // the button caption; clicking opens the settings sheet. Hidden on narrow
-    // viewports where only the settings button remains.
+    // The model name opens the full settings sheet at every viewport width.
     const isNarrowViewport = useNarrowViewport()
     // Pi turns run for minutes with thread.isDisabled set the whole time, so
     // Pi keeps its model/effort controls live mid-turn (#1442) — the generic
     // disable rule (controlsDisabled) would lock them for the entire turn.
     const modelEffortControlsDisabled = agentFlavor === 'pi' ? configurationControlsDisabled : controlsDisabled
     const modelValueLabel = useMemo(() => {
-        if (isNarrowViewport) return undefined
-        if (!onModelChange || !supportsModelChange(agentFlavor)) return undefined
-        // Pi models come from the dynamic piModels catalog; show the
-        // provider-qualified selection name. No button until the catalog
-        // resolves: a bare session model id has no provider and the sheet
-        // would have no Model section to open anyway.
+        if (!showSettingsButton) return undefined
+        if (!onModelChange || !supportsModelChange(agentFlavor)) return model ?? t('misc.model')
+        // An unresolved Pi catalog still leaves permissions reachable; the
+        // sheet hides model changes until it can resolve the provider.
         if (agentFlavor === 'pi') {
-            if (!selectedPiModel) return undefined
-            return selectedPiModel.name ?? selectedPiModel.modelId
+            return selectedPiModel?.name ?? selectedPiModel?.modelId ?? model ?? t('misc.model')
         }
-        if (modelOptions.length === 0) return undefined
+        if (modelOptions.length === 0) return model ?? t('misc.model')
         const rawKey = selectedModelBase !== undefined ? selectedModelBase : model
         const normalizedKey = agentFlavor === 'cursor'
             ? (!rawKey || rawKey === 'auto' || rawKey === 'default' || rawKey === 'default[]' ? 'auto' : rawKey)
             : (!rawKey || rawKey === 'auto' || rawKey === 'default' ? null : rawKey)
         const option = modelOptions.find((candidate) => candidate.value === normalizedKey)
         return option?.label ?? rawKey ?? undefined
-    }, [isNarrowViewport, onModelChange, agentFlavor, selectedPiModel, model, modelOptions, selectedModelBase])
+    }, [showSettingsButton, onModelChange, agentFlavor, selectedPiModel, model, modelOptions, selectedModelBase, t])
     const effortValueLabel = useMemo(() => {
         if (isNarrowViewport) return undefined
         if (!onEffortChange || !supportsEffort(agentFlavor)) return undefined
@@ -1717,15 +1593,9 @@ export function HappyComposer(props: {
         return option?.label ?? (effort ? effort : undefined)
     }, [isNarrowViewport, onEffortChange, agentFlavor, selectedPiModel, effort, claudeEffortOptions])
 
-    // Wrapper for DOM onClick consumers: never leak the MouseEvent into the
-    // `section` parameter (the gear must always open the full sheet).
-    const handleGearToggle = useCallback(() => {
-        handleSettingsToggle(null)
-    }, [handleSettingsToggle])
-
     const handleModelValueToggle = useCallback(() => {
         if (modelEffortControlsDisabled) return
-        handleSettingsToggle('model')
+        handleSettingsToggle(null)
     }, [modelEffortControlsDisabled, handleSettingsToggle])
 
     const handleEffortValueToggle = useCallback(() => {
@@ -1772,36 +1642,36 @@ export function HappyComposer(props: {
                                             {group.models.map((piModel) => {
                                                 const piRowSelected = piSelectedModel
                                                     ? piSelectedModel.provider === piModel.provider
-                                                        && piSelectedModel.modelId === piModel.modelId
+                                                    && piSelectedModel.modelId === piModel.modelId
                                                     : model === piModel.modelId
                                                 return (
-                                                <button
-                                                    key={`${piModel.provider}:${piModel.modelId}`}
-                                                    type="button"
-                                                    disabled={modelEffortControlsDisabled}
-                                                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                                                        modelEffortControlsDisabled
-                                                            ? 'cursor-not-allowed opacity-50'
-                                                            : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                                    }`}
-                                                    onClick={() => handleModelChange({ provider: piModel.provider, modelId: piModel.modelId })}
-                                                    onMouseDown={(e) => e.preventDefault()}
-                                                >
-                                                    <div
-                                                        className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                                                            piRowSelected
-                                                                ? 'border-[var(--app-link)]'
-                                                                : 'border-[var(--app-hint)]'
-                                                    }`}
+                                                    <button
+                                                        key={`${piModel.provider}:${piModel.modelId}`}
+                                                        type="button"
+                                                        disabled={modelEffortControlsDisabled}
+                                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                            modelEffortControlsDisabled
+                                                                ? 'cursor-not-allowed opacity-50'
+                                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                                            }`}
+                                                        onClick={() => handleModelChange({ provider: piModel.provider, modelId: piModel.modelId })}
+                                                        onMouseDown={(e) => e.preventDefault()}
                                                     >
-                                                        {piRowSelected && (
-                                                            <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
-                                                        )}
-                                                    </div>
-                                                    <span className={piRowSelected ? 'text-[var(--app-link)]' : ''}>
-                                                        {piModel.name ?? piModel.modelId}
-                                                    </span>
-                                                </button>
+                                                        <div
+                                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                                                            piRowSelected
+                                                                    ? 'border-[var(--app-link)]'
+                                                                    : 'border-[var(--app-hint)]'
+                                                                }`}
+                                                        >
+                                                            {piRowSelected && (
+                                                                <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
+                                                            )}
+                                                        </div>
+                                                        <span className={piRowSelected ? 'text-[var(--app-link)]' : ''}>
+                                                            {piModel.name ?? piModel.modelId}
+                                                        </span>
+                                                    </button>
                                                 )
                                             })}
                                         </div>
@@ -1811,39 +1681,39 @@ export function HappyComposer(props: {
                                             ? selectedModelBase === option.value
                                             : model === option.value
                                         return (
-                                        <button
-                                            key={option.value ?? 'auto'}
-                                            type="button"
-                                            disabled={modelEffortControlsDisabled}
-                                            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                                                modelEffortControlsDisabled
-                                                    ? 'cursor-not-allowed opacity-50'
-                                                    : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                            }`}
-                                            onClick={() => {
-                                                if (resolveModelVariantsForBase) {
-                                                    handleCursorModelRowClick(option.value)
-                                                } else {
-                                                    handleModelChange(option.value)
-                                                }
-                                            }}
-                                            onMouseDown={(e) => e.preventDefault()}
-                                        >
-                                            <div
-                                                className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                                                    isSelected
-                                                        ? 'border-[var(--app-link)]'
-                                                        : 'border-[var(--app-hint)]'
-                                                }`}
+                                            <button
+                                                key={option.value ?? 'auto'}
+                                                type="button"
+                                                disabled={modelEffortControlsDisabled}
+                                                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                            modelEffortControlsDisabled
+                                                        ? 'cursor-not-allowed opacity-50'
+                                                        : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
+                                                    }`}
+                                                onClick={() => {
+                                                    if (resolveModelVariantsForBase) {
+                                                        handleCursorModelRowClick(option.value)
+                                                    } else {
+                                                        handleModelChange(option.value)
+                                                    }
+                                                }}
+                                                onMouseDown={(e) => e.preventDefault()}
                                             >
-                                                {isSelected && (
-                                                    <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
-                                                )}
-                                            </div>
-                                            <span className={isSelected ? 'text-[var(--app-link)]' : ''}>
-                                                {option.label}
-                                            </span>
-                                        </button>
+                                                <div
+                                                    className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                                                    isSelected
+                                                            ? 'border-[var(--app-link)]'
+                                                            : 'border-[var(--app-hint)]'
+                                                        }`}
+                                                >
+                                                    {isSelected && (
+                                                        <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
+                                                    )}
+                                                </div>
+                                                <span className={isSelected ? 'text-[var(--app-link)]' : ''}>
+                                                    {option.label}
+                                                </span>
+                                            </button>
                                         )
                                     })}
                             </div>
@@ -1890,7 +1760,7 @@ export function HappyComposer(props: {
                                             controlsDisabled
                                                 ? 'cursor-not-allowed opacity-50'
                                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                        }`}
+                                            }`}
                                         onClick={() => handleModelReasoningEffortChange(option.value)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
@@ -1899,7 +1769,7 @@ export function HappyComposer(props: {
                                                 modelReasoningEffort === option.value
                                                     ? 'border-[var(--app-link)]'
                                                     : 'border-[var(--app-hint)]'
-                                            }`}
+                                                }`}
                                         >
                                             {modelReasoningEffort === option.value && (
                                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
@@ -1931,7 +1801,7 @@ export function HappyComposer(props: {
                                             modelEffortControlsDisabled
                                                 ? 'cursor-not-allowed opacity-50'
                                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                        }`}
+                                            }`}
                                         onClick={() => handleEffortChange(
                                             agentFlavor === 'pi' && effort === option.value ? null : option.value
                                         )}
@@ -1942,7 +1812,7 @@ export function HappyComposer(props: {
                                                 effort === option.value
                                                     ? 'border-[var(--app-link)]'
                                                     : 'border-[var(--app-hint)]'
-                                            }`}
+                                                }`}
                                         >
                                             {effort === option.value && (
                                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
@@ -1974,7 +1844,7 @@ export function HappyComposer(props: {
                                             controlsDisabled
                                                 ? 'cursor-not-allowed opacity-50'
                                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                        }`}
+                                            }`}
                                         onClick={() => handlePermissionChange(option.mode)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
@@ -1983,7 +1853,7 @@ export function HappyComposer(props: {
                                                 permissionMode === option.mode
                                                     ? 'border-[var(--app-link)]'
                                                     : 'border-[var(--app-hint)]'
-                                            }`}
+                                                }`}
                                         >
                                             {permissionMode === option.mode && (
                                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
@@ -2015,7 +1885,7 @@ export function HappyComposer(props: {
                                             controlsDisabled
                                                 ? 'cursor-not-allowed opacity-50'
                                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                        }`}
+                                            }`}
                                         onClick={() => handleServiceTierChange(option.value)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
@@ -2024,7 +1894,7 @@ export function HappyComposer(props: {
                                                 displayedServiceTier === option.value
                                                     ? 'border-[var(--app-link)]'
                                                     : 'border-[var(--app-hint)]'
-                                            }`}
+                                                }`}
                                         >
                                             {displayedServiceTier === option.value && (
                                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
@@ -2056,7 +1926,7 @@ export function HappyComposer(props: {
                                             controlsDisabled
                                                 ? 'cursor-not-allowed opacity-50'
                                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                        }`}
+                                            }`}
                                         onClick={() => handleCollaborationChange(option.mode)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
@@ -2065,7 +1935,7 @@ export function HappyComposer(props: {
                                                 collaborationMode === option.mode
                                                     ? 'border-[var(--app-link)]'
                                                     : 'border-[var(--app-hint)]'
-                                            }`}
+                                                }`}
                                         >
                                             {collaborationMode === option.mode && (
                                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
@@ -2093,7 +1963,7 @@ export function HappyComposer(props: {
                                             controlsDisabled
                                                 ? 'cursor-not-allowed opacity-50'
                                                 : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                        }`}
+                                            }`}
                                         onClick={() => handleCopilotAgentModeChange(option.mode)}
                                         onMouseDown={(e) => e.preventDefault()}
                                     >
@@ -2102,7 +1972,7 @@ export function HappyComposer(props: {
                                                 copilotAgentMode === option.mode
                                                     ? 'border-[var(--app-link)]'
                                                     : 'border-[var(--app-hint)]'
-                                            }`}
+                                                }`}
                                         >
                                             {copilotAgentMode === option.mode && (
                                                 <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
@@ -2116,7 +1986,7 @@ export function HappyComposer(props: {
                             </div>
                         ) : null}
 
-                        
+
                     </FloatingOverlay>
                 </div>
             )
@@ -2210,253 +2080,206 @@ export function HappyComposer(props: {
 
     return (
         <ComposerParkingContext.Provider value={isParkingScratchlist}>
-        <div className={shellClassName} data-testid="composer-shell" data-expanded={isExpanded || undefined}>
-            <div className={innerClassName}>
-                <ComposerPrimitive.Root className={rootClassName} onSubmit={handleSubmit}>
-                    {overlays}
+            <div className={shellClassName} data-testid="composer-shell" data-expanded={isExpanded || undefined}>
+                <div className={innerClassName}>
+                    <ComposerPrimitive.Root className={rootClassName} onSubmit={handleSubmit}>
+                        {overlays}
 
-                    <StatusBar
-                        active={active}
-                        thinking={thinking}
-                        agentState={agentState}
-                        backgroundTaskCount={backgroundTaskCount}
-                        contextSize={contextSize}
-                        contextCacheRead={contextCacheRead}
-                        contextWindow={contextWindow}
-                        contextModel={contextModel}
-                        model={model}
-                        codexPromptMode={props.codexPromptMode}
-                        onCodexPromptModeChange={props.onCodexPromptModeChange}
-                        modelReasoningEffort={modelReasoningEffort}
-                        effort={effort}
-                        serviceTier={serviceTier}
-                        permissionMode={permissionMode}
-                        collaborationMode={collaborationMode}
-                        copilotAgentMode={copilotAgentMode}
-                        agentFlavor={agentFlavor}
-                        voiceStatus={effectiveVoiceStatus}
-                    />
+                        <StatusBar
+                            active={active}
+                            thinking={thinking}
+                            agentState={agentState}
+                            backgroundTaskCount={backgroundTaskCount}
+                            contextSize={contextSize}
+                            contextCacheRead={contextCacheRead}
+                            contextWindow={contextWindow}
+                            contextModel={contextModel}
+                            model={model}
+                            codexPromptMode={props.codexPromptMode}
+                            onCodexPromptModeChange={props.onCodexPromptModeChange}
+                            modelReasoningEffort={modelReasoningEffort}
+                            effort={effort}
+                            serviceTier={serviceTier}
+                            permissionMode={permissionMode}
+                            collaborationMode={collaborationMode}
+                            copilotAgentMode={copilotAgentMode}
+                            agentFlavor={agentFlavor}
+                            voiceStatus="disconnected"
+                        />
 
-                    {dictationActive && dictation.partialTranscript ? (
-                        <div
-                            role="status"
-                            aria-live="polite"
-                            className="mb-2 max-h-20 overflow-y-auto rounded-md bg-[var(--app-subtle-bg)] px-3 py-2 text-sm text-[var(--app-fg)]"
-                        >
-                            {dictation.partialTranscript}
-                        </div>
-                    ) : null}
-
-                    {dictationActive && dictation.error ? (
-                        <div role="alert" className="mb-2 rounded-md bg-[var(--app-subtle-bg)] px-3 py-2 text-sm text-red-600">
-                            {dictation.error}
-                        </div>
-                    ) : null}
-
-                    {sendError ? (
-                        <div
-                            role="alert"
-                            data-testid="composer-send-error"
-                            className="mb-2 flex items-center justify-between gap-3 rounded-md bg-[var(--app-subtle-bg)] px-3 py-2 text-sm text-red-600"
-                        >
-                            <span className="flex-1">{sendError.message}</span>
-                            {sendError.action ? (
-                                <button
-                                    type="button"
-                                    data-testid="composer-send-error-action"
-                                    onClick={sendError.action.onClick}
-                                    disabled={sendError.action.pending}
-                                    className="shrink-0 rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {sendError.action.label}
-                                </button>
-                            ) : null}
-                        </div>
-                    ) : null}
-
-                    <div
-                        className={`flex overflow-hidden rounded-[20px] bg-[var(--app-secondary-bg)] ${
-                            isExpanded ? 'min-h-0 flex-1' : ''
-                        } ${
-                            sendError ? 'ring-1 ring-red-500' : ''
-                        }`}
-                        data-testid="composer-card"
-                    >
-                        <div className={`flex min-w-0 flex-1 flex-col ${
-                            isExpanded ? 'min-h-0' : ''
-                        }`}>
-                            {attachments.length > 0 ? (
-                                <div className={`flex flex-wrap gap-2 px-4 pt-3 ${
-                                    isExpanded ? 'max-h-[35%] shrink-0 overflow-y-auto' : ''
-                                }`}>
-                                    <SortableComposerAttachments
-                                        attachments={attachments}
-                                        orderedAttachmentIds={orderedAttachmentIds}
-                                        disabled={controlsDisabled}
-                                        onReorder={handleAttachmentReorder}
-                                    />
-                                </div>
-                            ) : null}
-
-                            <div className={`flex px-4 py-3 ${
-                                isExpanded ? 'min-h-0 flex-1 items-stretch' : 'items-center'
-                            }`}>
-                                {richMentionsEnabled ? (
-                                    <div
-                                        ref={richComposerFueAnchorRef}
-                                        className="relative flex min-w-0 flex-1"
-                                        data-testid="rich-composer-fue-anchor"
+                        {sendError ? (
+                            <div
+                                role="alert"
+                                data-testid="composer-send-error"
+                                className="mb-2 flex items-center justify-between gap-3 rounded-md bg-[var(--app-subtle-bg)] px-3 py-2 text-sm text-red-600"
+                            >
+                                <span className="flex-1">{sendError.message}</span>
+                                {sendError.action ? (
+                                    <button
+                                        type="button"
+                                        data-testid="composer-send-error-action"
+                                        onClick={sendError.action.onClick}
+                                        disabled={sendError.action.pending}
+                                        className="shrink-0 rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
-                                        <RichComposerInput
-                                            ref={richInputRef}
-                                            value={composerText}
-                                            autoFocus={!controlsDisabled && !isTouch}
-                                            placeholder={t(resolveComposerPlaceholderKey({
-                                                richMentionsEnabled: true,
-                                                showContinueHint,
-                                            }))}
+                                        {sendError.action.label}
+                                    </button>
+                                ) : null}
+                            </div>
+                        ) : null}
+
+                        <div
+                            className={`flex overflow-hidden rounded-[20px] bg-[var(--app-secondary-bg)] ${
+                            isExpanded ? 'min-h-0 flex-1' : ''
+                                } ${
+                            sendError ? 'ring-1 ring-red-500' : ''
+                                }`}
+                            data-testid="composer-card"
+                        >
+                            <div className={`flex min-w-0 flex-1 flex-col ${
+                            isExpanded ? 'min-h-0' : ''
+                                }`}>
+                                {attachments.length > 0 ? (
+                                    <div className={`flex flex-wrap gap-2 px-4 pt-3 ${
+                                    isExpanded ? 'max-h-[35%] shrink-0 overflow-y-auto' : ''
+                                        }`}>
+                                        <SortableComposerAttachments
+                                            attachments={attachments}
+                                            orderedAttachmentIds={orderedAttachmentIds}
                                             disabled={controlsDisabled}
-                                            onValueChange={handleRichValueChange}
-                                            onMirrorChange={handleRichMirrorChange}
+                                            onReorder={handleAttachmentReorder}
+                                        />
+                                    </div>
+                                ) : null}
+
+                                <div className={`flex px-4 py-3 ${
+                                isExpanded ? 'min-h-0 flex-1 items-stretch' : 'items-center'
+                                    }`}>
+                                    {richMentionsEnabled ? (
+                                        <div
+                                            className="relative flex min-w-0 flex-1"
+                                            data-testid="rich-composer-fue-anchor"
+                                        >
+                                            <RichComposerInput
+                                                ref={richInputRef}
+                                                value={composerText}
+                                                autoFocus={!controlsDisabled && !isTouch}
+                                                placeholder=""
+                                                disabled={controlsDisabled}
+                                                onValueChange={handleRichValueChange}
+                                                onMirrorChange={handleRichMirrorChange}
+                                                onKeyDown={handleKeyDown}
+                                                onPaste={handlePaste}
+                                                resolveSessionMentionTooltip={resolveSessionMentionTooltip}
+                                                onEdit={handleRichEdit}
+                                                className={editorClassName}
+                                            />
+                                        </div>
+                                    ) : isExpanded ? (
+                                        <ComposerPrimitive.Input
+                                            asChild
+                                            ref={textareaRef}
+                                            autoFocus={!controlsDisabled && !isTouch}
+                                            submitOnEnter={false}
+                                            cancelOnEscape={false}
+                                            onChange={handleChange}
+                                            onSelect={handleSelect}
                                             onKeyDown={handleKeyDown}
                                             onPaste={handlePaste}
-                                            onFocus={() => engageRichComposerFue()}
-                                            resolveSessionMentionTooltip={resolveSessionMentionTooltip}
-                                            onEdit={handleRichEdit}
-                                            className={editorClassName}
-                                        />
-                                        {richComposerFueStatus !== 'acknowledged' ? (
-                                            <FueDot
-                                                pulsing={richComposerFueStatus === 'unseen'}
-                                                ariaLabel={t('fue.newFeatureDot')}
+                                        >
+                                            <textarea
+                                                placeholder=""
+                                                disabled={controlsDisabled}
+                                                className="h-full min-h-0 flex-1 resize-none overflow-y-auto bg-transparent text-base leading-snug text-[var(--app-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                             />
-                                        ) : null}
-                                    </div>
-                                ) : isExpanded ? (
-                                    <ComposerPrimitive.Input
-                                        asChild
-                                        ref={textareaRef}
-                                        autoFocus={!controlsDisabled && !isTouch}
-                                        submitOnEnter={false}
-                                        cancelOnEscape={false}
-                                        onChange={handleChange}
-                                        onSelect={handleSelect}
-                                        onKeyDown={handleKeyDown}
-                                        onPaste={handlePaste}
-                                    >
-                                        <textarea
-                                            placeholder={t(resolveComposerPlaceholderKey({
-                                                richMentionsEnabled: false,
-                                                showContinueHint,
-                                            }))}
+                                        </ComposerPrimitive.Input>
+                                    ) : (
+                                        <ComposerPrimitive.Input
+                                            ref={textareaRef}
+                                            autoFocus={!controlsDisabled && !isTouch}
+                                            placeholder=""
                                             disabled={controlsDisabled}
-                                            className="h-full min-h-0 flex-1 resize-none overflow-y-auto bg-transparent text-base leading-snug text-[var(--app-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                            maxRows={5}
+                                            submitOnEnter={false}
+                                            cancelOnEscape={false}
+                                            onChange={handleChange}
+                                            onSelect={handleSelect}
+                                            onKeyDown={handleKeyDown}
+                                            onPaste={handlePaste}
+                                            className="flex-1 resize-none bg-transparent text-base leading-snug text-[var(--app-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                         />
-                                    </ComposerPrimitive.Input>
-                                ) : (
-                                    <ComposerPrimitive.Input
-                                        ref={textareaRef}
-                                        autoFocus={!controlsDisabled && !isTouch}
-                                        placeholder={t(resolveComposerPlaceholderKey({
-                                            richMentionsEnabled: false,
-                                            showContinueHint,
-                                        }))}
-                                        disabled={controlsDisabled}
-                                        maxRows={5}
-                                        submitOnEnter={false}
-                                        cancelOnEscape={false}
-                                        onChange={handleChange}
-                                        onSelect={handleSelect}
-                                        onKeyDown={handleKeyDown}
-                                        onPaste={handlePaste}
-                                        className="flex-1 resize-none bg-transparent text-base leading-snug text-[var(--app-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                    />
-                                )}
-                            </div>
-                            {richMentionsEnabled && richComposerFueStatus === 'engaging' ? (
-                                <FueCallout
-                                    title={t('richComposer.fueTitle')}
-                                    body={t('richComposer.fueBody')}
-                                    onDismiss={dismissRichComposerFue}
-                                    dismissLabel={t('fue.gotIt')}
-                                    closeAriaLabel={t('fue.closeAriaLabel')}
-                                    anchorRef={richComposerFueAnchorRef}
-                                    width={288}
+                                    )}
+                                </div>
+                                <ComposerButtons
+                                    canSend={canSend}
+                                    controlsDisabled={controlsDisabled}
+                                    showSettingsButton={showSettingsButton}
+                                    settingsButtonRef={settingsButtonRef}
+                                    settingsDisabled={modelEffortControlsDisabled}
+                                    modelValueButtonRef={modelValueButtonRef}
+                                    effortValueButtonRef={effortValueButtonRef}
+                                    onSettingsToggle={handleModelValueToggle}
+                                    expanded={isExpanded}
+                                    onExpandedToggle={handleExpandedToggle}
+                                    showTerminalButton={showTerminalButton}
+                                    terminalDisabled={terminalDisabled}
+                                    terminalLabel={terminalLabel}
+                                    onTerminal={onTerminal ?? (() => {})}
+                                    showAbortButton={showAbortButton}
+                                    abortDisabled={abortDisabled}
+                                    isAborting={isAborting}
+                                    onAbort={handleAbort}
+                                    showSwitchButton={showSwitchButton}
+                                    switchDisabled={switchDisabled}
+                                    isSwitching={isSwitching}
+                                    onSwitch={handleSwitch}
+                                    voiceEnabled={false}
+                                    dictationEnabled={false}
+                                    voiceStatus="disconnected"
+                                    voiceMicMuted={false}
+                                    onVoiceToggle={() => { }}
+                                    onSend={handleSend}
+                                    pendingSchedule={pendingSchedule}
+                                    onSchedule={handleUserSchedule}
+                                    onClearSchedule={onUserClearSchedule}
+                                    hasAttachments={blocksScheduling}
+                                    modelValueLabel={modelValueLabel}
+                                    modelValueDisabled={modelEffortControlsDisabled}
+                                    modelValueOpen={showSettings && settingsSection !== 'effort'}
+                                    onModelValueToggle={handleModelValueToggle}
+                                    effortValueLabel={effortValueLabel}
+                                    effortValueDisabled={modelEffortControlsDisabled}
+                                    effortValueOpen={showSettings && settingsSection !== 'model'}
+                                    onEffortValueToggle={handleEffortValueToggle}
+                                    scratchlistMode={props.scratchlistMode}
+                                    scratchlistCount={props.scratchlistCount}
+                                    onScratchlistToggle={props.onScratchlistToggle}
+                                    omitPrimaryButton
                                 />
-                            ) : null}
-
-                            <ComposerButtons
-                                canSend={canSend}
-                                controlsDisabled={controlsDisabled}
-                                showSettingsButton={showSettingsButton}
-                                settingsButtonRef={settingsButtonRef}
-                                settingsDisabled={modelEffortControlsDisabled}
-                                modelValueButtonRef={modelValueButtonRef}
-                                effortValueButtonRef={effortValueButtonRef}
-                                onSettingsToggle={handleGearToggle}
-                                expanded={isExpanded}
-                                onExpandedToggle={handleExpandedToggle}
-                                showTerminalButton={showTerminalButton}
-                                terminalDisabled={terminalDisabled}
-                                terminalLabel={terminalLabel}
-                                onTerminal={onTerminal ?? (() => {})}
-                                showAbortButton={showAbortButton}
-                                abortDisabled={abortDisabled}
-                                isAborting={isAborting}
-                                onAbort={handleAbort}
-                                showSwitchButton={showSwitchButton}
-                                switchDisabled={switchDisabled}
-                                isSwitching={isSwitching}
-                                onSwitch={handleSwitch}
-                                voiceEnabled={voiceEnabled}
-                                dictationEnabled={dictationActive}
-                                voiceStatus={effectiveVoiceStatus}
-                                voiceMicMuted={dictationActive ? false : voiceMicMuted}
-                                onVoiceToggle={effectiveVoiceToggle ?? (() => {})}
-                                onVoiceMicToggle={dictationActive ? undefined : onVoiceMicToggle}
-                                onSend={handleSend}
-                                pendingSchedule={pendingSchedule}
-                                onSchedule={handleUserSchedule}
-                                onClearSchedule={onUserClearSchedule}
-                                hasAttachments={blocksScheduling}
-                                modelValueLabel={modelValueLabel}
-                                modelValueDisabled={modelEffortControlsDisabled}
-                                modelValueOpen={showSettings && settingsSection !== 'effort'}
-                                onModelValueToggle={handleModelValueToggle}
-                                effortValueLabel={effortValueLabel}
-                                effortValueDisabled={modelEffortControlsDisabled}
-                                effortValueOpen={showSettings && settingsSection !== 'model'}
-                                onEffortValueToggle={handleEffortValueToggle}
-                                scratchlistMode={props.scratchlistMode}
-                                scratchlistCount={props.scratchlistCount}
-                                onScratchlistToggle={props.onScratchlistToggle}
-                                omitPrimaryButton
-                            />
+                            </div>
+                            {/* Send stays available beside the input; an empty draft never starts voice. */}
+                            <div
+                                className={
+                                    primaryFillHeight
+                                        ? 'flex shrink-0 self-stretch items-stretch'
+                                        : 'flex shrink-0 items-end self-stretch py-3 pr-3'
+                                }
+                            >
+                                <UnifiedButton
+                                    canSend={canSend}
+                                    voiceStatus="disconnected"
+                                    voiceEnabled={false}
+                                    controlsDisabled={controlsDisabled}
+                                    onSend={handleSend}
+                                    onVoiceToggle={() => { }}
+                                    fillHeight={primaryFillHeight}
+                                    routesToScratchlist={routesToScratchlist}
+                                />
+                            </div>
                         </div>
-                        {/* Collapsed card: fill-height primary (empty → voice; draft → Send). Expanded: compact. */}
-                        <div
-                            className={
-                                primaryFillHeight
-                                    ? 'flex shrink-0 self-stretch items-stretch'
-                                    : 'flex shrink-0 items-end self-stretch py-3 pr-3'
-                            }
-                        >
-                            <UnifiedButton
-                                canSend={canSend}
-                                voiceStatus={effectiveVoiceStatus}
-                                voiceEnabled={voiceEnabled}
-                                controlsDisabled={controlsDisabled}
-                                onSend={handleSend}
-                                onVoiceToggle={effectiveVoiceToggle ?? (() => {})}
-                                voiceLabel={dictationActive ? t('composer.dictate') : undefined}
-                                fillHeight={primaryFillHeight}
-                                routesToScratchlist={routesToScratchlist}
-                            />
-                        </div>
-                    </div>
-                </ComposerPrimitive.Root>
+                    </ComposerPrimitive.Root>
+                </div>
             </div>
-        </div>
         </ComposerParkingContext.Provider>
     )
 }
