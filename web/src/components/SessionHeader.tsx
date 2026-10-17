@@ -301,7 +301,7 @@ export function SessionHeader(props: {
     return (
         <>
             <div className="w-full shrink-0 border-b border-[var(--app-border)] bg-[var(--app-chat-header-bg)] text-[var(--app-chat-header-fg)] pt-[env(safe-area-inset-top)]">
-                <div className="mx-auto w-full max-w-content flex items-center gap-2 px-3 py-1.5">
+                <div className="mx-auto w-full max-w-content flex items-center gap-2 px-[var(--app-panel-gutter)] py-1.5">
                     {/* Back button */}
                     <button
                         type="button"

@@ -3,6 +3,7 @@
 @config "../tailwind.config.ts";
 
 :root {
+    --app-panel-gutter: 0.75rem;
     --app-chat-header-bg: #fbf0e9;
     --app-chat-header-fg: #a34c30;
     --app-composer-fg: #a34c30;
@@ -431,18 +432,17 @@ html:has(.chat-scroll-y) #root {
     }
 }
 
-/* On touch-first devices, keep the chat scrollbar from shifting centered content. */
-@media (hover: none) and (pointer: coarse) {
-    .chat-scroll-y {
-        scrollbar-gutter: stable both-edges;
-    }
+.chat-scroll-y {
+    scrollbar-gutter: stable both-edges;
+}
 
-    .chat-scroll-content {
-        padding-inline: max(
-            0.125rem,
-            calc(0.75rem - var(--chat-scroll-gutter-inline, 0px))
-        );
-    }
+.chat-scroll-content {
+    padding-inline: max(0px, calc(var(--app-panel-gutter) - var(--chat-scroll-gutter-inline, 0px)));
+}
+
+.session-list-content {
+    padding-left: max(0px, calc(var(--app-panel-gutter) - var(--session-list-scrollbar-width, 0px)));
+    padding-right: var(--app-panel-gutter);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -512,11 +512,6 @@ html:has(.chat-scroll-y) #root {
     direction: ltr;
 }
 
-/* Match fixed sidebar controls to the space reserved for the left scrollbar. */
-.session-list-scrollbar-offset {
-    padding-left: 8px;
-}
-
 /* Desktop sidebar: use custom width from CSS variable.
    Kept in sync with the Tailwind `split` breakpoint (see tailwind.config.ts)
    so the sidebar width/resize applies as soon as the split view appears on
@@ -537,13 +532,14 @@ html:has(.chat-scroll-y) #root {
 .sidebar-resize-handle {
     width: 4px;
     cursor: col-resize;
-    background: var(--app-divider);
-    transition: background-color 0.15s;
+    background: var(--app-chat-header-bg);
+    border-right: 1px solid var(--app-border);
+    transition: border-color 0.15s;
 }
 
 .sidebar-resize-handle:hover,
 .sidebar-resize-handle[data-dragging] {
-    background: var(--app-link);
+    border-color: var(--app-link);
 }
 
 .sidebar-resize-handle[data-dragging] {

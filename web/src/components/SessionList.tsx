@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { SessionListScrollAnchor } from './SessionListScrollAnchor'
 import type { SessionSummary } from '@/types/api'
 import { SESSION_LIFECYCLE_IDLE } from '@hapi/protocol'
@@ -1306,6 +1306,19 @@ export function SessionList(props: {
     // bounce to make a wheel pull feel right, so it stays on live updates.
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     useTransientScrollbar(scrollContainerRef, 'left')
+    useLayoutEffect(() => {
+        const container = scrollContainerRef.current
+        if (!container) return
+        const updateGutter = () => {
+            container.style.setProperty('--session-list-scrollbar-width', `${Math.max(0, container.offsetWidth - container.clientWidth)}px`)
+        }
+        updateGutter()
+        if (typeof ResizeObserver === 'undefined') return
+        const observer = new ResizeObserver(updateGutter)
+        observer.observe(container)
+        return () => observer.disconnect()
+    }, [])
+
     const [pullState, setPullState] = useState<PullToRefreshState>('idle')
     const pullStateRef = useRef<PullToRefreshState>('idle')
     const [isRefreshing, setIsRefreshing] = useState(false)
@@ -1393,9 +1406,9 @@ export function SessionList(props: {
 
     return (
         <div className="flex min-h-0 w-full flex-1 flex-col">
-            <div className="session-list-scrollbar-offset mx-auto w-full max-w-content shrink-0">
+            <div className="w-full shrink-0">
                 {renderHeader || props.headerActions ? (
-                    <div className="flex items-center justify-end gap-1 px-2 py-1">
+                    <div className="flex items-center justify-end gap-1 px-[var(--app-panel-gutter)] py-1">
                         {renderHeader ? (
                             <button
                                 type="button"
@@ -1434,7 +1447,7 @@ export function SessionList(props: {
                     </div>
                 ) : null}
                 <div ref={scrollContainerRef} className="app-scroll-y session-list-scrollbar-left scrollbar-auto-hide min-h-0 flex-1">
-                    <SessionListScrollAnchor sessions={props.sessions} className="mx-auto flex w-full max-w-content flex-col gap-1 pl-[3px] pr-2 pb-2">
+                    <SessionListScrollAnchor sessions={props.sessions} className="session-list-content flex w-full flex-col gap-1 pb-2">
                         {props.sessions.length === 0 && !props.isLoading ? (
                             <SessionsEmptyState
                                 onNewSession={props.onNewSession}
