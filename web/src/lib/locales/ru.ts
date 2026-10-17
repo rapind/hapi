@@ -844,6 +844,7 @@ export default {
   'settings.display.appearance.oled': 'OLED-чёрный',
   'settings.display.appearance.light': 'Светлая',
   'settings.display.colorTheme': 'Цветовая тема',
+    'settings.display.colorTheme.personal': 'Личная',
   'settings.display.colorTheme.default': 'По умолчанию',
   'settings.display.colorTheme.notion': 'Notion',
   'settings.display.colorTheme.one': 'One',

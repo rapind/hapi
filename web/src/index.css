@@ -7,12 +7,12 @@
     --app-message-side-inset: 50px;
     --app-chat-message-fg: var(--app-fg);
     --app-chat-message-bg: var(--app-chat-user-bg);
-    --app-sidebar-bg: #f1f0eb;
-    --app-chat-header-bg: #faf9f5;
-    --app-chat-header-fg: #353530;
-    --app-composer-fg: #353530;
-    --app-composer-bg: #f0efeb;
-    --app-bg: var(--tg-theme-bg-color, #faf9f5);
+    --app-sidebar-bg: var(--app-bg);
+    --app-chat-header-bg: var(--app-bg);
+    --app-chat-header-fg: var(--app-fg);
+    --app-composer-fg: var(--app-fg);
+    --app-composer-bg: var(--app-secondary-bg);
+    --app-bg: var(--tg-theme-bg-color, #ffffff);
     --app-fg: var(--tg-theme-text-color, #111827);
     --app-hint: var(--tg-theme-hint-color, #6b7280);
     --app-link: var(--tg-theme-link-color, #111827);
@@ -23,7 +23,7 @@
     --app-secondary-bg: var(--tg-theme-secondary-bg-color, #f3f4f6);
 
     --app-dialog-bg: #ffffff;
-    --app-chat-user-bg: #eeede9;
+    --app-chat-user-bg: #f2f4f6;
     --app-chat-user-surface-bg: var(--app-chat-user-bg);
     --app-chat-user-fg: #24292f;
     --app-chat-user-chip-bg: #DBEAFE;
@@ -32,7 +32,7 @@
     --app-chat-user-chip-action-fg: #bfdbfe;
     --app-chat-user-chip-action-hover-fg: #fecaca;
     --app-tool-card-bg: #f2f4f6;
-    --app-tool-card-title: #67665f;
+    --app-tool-card-title: var(--app-fg);
     --app-tool-group-bg: var(--app-tool-card-bg);
     --app-tool-card-hover-bg: #e9edf2;
     --app-tool-card-accent: #7b8491;
@@ -41,8 +41,8 @@
     --app-code-header-bg: #eceff2;
     --app-code-header-fg: #717784;
     --app-code-copy-hover-bg: rgba(17, 24, 39, 0.06);
-    --app-inline-code-border: #ddd6d0;
-    --app-inline-code-fg: #9f4543;
+    --app-inline-code-border: transparent;
+    --app-inline-code-fg: #2d333b;
     --app-md-quote-bg: #f1f3f5;
     --app-md-quote-border: #c9d0d8;
     --app-md-quote-fg: #525965;
@@ -62,7 +62,7 @@
     --app-divider: rgba(15, 23, 42, 0.08);
     --app-subtle-bg: rgba(15, 23, 42, 0.04);
     --app-code-bg: #f5f6f7;
-    --app-inline-code-bg: #f0ebe7;
+    --app-inline-code-bg: #ebecef;
 
     /* Diff colors (light) - from hapi-app */
     --app-diff-added-bg: #e6ffed;
@@ -95,16 +95,9 @@
 }
 
 [data-theme="dark"] {
-    --app-chat-message-fg: #edede9;
-    --app-chat-message-bg: #212121;
-    --app-sidebar-bg: #101010;
-    --app-chat-header-bg: #141414;
-    --app-chat-header-fg: #d8d7d2;
-    --app-composer-fg: #d8d7d2;
-    --app-composer-bg: #202020;
     /* Primary colors - override fallbacks for non-Telegram browsers */
-    --app-bg: var(--tg-theme-bg-color, #141414);
-    --app-fg: var(--tg-theme-text-color, #d8d7d2);
+    --app-bg: var(--tg-theme-bg-color, #1c1c1e);
+    --app-fg: var(--tg-theme-text-color, #ffffff);
     --app-hint: var(--tg-theme-hint-color, #8e8e93);
     --app-link: var(--tg-theme-link-color, #ffffff);
     --app-button: var(--tg-theme-button-color, #ffffff);
@@ -113,8 +106,8 @@
     --app-banner-text: var(--tg-theme-button-text-color, #ffffff);
     --app-secondary-bg: var(--tg-theme-secondary-bg-color, #2C2C2E);
 
-    --app-dialog-bg: #202020;
-    --app-chat-user-bg: #242424;
+    --app-dialog-bg: #202226;
+    --app-chat-user-bg: #2b2f34;
     --app-chat-user-surface-bg: var(--app-chat-user-bg);
     --app-chat-user-fg: #f5f7fa;
     --app-chat-user-chip-bg: rgba(37, 99, 235, 0.22);
@@ -122,24 +115,24 @@
     --app-chat-user-chip-action-bg: #171f32;
     --app-chat-user-chip-action-fg: #7088aa;
     --app-chat-user-chip-action-hover-fg: #f87171;
-    --app-tool-card-bg: #242424;
-    --app-tool-card-title: #85847e;
+    --app-tool-card-bg: #2b2f34;
+    --app-tool-card-title: var(--app-fg);
     --app-tool-group-bg: var(--app-tool-card-bg);
-    --app-tool-card-hover-bg: #303030;
-    --app-tool-card-accent: #b8b8b0;
+    --app-tool-card-hover-bg: #343a41;
+    --app-tool-card-accent: #b8c0cb;
     --app-tool-card-muted-action-fg: #7f8792;
-    --app-tool-card-subtitle: #85847e;
-    --app-code-header-bg: #303030;
+    --app-tool-card-subtitle: #b3bac5;
+    --app-code-header-bg: #353b43;
     --app-code-header-fg: #c4cbd6;
     --app-code-copy-hover-bg: rgba(255, 255, 255, 0.08);
-    --app-inline-code-border: #373737;
-    --app-inline-code-fg: #d97876;
+    --app-inline-code-border: transparent;
+    --app-inline-code-fg: #f5f7fa;
     --app-md-quote-bg: #31363d;
     --app-md-quote-border: #6b7481;
     --app-md-quote-fg: #d7dde6;
     --app-md-table-bg: #2a2f35;
     --app-md-table-head-bg: #353b43;
-    --app-reasoning-bg: #242424;
+    --app-reasoning-bg: #2b3036;
     --app-mermaid-node-fill: #323843;
     --app-mermaid-node-border: #7aa2ff;
     --app-mermaid-cluster-fill: #2d3440;
@@ -152,7 +145,7 @@
     --app-divider: rgba(255, 255, 255, 0.08);
     --app-subtle-bg: rgba(255, 255, 255, 0.05);
     --app-code-bg: #2a2f35;
-    --app-inline-code-bg: #212121;
+    --app-inline-code-bg: #383e47;
 
     /* Diff colors (dark) - from hapi-app */
     --app-diff-added-bg: #0d2e1f;
@@ -180,13 +173,6 @@
 }
 
 [data-theme="oled"] {
-    --app-chat-message-fg: #edede9;
-    --app-chat-message-bg: #212121;
-    --app-sidebar-bg: #050505;
-    --app-chat-header-bg: #080808;
-    --app-chat-header-fg: #d8d7d2;
-    --app-composer-fg: #d8d7d2;
-    --app-composer-bg: #1b1b1b;
     /*
      * Pure-black canvas for OLED panels. Unlike Dark mode we never defer to
      * --tg-theme-* here, otherwise Telegram's gray backgrounds would defeat the
@@ -211,18 +197,18 @@
     --app-chat-user-chip-action-bg: #0d1428;
     --app-chat-user-chip-action-fg: #7088aa;
     --app-chat-user-chip-action-hover-fg: #f87171;
-    --app-tool-card-title: #85847e;
+    --app-tool-card-title: var(--app-fg);
     --app-tool-card-bg: #0e0e10;
     --app-tool-group-bg: var(--app-tool-card-bg);
     --app-tool-card-hover-bg: #161618;
     --app-tool-card-accent: #b8c0cb;
     --app-tool-card-muted-action-fg: #6b6f78;
-    --app-tool-card-subtitle: #85847e;
+    --app-tool-card-subtitle: #9aa0aa;
     --app-code-header-bg: #161618;
     --app-code-header-fg: #c4cbd6;
     --app-code-copy-hover-bg: rgba(255, 255, 255, 0.08);
-    --app-inline-code-border: #373737;
-    --app-inline-code-fg: #d97876;
+    --app-inline-code-border: transparent;
+    --app-inline-code-fg: #f5f7fa;
     --app-md-quote-bg: #131316;
     --app-md-quote-border: #3a3a40;
     --app-md-quote-fg: #d7dde6;
@@ -241,7 +227,7 @@
     --app-divider: rgba(255, 255, 255, 0.1);
     --app-subtle-bg: rgba(255, 255, 255, 0.06);
     --app-code-bg: #0e0e10;
-    --app-inline-code-bg: #212121;
+    --app-inline-code-bg: #1a1a1d;
 
     /* Diff colors (oled) */
     --app-diff-added-bg: #07251a;
@@ -449,10 +435,17 @@ html:has(.chat-scroll-y) #root {
     scrollbar-gutter: stable both-edges;
 }
 
-.chat-scroll-content {
+[data-color-theme="personal"] .chat-scroll-content {
     --app-fg: var(--app-chat-message-fg);
+    --app-hint: var(--app-tool-card-title);
+    --app-tool-card-subtitle: var(--app-tool-card-title);
+    --app-tool-card-accent: var(--app-tool-card-title);
+    --app-tool-card-muted-action-fg: var(--app-tool-card-title);
     --app-chat-user-fg: var(--app-chat-message-fg);
     --app-chat-user-surface-bg: var(--app-chat-message-bg);
+}
+
+.chat-scroll-content {
     --app-message-gutter: calc(var(--app-panel-gutter) + var(--app-message-side-inset));
     color: var(--app-fg);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -500,7 +493,7 @@ html:has(.chat-scroll-y) #root {
     }
 }
 
-.app-chat-composer {
+[data-color-theme="personal"] .app-chat-composer {
     --app-bg: var(--app-chat-header-bg);
     --app-secondary-bg: var(--app-composer-bg);
     --app-subtle-bg: var(--app-composer-bg);
@@ -512,7 +505,7 @@ html:has(.chat-scroll-y) #root {
     color: var(--app-composer-fg);
 }
 
-.app-session-sidebar {
+[data-color-theme="personal"] .app-session-sidebar {
     --app-bg: var(--app-sidebar-bg);
     --app-fg: var(--app-chat-header-fg);
     --app-hint: var(--app-chat-header-fg);

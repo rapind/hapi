@@ -848,6 +848,7 @@ export default {
   'settings.display.appearance.oled': 'OLED 纯黑',
   'settings.display.appearance.light': '浅色',
   'settings.display.colorTheme': '颜色主题',
+    'settings.display.colorTheme.personal': '个人',
   'settings.display.colorTheme.default': '默认',
   'settings.display.colorTheme.notion': 'Notion',
   'settings.display.colorTheme.one': 'One',

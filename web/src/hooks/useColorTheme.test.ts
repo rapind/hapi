@@ -2,6 +2,8 @@ import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
     applyColorTheme,
+    getColorThemeBackground,
+    getColorThemePickerValue,
     getColorThemeStorageKey,
     getStoredColorTheme,
     parseColorTheme,
@@ -71,5 +73,25 @@ describe('useColorTheme', () => {
 
         expect(document.documentElement.style.getPropertyValue('--app-bg')).toBe('#1f2433')
         expect(document.documentElement.style.getPropertyValue('--app-chat-user-chip-bg')).toBe('rgba(123, 140, 255, 0.24)')
+    })
+
+    it.each(['light', 'dark', 'oled'] as const)('applies the personal palette for %s', (scheme) => {
+        applyColorTheme('personal', scheme)
+        const style = document.documentElement.style
+        expect(style.getPropertyValue('--app-inline-code-bg')).toBe(style.getPropertyValue('--app-chat-message-bg'))
+        expect(style.getPropertyValue('--app-inline-code-fg')).toBe(scheme === 'light' ? '#9f4543' : '#d97876')
+        expect(style.getPropertyValue('--app-hint')).toBe(style.getPropertyValue('--app-tool-card-title'))
+        expect(getColorThemeBackground('personal', scheme)).toBe(style.getPropertyValue('--app-bg'))
+        expect(getColorThemePickerValue('personal', scheme, 'hint')).toBe(style.getPropertyValue('--app-hint'))
+    })
+
+    it.each(['default', 'one'] as const)('clears personal palette tokens when switching to %s', (next) => {
+        applyColorTheme('personal', 'dark')
+        applyColorTheme(next, 'dark')
+        const style = document.documentElement.style
+        expect(style.getPropertyValue('--app-chat-message-fg')).toBe('')
+        expect(style.getPropertyValue('--app-sidebar-bg')).toBe('')
+        expect(style.getPropertyValue('--app-inline-code-border')).toBe('')
+        expect(style.getPropertyValue('--app-tool-card-title')).toBe('')
     })
 })
