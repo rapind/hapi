@@ -199,7 +199,7 @@ function SessionsPage() {
         <>
             <div className="flex h-full min-h-0">
             <div
-                className={`${isSessionsIndex ? 'flex' : 'hidden split:flex'} w-full shrink-0 flex-col bg-[var(--app-bg)]`}
+                    className={`${isSessionsIndex ? 'flex' : 'hidden split:flex'} app-session-sidebar w-full shrink-0 flex-col bg-[var(--app-bg)]`}
                 style={{ '--sidebar-w': `${sidebar.width}px` } as React.CSSProperties}
             >
                 <div className="flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">

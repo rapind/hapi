@@ -477,6 +477,16 @@ html:has(.chat-scroll-y) #root {
     }
 }
 
+.app-session-sidebar {
+    --app-bg: var(--app-chat-header-bg);
+    --app-fg: var(--app-chat-header-fg);
+    --app-hint: var(--app-chat-header-fg);
+    --app-link: var(--app-chat-header-fg);
+    --app-secondary-bg: color-mix(in srgb, var(--app-chat-header-fg) 12%, var(--app-chat-header-bg));
+    --app-subtle-bg: color-mix(in srgb, var(--app-chat-header-fg) 6%, var(--app-chat-header-bg));
+    color: var(--app-fg);
+}
+
 /* Keep the session list scrollbar on the left at every viewport size. */
 .session-list-scrollbar-left {
     direction: rtl;

@@ -1865,7 +1865,7 @@ function SessionChatInner(props: SessionChatProps) {
     })
 
     return (
-        <div className="flex h-full min-h-0 flex-col">
+        <div className="flex h-full min-h-0 flex-col [--content-max-w:100%]">
             <SessionHeader
                 session={props.session}
                 serviceTier={effectiveCodexServiceTier}
