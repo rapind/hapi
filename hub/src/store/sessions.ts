@@ -122,6 +122,26 @@ function preserveCursorProtocolPair(
     return merged
 }
 
+// Human title ownership is hub-owned. The field may travel in raw snapshots,
+// but MetadataSchema strips it. Enforce against the persisted row at every write.
+function preserveUserChosenName(prior: unknown, next: unknown, userInitiatedRename = false): unknown {
+    const previous = isPlainObject(prior) ? prior : {}
+    const chosenName = typeof previous.userChosenName === 'string' ? previous.userChosenName : undefined
+    if (!isPlainObject(next) && chosenName === undefined) return next
+
+    const metadata: Record<string, unknown> = isPlainObject(next)
+        ? { ...next }
+        : { ...mergeSessionMetadata(previous, {}) as Record<string, unknown> }
+    delete metadata.userChosenName
+    if (userInitiatedRename && typeof metadata.name === 'string') {
+        metadata.userChosenName = metadata.name
+    } else if (chosenName !== undefined) {
+        metadata.name = chosenName
+        metadata.userChosenName = chosenName
+    }
+    return metadata
+}
+
 export function mergeSessionMetadata(prior: unknown, next: unknown): unknown {
     if (!isPlainObject(prior) || !isPlainObject(next)) {
         return next
@@ -130,6 +150,7 @@ export function mergeSessionMetadata(prior: unknown, next: unknown): unknown {
     merged = carryForwardIfMissing(prior, next, merged, PARSE_IDENTITY_FIELDS)
     merged = carryForwardIfMissing(prior, next, merged, ROUTING_FIELDS)
     merged = carryForwardIfMissing(prior, next, merged, SIMPLE_RESUME_TOKENS)
+    merged = carryForwardIfMissing(prior, next, merged, ['codexPromptMode'])
     merged = preserveCursorProtocolPair(prior, next, merged)
     if (prior.launchOrigin !== undefined) {
         merged = { ...(merged ?? next), launchOrigin: prior.launchOrigin }
@@ -226,7 +247,7 @@ export function getOrCreateSession(
         }
     }
 
-    const metadataJson = JSON.stringify(metadata)
+    const metadataJson = JSON.stringify(preserveUserChosenName(null, metadata))
     const agentStateJson = agentState === null || agentState === undefined ? null : JSON.stringify(agentState)
 
     prepareCached(db, `
@@ -367,7 +388,11 @@ export function adoptPreallocatedSession(
         }
 
         const now = Date.now()
-        const metadataJson = JSON.stringify(mergeSessionMetadata(existing.metadata, metadata))
+        const adoptedMetadata = isPlainObject(metadata) && metadata.flavor === 'codex'
+            && isPlainObject(existing.metadata) && existing.metadata.codexPromptMode !== undefined
+            ? { ...metadata, codexPromptMode: existing.metadata.codexPromptMode }
+            : metadata
+        const metadataJson = JSON.stringify(preserveUserChosenName(existing.metadata, mergeSessionMetadata(existing.metadata, adoptedMetadata)))
         const agentStateJson = agentState === null || agentState === undefined ? null : JSON.stringify(agentState)
         const stubTag = machineSpawnPreallocTag(id)
 
@@ -416,7 +441,7 @@ export function updateSessionMetadata(
     metadata: unknown,
     expectedVersion: number,
     namespace: string,
-    options?: { touchUpdatedAt?: boolean; allowUnarchive?: boolean }
+    options?: { touchUpdatedAt?: boolean; allowUnarchive?: boolean; userInitiatedRename?: boolean; inheritUserChosenNameFrom?: string }
 ): VersionedUpdateResult<unknown | null> {
     const now = Date.now()
     const touchUpdatedAt = options?.touchUpdatedAt !== false
@@ -430,7 +455,11 @@ export function updateSessionMetadata(
             }
 
             const prior = existing.metadata
-            let merged = mergeSessionMetadata(prior, metadata)
+            let titleOwner = prior
+            if (options?.inheritUserChosenNameFrom && (!isPlainObject(prior) || typeof prior.userChosenName !== 'string')) {
+                titleOwner = getSessionByNamespace(db, options.inheritUserChosenNameFrom, namespace)?.metadata ?? prior
+            }
+            let merged = preserveUserChosenName(titleOwner, mergeSessionMetadata(prior, metadata), options?.userInitiatedRename)
 
             // #1911 M1: unauthorized un-archive of hub-archived rows.
             // Return success + merge-preserved archive fields — NOT version-mismatch

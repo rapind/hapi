@@ -74,7 +74,7 @@ export function createChatCreationRoutes(getEngine: () => SyncEngine | null, dat
             undefined, resolved.effort ?? undefined, resolved.permissionMode ?? undefined,
             resolved.serviceTier ?? undefined, undefined, resolved.collaborationMode ?? undefined,
             resolved.copilotAgentMode ?? undefined, resolved.startingMode ?? undefined,
-            namespace, { launchOrigin }
+            namespace, resolved.codexPromptMode, { launchOrigin }
         )
         if (result.type !== 'success') return c.json(result)
         // A settings write failure must never masquerade as a failed spawn and

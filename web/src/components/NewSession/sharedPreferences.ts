@@ -31,6 +31,7 @@ export function readBrowserCreationPreferences(knownMachineIds: readonly string[
                 }
                 if (['claude', 'grok', 'pi'].includes(agent)) settings.effort = prior.effort === 'auto' ? null : prior.effort
                 if (['codex', 'opencode'].includes(agent)) settings.modelReasoningEffort = prior.modelReasoningEffort === 'default' ? null : prior.modelReasoningEffort
+                if (agent === 'codex') settings.codexPromptMode = prior.codexPromptMode ?? 'queue'
                 agents[agent] = settings
             }
             machines[id] = { directory: paths[id]?.[0], agents }

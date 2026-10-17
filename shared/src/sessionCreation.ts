@@ -73,6 +73,7 @@ export function resolveChatCreation(
             throw new Error(`${field} is unsupported for ${agent}; clear it or choose a supported agent`)
         }
     }
+    only('codexPromptMode', ['codex'])
     only('serviceTier', ['codex'])
     only('collaborationMode', ['codex'])
     only('copilotAgentMode', ['copilot'])

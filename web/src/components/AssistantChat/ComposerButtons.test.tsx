@@ -403,7 +403,10 @@ describe('ComposerButtons responsive toolbar', () => {
         const toolbar = screen.getByTestId('composer-toolbar-items')
         expect(toolbar.className).toContain('overflow-x-auto')
         const toolbarButtons = within(toolbar).getAllByRole('button')
-        expect(toolbarButtons.length).toBeGreaterThanOrEqual(8)
+        expect(toolbarButtons.length).toBeGreaterThanOrEqual(4)
+        for (const label of [/expand message editor/i, 'Terminal', /schedule send/i, /dictate/i]) {
+            expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
+        }
         for (const button of toolbarButtons) {
             expect(button.closest('.shrink-0')).not.toBeNull()
         }

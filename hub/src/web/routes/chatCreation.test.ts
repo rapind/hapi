@@ -49,6 +49,14 @@ describe('chat creation and shared preferences', () => {
         expect(args()[3]).toBeUndefined()
         expect(args()[10]).toBe('read-only')
     })
+    it('persists and inherits deploy Queue/Steer for Codex without applying it to Claude', async () => {
+        const { post, store } = harness()
+        const initial = await (await post('/sessions/create', { directory: '/repo', agent: 'codex', codexPromptMode: 'steer' })).json() as { sessionId: string }
+        expect(store.sessions.getSession(initial.sessionId)!.metadata).toMatchObject({ codexPromptMode: 'steer' })
+        const inherited = await (await post('/sessions/create', {})).json() as { sessionId: string }
+        expect(store.sessions.getSession(inherited.sessionId)!.metadata).toMatchObject({ codexPromptMode: 'steer' })
+        expect((await post('/sessions/create', { agent: 'claude', codexPromptMode: 'steer' })).status).toBe(400)
+    })
     it('imports missing browser scopes once without overwriting shared values', async () => {
         const { post } = harness()
         const first = { lastMachineId: 'machine-1', lastAgent: 'codex', machines: { 'machine-1': { directory: '/new', agents: { codex: { model: null, permissionMode: 'read-only' } } } } }
