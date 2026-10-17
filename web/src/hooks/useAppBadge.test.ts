@@ -10,6 +10,7 @@ function createSession(id: string, updatedAt: number): SessionSummary {
         active: false,
         thinking: false,
         activeAt: updatedAt,
+        createdAt: 0,
         updatedAt,
         // Has real conversation content, so it's eligible for the sidebar's
         // "Unread" filter and "mark all read" — see createStubSession() below

@@ -55,8 +55,7 @@ type SessionGroup = {
     displayName: string
     machineId: string | null
     sessions: SessionSummary[]
-    latestUpdatedAt: number
-    hasActiveSession: boolean
+    latestCreatedAt: number
     hasPinnedSession: boolean
 }
 
@@ -76,6 +75,10 @@ export function emptyRunningBuckets(): Record<RunningBucketKey, SessionSummary[]
     return { working: [], pending: [], active: [], idle: [] }
 }
 
+function compareSessionCreation(a: SessionSummary, b: SessionSummary): number {
+    return b.createdAt - a.createdAt || a.id.localeCompare(b.id)
+}
+
 /**
  * Split the connected sessions into the in-progress / active sub-buckets the
  * pinned sections render. Pure so the bucketing rules stay testable.
@@ -83,7 +86,7 @@ export function emptyRunningBuckets(): Record<RunningBucketKey, SessionSummary[]
 export function bucketRunningSessions(
     sessions: SessionSummary[],
     pinInProgressSessions: boolean,
-    compare: (a: SessionSummary, b: SessionSummary) => number = (a, b) => b.updatedAt - a.updatedAt
+    compare: (a: SessionSummary, b: SessionSummary) => number = compareSessionCreation
 ): Record<RunningBucketKey, SessionSummary[]> {
     const buckets = emptyRunningBuckets()
     if (!pinInProgressSessions) {
@@ -285,16 +288,12 @@ function groupSessionsByDirectory(sessions: SessionSummary[]): SessionGroup[] {
         .map(([key, group]) => {
             const sortedSessions = [...group.sessions].sort((a, b) => {
                 if (Boolean(a.pinned) !== Boolean(b.pinned)) return a.pinned ? -1 : 1
-                const rankA = a.active ? (a.pendingRequestsCount > 0 ? 0 : 1) : 2
-                const rankB = b.active ? (b.pendingRequestsCount > 0 ? 0 : 1) : 2
-                if (rankA !== rankB) return rankA - rankB
-                return b.updatedAt - a.updatedAt
+                return compareSessionCreation(a, b)
             })
-            const latestUpdatedAt = group.sessions.reduce(
-                (max, s) => (s.updatedAt > max ? s.updatedAt : max),
+            const latestCreatedAt = group.sessions.reduce(
+                (max, s) => Math.max(s.createdAt, max),
                 -Infinity
             )
-            const hasActiveSession = group.sessions.some(s => s.active)
             const hasPinnedSession = group.sessions.some(s => s.pinned)
             const displayName = getPathDisplayName(group.directory)
 
@@ -304,8 +303,7 @@ function groupSessionsByDirectory(sessions: SessionSummary[]): SessionGroup[] {
                 displayName,
                 machineId: group.machineId,
                 sessions: sortedSessions,
-                latestUpdatedAt,
-                hasActiveSession,
+                latestCreatedAt,
                 hasPinnedSession
             }
         })
@@ -313,10 +311,7 @@ function groupSessionsByDirectory(sessions: SessionSummary[]): SessionGroup[] {
             if (a.hasPinnedSession !== b.hasPinnedSession) {
                 return a.hasPinnedSession ? -1 : 1
             }
-            if (a.hasActiveSession !== b.hasActiveSession) {
-                return a.hasActiveSession ? -1 : 1
-            }
-            return b.latestUpdatedAt - a.latestUpdatedAt
+            return b.latestCreatedAt - a.latestCreatedAt || a.key.localeCompare(b.key)
         })
 }
 
@@ -1075,13 +1070,10 @@ export function SessionList(props: {
     const showMachineLabels = new Set(sidebarSessions.map(session => session.metadata?.machineId)).size > 1
     const globalPinnedSessions = useMemo(() => {
         const pinned = sidebarSessions.filter((session) => Boolean(session.globalPinned))
-        return [...pinned].sort((a, b) => b.updatedAt - a.updatedAt)
+        return [...pinned].sort(compareSessionCreation)
     }, [sidebarSessions])
     const runningSessions = useMemo(() => {
-        const byRecent = (a: SessionSummary, b: SessionSummary) => {
-            return b.updatedAt - a.updatedAt
-        }
-        return bucketRunningSessions(sidebarSessions, pinInProgressSessions, byRecent)
+        return bucketRunningSessions(sidebarSessions, pinInProgressSessions)
     }, [sidebarSessions, pinInProgressSessions])
     const runningSessionTotal = runningSessions.working.length
         + runningSessions.pending.length
