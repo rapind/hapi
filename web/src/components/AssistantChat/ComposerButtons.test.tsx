@@ -92,7 +92,7 @@ describe('UnifiedButton — routesToScratchlist visual state', () => {
         )
         const btn = getButton('Send')
         expect(btn.className).not.toContain('bg-amber-500')
-        expect(btn.className).toContain('bg-black')
+        expect(btn.className).toContain('bg-[var(--app-button)]')
     })
 
     it('defaults routesToScratchlist to false when omitted', () => {

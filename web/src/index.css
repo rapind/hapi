@@ -6,6 +6,7 @@
     --app-chat-header-bg: #fbf0e9;
     --app-chat-header-fg: #a34c30;
     --app-composer-fg: #a34c30;
+    --app-composer-bg: #f3e1d5;
     --app-bg: var(--tg-theme-bg-color, #ffffff);
     --app-fg: var(--tg-theme-text-color, #111827);
     --app-hint: var(--tg-theme-hint-color, #6b7280);
@@ -91,6 +92,7 @@
     --app-chat-header-bg: #2b211d;
     --app-chat-header-fg: #e5ac90;
     --app-composer-fg: #e5ac90;
+    --app-composer-bg: #38271f;
     /* Primary colors - override fallbacks for non-Telegram browsers */
     --app-bg: var(--tg-theme-bg-color, #1c1c1e);
     --app-fg: var(--tg-theme-text-color, #ffffff);
@@ -171,6 +173,7 @@
     --app-chat-header-bg: #1c1410;
     --app-chat-header-fg: #e5ac90;
     --app-composer-fg: #e5ac90;
+    --app-composer-bg: #291b14;
     /*
      * Pure-black canvas for OLED panels. Unlike Dark mode we never defer to
      * --tg-theme-* here, otherwise Telegram's gray backgrounds would defeat the
@@ -475,6 +478,18 @@ html:has(.chat-scroll-y) #root {
     :root {
         --content-max-w: min(90%, 1200px);
     }
+}
+
+.app-chat-composer {
+    --app-bg: var(--app-chat-header-bg);
+    --app-secondary-bg: var(--app-composer-bg);
+    --app-subtle-bg: var(--app-composer-bg);
+    --app-fg: var(--app-composer-fg);
+    --app-hint: var(--app-composer-fg);
+    --app-link: var(--app-composer-fg);
+    --app-button: var(--app-composer-fg);
+    --app-button-text: var(--app-composer-bg);
+    color: var(--app-composer-fg);
 }
 
 .app-session-sidebar {

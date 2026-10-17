@@ -313,7 +313,7 @@ export function ComposerExpandButton(props: {
             className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
                 props.expanded
                     ? 'bg-[var(--app-bg)] text-[var(--app-link)]'
-                    : 'text-[var(--app-fg)]/60 hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)]'
+                    : 'text-[var(--app-fg)] hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)]'
                 }`}
             onClick={props.onToggle}
         >
@@ -414,7 +414,7 @@ export function ComposerToolbarItemPreview(props: { item: ComposerToolbarItemId;
     const isTextControl = props.item === 'model' || props.item === 'effort'
     return (
         <span
-            className={`flex h-8 items-center justify-center rounded-full text-[var(--app-fg)]/60 ${isTextControl ? 'gap-1 px-3' : 'w-8'}`}
+            className={`flex h-8 items-center justify-center rounded-full text-[var(--app-fg)] ${isTextControl ? 'gap-1 px-3' : 'w-8'}`}
             aria-hidden="true"
         >
             {icon}
@@ -423,7 +423,7 @@ export function ComposerToolbarItemPreview(props: { item: ComposerToolbarItemId;
 }
 
 export function ComposerSendButtonPreview() {
-    return <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-white dark:bg-white dark:text-black" aria-hidden="true"><SendIcon /></span>
+    return <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--app-button)] text-[var(--app-button-text)]" aria-hidden="true"><SendIcon /></span>
 }
 
 /**
@@ -469,7 +469,7 @@ function ScratchlistToggleButton(props: {
                 className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     props.scratchlistMode
                         ? 'bg-amber-500 text-white hover:bg-amber-600'
-                        : 'text-[var(--app-fg)]/60 hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)]'
+                        : 'text-[var(--app-fg)] hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)]'
                     }`}
             >
                 <ScratchlistToggleIcon />
@@ -586,11 +586,11 @@ export function UnifiedButton(props: {
 
     if (isConnecting) {
         icon = <LoadingIcon />
-        className = 'bg-black text-white'
+        className = 'bg-[var(--app-button)] text-[var(--app-button-text)]'
         ariaLabel = t('voice.connecting')
     } else if (isConnected) {
         icon = <StopIcon />
-        className = 'bg-black text-white'
+        className = 'bg-[var(--app-button)] text-[var(--app-button-text)]'
         ariaLabel = t('composer.stop')
     } else if (routesToScratchlist) {
         // Amber send button - matches the scratchlist drawer accent.
@@ -601,15 +601,15 @@ export function UnifiedButton(props: {
         ariaLabel = t('scratchlist.sendToScratchlist')
     } else if (hasText) {
         icon = <SendIcon />
-        className = 'bg-black text-white'
+        className = 'bg-[var(--app-button)] text-[var(--app-button-text)]'
         ariaLabel = t('composer.send')
     } else if (props.voiceEnabled) {
         icon = <VoiceAssistantIcon size={iconSize} />
-        className = 'bg-black text-white'
+        className = 'bg-[var(--app-button)] text-[var(--app-button-text)]'
         ariaLabel = props.voiceLabel ?? t('composer.voice')
     } else {
         icon = <SendIcon />
-        className = 'bg-[#C0C0C0] text-white'
+        className = 'bg-[var(--app-button)]/30 text-[var(--app-button-text)]'
         ariaLabel = t('composer.send')
     }
 
@@ -681,8 +681,8 @@ export function DictationButton(props: {
             data-variant={companion ? 'companion' : 'toolbar'}
             className={
                 companion
-                    ? `flex ${draftVoiceCompanionSizeClass()} items-center justify-center bg-black text-white transition-colors hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-50`
-                    : 'flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-fg)]/60 transition-colors hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)] disabled:cursor-not-allowed disabled:opacity-50'
+                    ? `flex ${draftVoiceCompanionSizeClass()} items-center justify-center bg-[var(--app-button)] text-[var(--app-button-text)] transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50`
+                    : 'flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-fg)] transition-colors hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)] disabled:cursor-not-allowed disabled:opacity-50'
             }
         >
             <VoiceAssistantIcon size={iconSize} />
@@ -772,7 +772,7 @@ export function ComposerButtons(props: {
                             aria-label={t('composer.attach')}
                             title={t('composer.attach')}
                             disabled={props.controlsDisabled || hasSchedule}
-                            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-fg)]/60 transition-colors hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)] disabled:cursor-not-allowed disabled:opacity-50"
+                            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-fg)] transition-colors hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <AttachmentIcon />
                         </ComposerPrimitive.AddAttachment>
@@ -788,7 +788,7 @@ export function ComposerButtons(props: {
                                 className={`flex h-8 items-center gap-1 rounded-full px-3 text-xs font-medium transition-colors ${
                             props.modelValueOpen
                                         ? 'bg-[var(--app-secondary-bg)] text-[var(--app-link)]'
-                                        : 'text-[var(--app-fg)]/60 hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)]'
+                                        : 'text-[var(--app-fg)] hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)]'
                                     }`}
                                 onClick={props.onModelValueToggle}
                                 disabled={props.modelValueDisabled}
@@ -809,7 +809,7 @@ export function ComposerButtons(props: {
                                 className={`flex h-8 items-center gap-1 rounded-full px-3 text-xs font-medium transition-colors ${
                             props.effortValueOpen
                                         ? 'bg-[var(--app-secondary-bg)] text-[var(--app-link)]'
-                                        : 'text-[var(--app-fg)]/60 hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)]'
+                                        : 'text-[var(--app-fg)] hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)]'
                                     }`}
                                 onClick={props.onEffortValueToggle}
                                 disabled={props.effortValueDisabled}
@@ -828,7 +828,7 @@ export function ComposerButtons(props: {
                                 aria-label={t('composer.abort')}
                                 title={t('composer.abort')}
                                 disabled={props.abortDisabled}
-                                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-fg)]/60 transition-colors hover:bg-[var(--app-bg)] hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-fg)] transition-colors hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)] disabled:cursor-not-allowed disabled:opacity-50"
                                 onClick={props.onAbort}
                             >
                                 <AbortIcon spinning={props.isAborting} />
@@ -843,7 +843,7 @@ export function ComposerButtons(props: {
                                 aria-label={t('composer.switchRemote')}
                                 title={t('composer.switchRemote')}
                                 disabled={props.switchDisabled}
-                                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-fg)]/60 transition-colors hover:bg-[var(--app-bg)] hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-fg)] transition-colors hover:bg-[var(--app-bg)] hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                                 onClick={props.onSwitch}
                             >
                                 <SwitchToRemoteIcon />
