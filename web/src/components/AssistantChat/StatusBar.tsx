@@ -12,7 +12,6 @@ import type { AgentState, CodexCollaborationMode, PermissionMode } from '@/types
 import type { ConversationStatus } from '@/realtime/types'
 import { getContextBudgetTokens } from '@/chat/modelConfig'
 import {
-    formatReasoningLabel,
     formatCompactReasoningLabel,
     getReasoningEffortForFlavor,
     shouldShowReasoningStatusLabel
@@ -289,9 +288,6 @@ export function StatusBar(props: {
     )
     const displaysReasoning = shouldShowReasoningStatusLabel(props.agentFlavor, reasoningEffort)
     const reasoningLabel = displaysReasoning
-        ? formatReasoningLabel(reasoningEffort, headerMetadata.showLabels)
-        : null
-    const compactReasoningLabel = displaysReasoning
         ? formatCompactReasoningLabel(reasoningEffort)
         : null
     const codexFastMode = shouldShowCodexFastBadge(props.agentFlavor, props.serviceTier)
@@ -389,8 +385,7 @@ export function StatusBar(props: {
             <div className="flex min-w-0 shrink-0 items-baseline gap-2">
                 {reasoningLabel ? (
                     <span className="whitespace-nowrap text-xs text-[var(--app-hint)]">
-                        <span className="sm:hidden">{compactReasoningLabel}</span>
-                        <span className="hidden sm:inline">{reasoningLabel}</span>
+                        {reasoningLabel}
                     </span>
                 ) : null}
                 {props.agentFlavor === 'codex' && props.codexPromptMode ? (
