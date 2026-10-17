@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
@@ -84,7 +84,7 @@ describe('Personal sidebar controls', () => {
         expect(screen.queryByTitle('Copy: /work/repo')).not.toBeInTheDocument()
     })
 
-    it('shows every chat regardless of preview and active-only preferences, and group clicks never hide them', () => {
+    it('initially shows every chat regardless of preview and active-only preferences', () => {
         localStorage.setItem('hapi-session-preview-limit', '3')
         localStorage.setItem('hapi-show-active-sessions-only', 'true')
         const sessions = Array.from({ length: 25 }, (_, index) => makeSession({
@@ -93,7 +93,6 @@ describe('Personal sidebar controls', () => {
             metadata: { path: '/work/repo', name: `Chat number ${index}` },
         }))
         renderSessionList(sessions)
-        fireEvent.click(screen.getByTitle('/work/repo'))
         for (let index = 0; index < sessions.length; index++) {
             expect(screen.getByRole('button', { name: new RegExp(`Chat number ${index} `) })).toBeVisible()
         }

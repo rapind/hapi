@@ -441,6 +441,21 @@ describe('SessionList collapse behavior', () => {
     })
 
 
+    it('lets project folders collapse and reopen', () => {
+        const sessions = [makeSession({ id: 'foldable', metadata: { path: '/work/hapi', name: 'Folder chat', flavor: 'codex' } })]
+        render(renderSessionList(sessions, null))
+
+        const toggle = screen.getByRole('button', { name: 'work/hapi', expanded: true })
+        fireEvent.click(toggle)
+        expect(toggle).toHaveAttribute('aria-expanded', 'false')
+        expect(getProjectPanel()).not.toBeVisible()
+        expect(screen.queryByRole('button', { name: /Folder chat/ })).not.toBeInTheDocument()
+
+        fireEvent.click(toggle)
+        expect(toggle).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('button', { name: /Folder chat/ })).toBeVisible()
+    })
+
     it('keeps an inactive project-pinned group expanded with no selection', () => {
         const sessions = [
             makeSession({

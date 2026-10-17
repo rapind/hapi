@@ -1049,6 +1049,7 @@ export function SessionList(props: {
     const { pinInProgressSessions } = usePinInProgressSessions()
     const showDetailedStatus = sessionListStatusMode === 'detailed'
     const [, setCodexImportedSessionsVersion] = useState(0)
+    const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(() => new Set())
 
     useEffect(() => {
         // 中文注释：监听导入标记变化，让列表在“导入完成”或“用户已在 Hapi 中继续会话”后立即刷新时间文案。
@@ -1222,6 +1223,7 @@ export function SessionList(props: {
 
     const renderDirectoryGroup = (group: SessionGroup) => {
         const canStartInGroupDirectory = group.directory !== 'Other'
+        const expanded = !collapsedProjects.has(group.key)
         // With multiple machines in the unfiltered view, disambiguate
         // same-named directories by suffixing the machine label.
         const groupTitle = showMachineLabels
@@ -1233,9 +1235,22 @@ export function SessionList(props: {
                     className="group/project sticky top-0 z-10 flex items-center gap-2 bg-[var(--app-bg)] py-1.5 pl-2 pr-2 text-left rounded-lg transition-colors hover:bg-[var(--app-secondary-bg)] min-w-0 w-full select-none"
                     title={group.directory}
                 >
-                    <span className="font-medium text-sm truncate flex-1">
-                        {groupTitle}
-                    </span>
+                    <button
+                        type="button"
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        aria-expanded={expanded}
+                        onClick={() => setCollapsedProjects((previous) => {
+                            const next = new Set(previous)
+                            if (next.has(group.key)) next.delete(group.key)
+                            else next.add(group.key)
+                            return next
+                        })}
+                    >
+                        <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className={`h-3.5 w-3.5 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}>
+                            <path d="m7 4 6 6-6 6" />
+                        </svg>
+                        <span className="truncate text-sm font-medium">{groupTitle}</span>
+                    </button>
                     {onNewSessionInDirectory && canStartInGroupDirectory ? (
                         <button
                             type="button"
@@ -1259,7 +1274,7 @@ export function SessionList(props: {
                 </div>
 
                 {/* Sessions */}
-                <div className="flex flex-col gap-0.5 ml-3 pl-1 py-1">
+                <div hidden={!expanded} className={expanded ? "flex flex-col gap-0.5 ml-3 pl-1 py-1" : "hidden"}>
                     {group.sessions.map((s, index) => (
                         <div key={s.id} className="contents">
                             {shouldShowPinnedDivider(group.sessions, index) ? (
@@ -1380,7 +1395,7 @@ export function SessionList(props: {
         <div className="flex min-h-0 w-full flex-1 flex-col">
             <div className="session-list-scrollbar-offset mx-auto w-full max-w-content shrink-0">
                 {renderHeader || props.headerActions ? (
-                    <div className="flex items-center gap-1 px-2 py-1">
+                    <div className="flex items-center justify-end gap-1 px-2 py-1">
                         {renderHeader ? (
                             <button
                                 type="button"
