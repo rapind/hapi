@@ -744,10 +744,8 @@ export function ComposerButtons(props: {
     scratchlistMode?: boolean
     scratchlistCount?: number
     onScratchlistToggle?: () => void
-    /**
-     * When true, omit UnifiedButton — HappyComposer places it in a
-     * full-height column beside the input + toolbar.
-     */
+    statusLine?: ReactNode
+    /** Omit UnifiedButton when HappyComposer places it beside the input. */
     omitPrimaryButton?: boolean
 }) {
     const { t } = useTranslation()
@@ -760,7 +758,7 @@ export function ComposerButtons(props: {
     const toolbarJustifyContent = getComposerToolbarJustifyContent(layout.mode)
 
     return (
-        <div className="flex shrink-0 items-center gap-1 px-2 pb-2">
+        <div className="flex shrink-0 items-center gap-1 py-1">
             <div
                 data-testid="composer-toolbar-items"
                 className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -878,6 +876,7 @@ export function ComposerButtons(props: {
 
                     {/* Schedule button — only shown when onSchedule handler is provided */}
                 </OrderedToolbarItems>
+                {props.statusLine ? <div className="ml-auto flex shrink-0 items-center pl-2">{props.statusLine}</div> : null}
             </div>
 
             {props.omitPrimaryButton ? null : (

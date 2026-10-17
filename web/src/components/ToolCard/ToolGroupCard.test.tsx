@@ -118,7 +118,7 @@ describe('ToolGroupCard', () => {
         expect(screen.queryByText('src/a.ts')).not.toBeInTheDocument()
         expect(screen.queryByText('bun test')).not.toBeInTheDocument()
 
-        expect(view.container.innerHTML).toContain('bg-[var(--app-tool-group-bg)]')
+        expect(view.container.innerHTML).toContain('bg-transparent')
     })
 
     it('derives completed group wall-clock timing from the earliest start and latest finish', () => {
@@ -137,7 +137,7 @@ describe('ToolGroupCard', () => {
         })
     })
 
-    it('shows group start, live duration, and a spinner while collapsed and running', () => {
+    it('hides live timing until expansion while retaining the running spinner', () => {
         const startedAt = Date.now() - 5_000
         const completed = makeToolBlock('read-1', 'Read')
         completed.tool.startedAt = startedAt
@@ -156,13 +156,17 @@ describe('ToolGroupCard', () => {
         })
         const view = renderCard(group)
 
+        expect(screen.queryByText('Started')).not.toBeInTheDocument()
+        expect(screen.queryByText('Duration')).not.toBeInTheDocument()
+        expect(screen.queryByText('Finished')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { expanded: false }))
         expect(screen.getByText('Started')).toBeInTheDocument()
         expect(screen.getByText('Duration')).toBeInTheDocument()
         expect(screen.queryByText('Finished')).not.toBeInTheDocument()
         expect(within(view.container).getByLabelText('Running')).toBeInTheDocument()
     })
 
-    it('shows final timing in the collapsed header after every tool finishes', () => {
+    it('shows completed timing only after expansion', () => {
         const startedAt = Date.now() - 4_000
         const first = makeToolBlock('read-1', 'Read')
         first.tool.startedAt = startedAt
@@ -173,6 +177,10 @@ describe('ToolGroupCard', () => {
 
         renderCard(makeGroup({ tools: [first, second] }))
 
+        expect(screen.queryByText('Started')).not.toBeInTheDocument()
+        expect(screen.queryByText('Duration')).not.toBeInTheDocument()
+        expect(screen.queryByText('Finished')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { expanded: false }))
         expect(screen.getByText('Started')).toBeInTheDocument()
         expect(screen.getByText('Finished')).toBeInTheDocument()
         expect(screen.getByText('Duration')).toBeInTheDocument()

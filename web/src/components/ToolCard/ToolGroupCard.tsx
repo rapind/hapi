@@ -114,7 +114,7 @@ function RowLabel(props: { block: ToolCallBlock; metadata: SessionMetadataSummar
                     {presentation.icon}
                 </div>
                 <div className="min-w-0 flex-1">
-                    <div className="truncate whitespace-nowrap text-sm font-medium text-[var(--app-fg)]">
+                    <div className="truncate whitespace-nowrap text-sm font-normal text-[var(--app-tool-card-title)]">
                         {presentation.title}
                     </div>
                     {presentation.subtitle ? (
@@ -295,8 +295,8 @@ export function ToolGroupCard(props: {
     const fileCount = props.block.summary.fileTargets.length
 
     return (
-        <Card className="overflow-hidden rounded-[20px] bg-[var(--app-tool-group-bg)] shadow-none">
-            <CardHeader className={cn('space-y-0 p-3', subtitle ? 'pb-2' : null)}>
+        <Card className="overflow-hidden rounded-2xl bg-transparent shadow-none">
+            <CardHeader className="space-y-0 px-0 py-1">
                 <button
                     type="button"
                     onClick={() => setOpen((value) => !value)}
@@ -309,16 +309,10 @@ export function ToolGroupCard(props: {
                                 <div className="shrink-0 flex h-3.5 w-3.5 items-center justify-center text-[var(--app-tool-card-accent)] leading-none">
                                     <DetailsIcon open={open} />
                                 </div>
-                                <CardTitle className="min-w-0 truncate whitespace-nowrap text-sm font-medium leading-tight text-[var(--app-fg)]">
+                                <CardTitle className="min-w-0 truncate whitespace-nowrap text-sm font-normal leading-tight text-[var(--app-tool-card-title)]">
                                     {primaryTitle}
                                 </CardTitle>
                             </div>
-                            <ToolTimingSummary
-                                startedAt={groupTiming.startedAt}
-                                completedAt={groupTiming.completedAt}
-                                durationMs={groupTiming.durationMs}
-                                typography="group"
-                            />
                         </div>
 
                         <div className="flex shrink-0 items-center gap-2 self-center text-[var(--app-hint)]">
@@ -364,6 +358,14 @@ export function ToolGroupCard(props: {
 
             {open ? (
                 <CardContent className="px-3 pb-3 pt-1">
+                    <div className="mb-2">
+                        <ToolTimingSummary
+                            startedAt={groupTiming.startedAt}
+                            completedAt={groupTiming.completedAt}
+                            durationMs={groupTiming.durationMs}
+                            typography="group"
+                        />
+                    </div>
                     <div className="flex flex-col gap-2">
                         {props.block.presentationMode === 'codex-exploration' ? (
                             <CodexExplorationRows tools={props.block.tools} onSelect={setSelectedToolId} />

@@ -217,6 +217,7 @@ export function StatusBar(props: {
     copilotAgentMode?: import('@hapi/protocol').CopilotAgentMode
     agentFlavor?: string | null
     voiceStatus?: ConversationStatus
+    inline?: boolean
 }) {
     const { t } = useTranslation()
     const [savingPromptMode, setSavingPromptMode] = useState(false)
@@ -313,7 +314,7 @@ export function StatusBar(props: {
     }
 
     const statusBar = (
-        <div className="flex min-w-0 items-baseline justify-between gap-2 px-2 pb-1">
+        <div data-testid="composer-status" className={props.inline ? "flex shrink-0 items-center gap-3" : "flex min-w-0 items-baseline justify-between gap-2 px-2 pb-1"}>
             <div className="flex min-w-0 items-baseline gap-2">
                 <div className="relative top-px sm:top-0.5 flex shrink-0 items-center gap-1.5">
                     <span

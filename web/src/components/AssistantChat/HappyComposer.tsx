@@ -48,7 +48,6 @@ import { StatusBar } from '@/components/AssistantChat/StatusBar'
 import {
     ComposerButtons,
     UnifiedButton,
-    isComposerPrimaryFillHeight,
 } from '@/components/AssistantChat/ComposerButtons'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { SortableComposerAttachments } from '@/components/AssistantChat/SortableComposerAttachments'
@@ -791,7 +790,7 @@ export function HappyComposer(props: {
     const { haptic: platformHaptic, isTouch } = usePlatform()
     const { isStandalone, isIOS } = usePWAInstall()
     const isIOSPWA = isIOS && isStandalone
-    const bottomPaddingClass = isIOSPWA ? 'pb-0' : 'pb-3'
+    const bottomPaddingClass = isIOSPWA ? 'pb-0' : 'pb-1'
     const activeWord = useActiveWord(inputState.text, inputState.selection, autocompletePrefixes)
     const [suggestions, selectedIndex, moveUp, moveDown, clearSuggestions] = useActiveSuggestions(
         activeWord,
@@ -1545,13 +1544,7 @@ export function HappyComposer(props: {
     )
     const showAbortButton = true
     const routesToScratchlist = (props.scratchlistMode ?? false) && pendingSchedule == null
-    const primaryFillHeight = isComposerPrimaryFillHeight({
-        canSend,
-        voiceEnabled: false,
-        voiceStatus: 'disconnected',
-        routesToScratchlist,
-        expanded: isExpanded,
-    })
+
 
     // The model name opens the full settings sheet at every viewport width.
     const isNarrowViewport = useNarrowViewport()
@@ -2080,32 +2073,12 @@ export function HappyComposer(props: {
 
     return (
         <ComposerParkingContext.Provider value={isParkingScratchlist}>
-            <div className={`app-chat-composer border-t border-[var(--app-border)] ${shellClassName}`} data-testid="composer-shell" data-expanded={isExpanded || undefined}>
+            <div className={`app-chat-composer ${shellClassName}`} data-testid="composer-shell" data-expanded={isExpanded || undefined}>
                 <div className={innerClassName}>
                     <ComposerPrimitive.Root className={rootClassName} onSubmit={handleSubmit}>
                         {overlays}
 
-                        <StatusBar
-                            active={active}
-                            thinking={thinking}
-                            agentState={agentState}
-                            backgroundTaskCount={backgroundTaskCount}
-                            contextSize={contextSize}
-                            contextCacheRead={contextCacheRead}
-                            contextWindow={contextWindow}
-                            contextModel={contextModel}
-                            model={model}
-                            codexPromptMode={props.codexPromptMode}
-                            onCodexPromptModeChange={props.onCodexPromptModeChange}
-                            modelReasoningEffort={modelReasoningEffort}
-                            effort={effort}
-                            serviceTier={serviceTier}
-                            permissionMode={permissionMode}
-                            collaborationMode={collaborationMode}
-                            copilotAgentMode={copilotAgentMode}
-                            agentFlavor={agentFlavor}
-                            voiceStatus="disconnected"
-                        />
+
 
                         {sendError ? (
                             <div
@@ -2129,8 +2102,7 @@ export function HappyComposer(props: {
                         ) : null}
 
                         <div
-                            className={`flex overflow-hidden rounded-[20px] bg-[var(--app-secondary-bg)] ${
-                            isExpanded ? 'min-h-0 flex-1' : ''
+                            className={`flex overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-secondary-bg)] ${isExpanded ? 'min-h-0 flex-1' : ''
                                 } ${
                             sendError ? 'ring-1 ring-red-500' : ''
                                 }`}
@@ -2152,8 +2124,7 @@ export function HappyComposer(props: {
                                     </div>
                                 ) : null}
 
-                                <div className={`flex px-4 py-3 ${
-                                isExpanded ? 'min-h-0 flex-1 items-stretch' : 'items-center'
+                                <div className={`flex px-3 py-2 ${isExpanded ? 'min-h-0 flex-1 items-stretch' : 'items-center'
                                     }`}>
                                     {richMentionsEnabled ? (
                                         <div
@@ -2210,7 +2181,46 @@ export function HappyComposer(props: {
                                         />
                                     )}
                                 </div>
+
+                            </div>
+                            {/* Send stays available beside the input; an empty draft never starts voice. */}
+                            <div className="flex shrink-0 items-end p-2">
+                                <UnifiedButton
+                                    canSend={canSend}
+                                    voiceStatus="disconnected"
+                                    voiceEnabled={false}
+                                    controlsDisabled={controlsDisabled}
+                                    onSend={handleSend}
+                                    onVoiceToggle={() => { }}
+                                    fillHeight={false}
+                                    routesToScratchlist={routesToScratchlist}
+                                />
+                            </div>
+                        </div>
                                 <ComposerButtons
+                            statusLine={
+                                <StatusBar inline
+                                    active={active}
+                                    thinking={thinking}
+                                    agentState={agentState}
+                                    backgroundTaskCount={backgroundTaskCount}
+                                    contextSize={contextSize}
+                                    contextCacheRead={contextCacheRead}
+                                    contextWindow={contextWindow}
+                                    contextModel={contextModel}
+                                    model={model}
+                                    codexPromptMode={props.codexPromptMode}
+                                    onCodexPromptModeChange={props.onCodexPromptModeChange}
+                                    modelReasoningEffort={modelReasoningEffort}
+                                    effort={effort}
+                                    serviceTier={serviceTier}
+                                    permissionMode={permissionMode}
+                                    collaborationMode={collaborationMode}
+                                    copilotAgentMode={copilotAgentMode}
+                                    agentFlavor={agentFlavor}
+                                    voiceStatus="disconnected"
+                                />
+                            }
                                     canSend={canSend}
                                     controlsDisabled={controlsDisabled}
                                     showSettingsButton={showSettingsButton}
@@ -2256,27 +2266,6 @@ export function HappyComposer(props: {
                                     onScratchlistToggle={props.onScratchlistToggle}
                                     omitPrimaryButton
                                 />
-                            </div>
-                            {/* Send stays available beside the input; an empty draft never starts voice. */}
-                            <div
-                                className={
-                                    primaryFillHeight
-                                        ? 'flex shrink-0 self-stretch items-stretch'
-                                        : 'flex shrink-0 items-end self-stretch py-3 pr-3'
-                                }
-                            >
-                                <UnifiedButton
-                                    canSend={canSend}
-                                    voiceStatus="disconnected"
-                                    voiceEnabled={false}
-                                    controlsDisabled={controlsDisabled}
-                                    onSend={handleSend}
-                                    onVoiceToggle={() => { }}
-                                    fillHeight={primaryFillHeight}
-                                    routesToScratchlist={routesToScratchlist}
-                                />
-                            </div>
-                        </div>
                     </ComposerPrimitive.Root>
                 </div>
             </div>

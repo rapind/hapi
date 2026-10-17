@@ -41,6 +41,16 @@ describe('Personal composer', () => {
         expect(onVoiceToggle).not.toHaveBeenCalled()
     })
 
+    it('keeps status indicators in the bottom toolbar outside the input card', () => {
+        render(<Preview onVoiceToggle={vi.fn()} />)
+        const toolbar = screen.getByTestId('composer-toolbar-items')
+        const card = screen.getByTestId('composer-card')
+        expect(toolbar).toContainElement(screen.getByTestId('composer-status'))
+        expect(card).not.toContainElement(toolbar)
+        expect(card).toContainElement(screen.getByRole('textbox'))
+        expect(card).toContainElement(screen.getByRole('button', { name: 'Send' }))
+    })
+
     it('enables Send after typing a draft', () => {
         localStorage.setItem('hapi.composer.richMentions', '0')
         render(<Preview onVoiceToggle={vi.fn()} />)
