@@ -6,8 +6,8 @@ import type { SessionMetadataSummary } from '@/types/api'
 import { useHappyChatContext } from '@/components/AssistantChat/context'
 import { getToolTimingDetails, ToolDetailDialogContent, ToolStatusIcon, ToolTimingSummary, toolStatusColorClass } from '@/components/ToolCard/ToolCard'
 import { getToolPresentation } from '@/components/ToolCard/knownTools'
-import { formatGroupedHeaderSubtitle, formatGroupedHeaderTitle, safeGroupedLabelValue } from '@/components/ToolCard/groupedPresentation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatGroupedHeaderTitle, safeGroupedLabelValue } from '@/components/ToolCard/groupedPresentation'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
@@ -68,32 +68,6 @@ function RowStatusBadge(props: { block: ToolCallBlock }) {
         return <SummaryBadge className="bg-amber-500/10 text-amber-700" text={t('toolGroup.rowStatus.pending')} />
     }
     return null
-}
-
-function formatActionSummary(block: ToolGroupBlock, t: (key: string, params?: Record<string, string | number>) => string): string | null {
-    const parts: string[] = []
-    const { countsByKind } = block.summary
-
-    if (countsByKind.mutation > 0) {
-        parts.push(t('toolGroup.summary.mutation', { n: countsByKind.mutation }))
-    }
-    if (countsByKind.read > 0) {
-        parts.push(t('toolGroup.summary.read', { n: countsByKind.read }))
-    }
-    if (countsByKind.command > 0) {
-        parts.push(t('toolGroup.summary.command', { n: countsByKind.command }))
-    }
-    if (countsByKind.search > 0) {
-        parts.push(t('toolGroup.summary.search', { n: countsByKind.search }))
-    }
-    if (countsByKind.web > 0) {
-        parts.push(t('toolGroup.summary.web', { n: countsByKind.web }))
-    }
-    if (countsByKind.other > 0 && parts.length > 0) {
-        parts.push(t('toolGroup.summary.other', { n: countsByKind.other }))
-    }
-
-    return parts.length > 0 ? parts.join(' · ') : null
 }
 
 function RowLabel(props: { block: ToolCallBlock; metadata: SessionMetadataSummary | null }) {
@@ -286,12 +260,6 @@ export function ToolGroupCard(props: {
     }, [selectedTool, props.metadata, t])
 
     const primaryTitle = formatGroupedHeaderTitle(props.block, t)
-    const subtitle = props.block.presentationMode === 'codex-exploration'
-        ? null
-        : formatGroupedHeaderSubtitle(props.block, t) ?? formatActionSummary(props.block, t)
-    const summaryBadgeText = props.block.presentationMode === 'codex-exploration'
-        ? null
-        : subtitle ?? t('toolGroup.toolCount', { n: props.block.tools.length })
     const fileCount = props.block.summary.fileTargets.length
 
     return (
@@ -320,12 +288,6 @@ export function ToolGroupCard(props: {
                                 <span className={toolStatusColorClass('running')} aria-label={t('toolGroup.rowStatus.running')}>
                                     <ToolStatusIcon state="running" />
                                 </span>
-                            ) : null}
-                            {summaryBadgeText ? (
-                                <SummaryBadge
-                                    className="bg-[var(--app-subtle-bg)] text-xs font-normal text-[var(--app-hint)]"
-                                    text={summaryBadgeText}
-                                />
                             ) : null}
                             {props.block.summary.runningCount > 0 ? (
                                 <SummaryBadge

@@ -112,9 +112,8 @@ describe('ToolGroupCard', () => {
         const view = renderCard(makeGroup())
 
         expect(screen.getByRole('button', { name: /inspect a\.ts/i })).toHaveAttribute('aria-expanded', 'false')
-        expect(screen.getByText('Run 1 · Read 1')).toBeInTheDocument()
+        expect(screen.queryByText('Run 1 · Read 1')).not.toBeInTheDocument()
         expect(screen.queryByText('2 actions')).not.toBeInTheDocument()
-        expect(screen.getByText('Run 1 · Read 1')).toHaveClass('text-xs', 'font-normal', 'text-[var(--app-hint)]')
         expect(screen.queryByText('src/a.ts')).not.toBeInTheDocument()
         expect(screen.queryByText('bun test')).not.toBeInTheDocument()
 
@@ -195,7 +194,7 @@ describe('ToolGroupCard', () => {
         fireEvent.click(groupToggle)
         expect(groupToggle).toHaveAttribute('aria-expanded', 'true')
         expect(view.container.querySelector('svg[data-state="open"]')).toBeInTheDocument()
-        expect(screen.getByText('Run 1 · Read 1')).toBeInTheDocument()
+        expect(screen.queryByText('Run 1 · Read 1')).not.toBeInTheDocument()
         expect(screen.queryByText('2 actions')).not.toBeInTheDocument()
         expect(screen.getByText('src/a.ts')).toBeInTheDocument()
         expect(screen.getByText('bun test')).toBeInTheDocument()
@@ -291,7 +290,7 @@ describe('ToolGroupCard', () => {
         }))
 
         expect(screen.getByRole('button', { name: /tool activity/i })).toBeInTheDocument()
-        expect(screen.getByText('25 actions')).toBeInTheDocument()
+        expect(screen.queryByText('25 actions')).not.toBeInTheDocument()
         expect(screen.queryByText('Use tool +24')).not.toBeInTheDocument()
         expect(screen.queryByText('Tool 25')).not.toBeInTheDocument()
 
