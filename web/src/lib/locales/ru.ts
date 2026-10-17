@@ -228,6 +228,9 @@ export default {
   // Шапка сессии
   'session.title': 'Файлы',
   'session.view.returnToChat': 'Вернуться к диалогу',
+    'session.fullscreen.enter': 'На весь экран',
+    'session.fullscreen.exit': 'Выйти из полноэкранного режима',
+    'session.fullscreen.failed': 'Не удалось изменить полноэкранный режим',
   'session.more': 'Дополнительные действия',
   'session.outline.open': 'План диалога',
   'session.outline.close': 'Закрыть план',

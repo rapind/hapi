@@ -466,7 +466,7 @@ function ToolCardInner(props: ToolCardProps) {
                         {presentation.icon}
                     </div>
                     <CardTitle className={cn(
-                        'min-w-0 text-sm font-normal leading-tight text-[var(--app-tool-card-title)]',
+                        'min-w-0 text-[length:var(--app-chat-font-size)] font-normal leading-relaxed text-[var(--app-tool-card-title)]',
                         isCodexAgentCard ? 'truncate whitespace-nowrap' : 'break-words'
                     )}>
                         {toolTitle}
@@ -507,7 +507,7 @@ function ToolCardInner(props: ToolCardProps) {
 
     return (
         <Card className={cn('overflow-hidden rounded-2xl bg-transparent shadow-none', isPromptCard && 'border border-[var(--app-border)]')}>
-            <CardHeader className={cn('space-y-0', isPromptCard ? 'p-3' : 'px-0 py-1')}>
+            <CardHeader className={cn('space-y-0', isPromptCard ? 'p-3' : 'px-0 py-1.5')}>
                 <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
                     <DialogTrigger asChild>
                         <button

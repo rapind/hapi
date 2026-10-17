@@ -154,6 +154,39 @@ export function SessionHeader(props: {
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [isSyncingCodex, setIsSyncingCodex] = useState(false)
     const [isSyncingPi, setIsSyncingPi] = useState(false)
+    const fullscreenSupported = typeof document !== 'undefined'
+        && document.fullscreenEnabled
+        && typeof document.documentElement.requestFullscreen === 'function'
+    const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && document.fullscreenElement === document.documentElement)
+    const [fullscreenPending, setFullscreenPending] = useState(false)
+
+    useEffect(() => {
+        const updateFullscreen = () => setFullscreen(document.fullscreenElement === document.documentElement)
+        document.addEventListener('fullscreenchange', updateFullscreen)
+        return () => document.removeEventListener('fullscreenchange', updateFullscreen)
+    }, [])
+
+    const toggleFullscreen = async () => {
+        if (fullscreenPending) return
+        setFullscreenPending(true)
+        try {
+            if (document.fullscreenElement) {
+                await document.exitFullscreen()
+            } else {
+                await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+            }
+        } catch (error) {
+            addToast({
+                title: t('session.fullscreen.failed'),
+                body: error instanceof Error ? error.message : t('dialog.error.default'),
+                sessionId: session.id,
+                url: `/sessions/${session.id}`,
+            })
+        } finally {
+            setFullscreenPending(false)
+        }
+    }
+
 
     const { archiveSession, reopenSession, renameSession, suggestSessionTitle, updateSessionSummary, setPinMode, deleteSession, isPending } = useSessionActions(
         api,
@@ -363,6 +396,22 @@ export function SessionHeader(props: {
                             aria-pressed={props.terminalActive ?? false}
                         >
                             <TerminalIcon />
+                        </button>
+                    ) : null}
+
+                    {fullscreenSupported ? (
+                        <button
+                            type="button"
+                            onClick={() => void toggleFullscreen()}
+                            disabled={fullscreenPending}
+                            title={t(fullscreen ? 'session.fullscreen.exit' : 'session.fullscreen.enter')}
+                            aria-label={t(fullscreen ? 'session.fullscreen.exit' : 'session.fullscreen.enter')}
+                            aria-pressed={fullscreen}
+                            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-chat-header-fg)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)] disabled:opacity-50"
+                        >
+                            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                                <path d={fullscreen ? 'M8 3v5H3m18 0h-5V3M3 16h5v5m8 0v-5h5' : 'M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5'} />
+                            </svg>
                         </button>
                     ) : null}
 

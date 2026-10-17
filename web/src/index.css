@@ -89,8 +89,8 @@
     --app-badge-error-border: rgba(239, 68, 68, 0.3);
 
     --app-font-scale: 1;
-    --app-chat-font-size: 0.9375rem;
-    --app-chat-line-height: 1.75rem;
+    --app-chat-font-size: 1rem;
+    --app-chat-line-height: 1.875rem;
     --app-message-action-size: 1.125rem;
 }
 
@@ -455,6 +455,8 @@ html:has(.chat-scroll-y) #root {
     --app-chat-user-surface-bg: var(--app-chat-message-bg);
     --app-message-gutter: calc(var(--app-panel-gutter) + var(--app-message-side-inset));
     color: var(--app-fg);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
     padding-inline: max(0px, calc(var(--app-message-gutter) - var(--chat-scroll-gutter-inline, 0px)));
 }
 

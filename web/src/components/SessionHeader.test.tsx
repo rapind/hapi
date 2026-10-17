@@ -45,6 +45,7 @@ function renderHeader(session: Session, extra?: { serviceTier?: string | null; t
         <QueryClientProvider client={new QueryClient()}>
             <ToastProvider>
                 <I18nProvider>
+                    <ToastMessages />
                     <SessionHeader
                         session={session}
                         serviceTier={extra?.serviceTier}
@@ -355,5 +356,61 @@ describe('SessionHeader', () => {
         fireEvent.click(screen.getByRole('menuitem', { name: 'Pin in project' }))
 
         expect(await screen.findByText('Could not update pin: Network unavailable')).toBeInTheDocument()
+    })
+})
+
+describe('App fullscreen', () => {
+    afterEach(() => {
+        for (const key of ['fullscreenEnabled', 'fullscreenElement', 'exitFullscreen']) {
+            Reflect.deleteProperty(document, key)
+        }
+        Reflect.deleteProperty(document.documentElement, 'requestFullscreen')
+    })
+
+    it('hides the toggle when fullscreen is unavailable', () => {
+        renderHeader(baseSession())
+        expect(screen.queryByRole('button', { name: 'Enter fullscreen' })).not.toBeInTheDocument()
+    })
+
+    it('toggles the whole document and follows browser fullscreen changes', async () => {
+        let current: Element | null = null
+        const request = vi.fn(async () => {
+            current = document.documentElement
+            document.dispatchEvent(new Event('fullscreenchange'))
+        })
+        const exit = vi.fn(async () => {
+            current = null
+            document.dispatchEvent(new Event('fullscreenchange'))
+        })
+        Object.defineProperties(document, {
+            fullscreenEnabled: { configurable: true, value: true },
+            fullscreenElement: { configurable: true, get: () => current },
+            exitFullscreen: { configurable: true, value: exit },
+        })
+        Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: request })
+        renderHeader(baseSession())
+        fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' }))
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeEnabled())
+        expect(request).toHaveBeenCalledWith({ navigationUI: 'hide' })
+        fireEvent.click(screen.getByRole('button', { name: 'Exit fullscreen' }))
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toBeEnabled())
+        expect(exit).toHaveBeenCalledOnce()
+        fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' }))
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeEnabled())
+        current = null
+        fireEvent(document, new Event('fullscreenchange'))
+        expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toBeInTheDocument()
+    })
+
+    it('reports a rejected request and allows another attempt', async () => {
+        Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: true })
+        Object.defineProperty(document.documentElement, 'requestFullscreen', {
+            configurable: true,
+            value: vi.fn().mockRejectedValue(new Error('Fullscreen denied')),
+        })
+        renderHeader(baseSession())
+        fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' }))
+        await waitFor(() => expect(screen.getByText('Could not change fullscreen mode: Fullscreen denied')).toBeInTheDocument())
+        expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toBeEnabled()
     })
 })

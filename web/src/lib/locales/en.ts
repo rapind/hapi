@@ -228,6 +228,9 @@ export default {
   // Session header
   'session.title': 'Files',
   'session.view.returnToChat': 'Return to conversation',
+    'session.fullscreen.enter': 'Enter fullscreen',
+    'session.fullscreen.exit': 'Exit fullscreen',
+    'session.fullscreen.failed': 'Could not change fullscreen mode',
   'session.more': 'More actions',
   'session.outline.open': 'Conversation outline',
   'session.outline.close': 'Close outline',

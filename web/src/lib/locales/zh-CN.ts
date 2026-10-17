@@ -228,6 +228,9 @@ export default {
   // Session header
   'session.title': '文件',
   'session.view.returnToChat': '返回会话',
+    'session.fullscreen.enter': '进入全屏',
+    'session.fullscreen.exit': '退出全屏',
+    'session.fullscreen.failed': '无法切换全屏模式',
   'session.more': '更多操作',
   'session.outline.open': '会话大纲',
   'session.outline.close': '关闭大纲',

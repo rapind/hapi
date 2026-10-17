@@ -88,7 +88,7 @@ function RowLabel(props: { block: ToolCallBlock; metadata: SessionMetadataSummar
                     {presentation.icon}
                 </div>
                 <div className="min-w-0 flex-1">
-                    <div className="truncate whitespace-nowrap text-sm font-normal text-[var(--app-tool-card-title)]">
+                    <div className="truncate whitespace-nowrap text-[length:var(--app-chat-font-size)] font-normal leading-relaxed text-[var(--app-tool-card-title)]">
                         {presentation.title}
                     </div>
                     {presentation.subtitle ? (
@@ -264,7 +264,7 @@ export function ToolGroupCard(props: {
 
     return (
         <Card className="overflow-hidden rounded-2xl bg-transparent shadow-none">
-            <CardHeader className="space-y-0 px-0 py-1">
+            <CardHeader className="space-y-0 px-0 py-1.5">
                 <button
                     type="button"
                     onClick={() => setOpen((value) => !value)}
@@ -277,7 +277,7 @@ export function ToolGroupCard(props: {
                                 <div className="shrink-0 flex h-3.5 w-3.5 items-center justify-center text-[var(--app-tool-card-accent)] leading-none">
                                     <DetailsIcon open={open} />
                                 </div>
-                                <CardTitle className="min-w-0 truncate whitespace-nowrap text-sm font-normal leading-tight text-[var(--app-tool-card-title)]">
+                                <CardTitle className="min-w-0 truncate whitespace-nowrap text-[length:var(--app-chat-font-size)] font-normal leading-relaxed text-[var(--app-tool-card-title)]">
                                     {primaryTitle}
                                 </CardTitle>
                             </div>
