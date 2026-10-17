@@ -4,6 +4,7 @@
 
 :root {
     --app-panel-gutter: 0.75rem;
+    --app-message-side-inset: 40px;
     --app-chat-message-fg: var(--app-fg);
     --app-chat-message-bg: var(--app-chat-user-bg);
     --app-sidebar-bg: #f1f0eb;
@@ -40,8 +41,8 @@
     --app-code-header-bg: #eceff2;
     --app-code-header-fg: #717784;
     --app-code-copy-hover-bg: rgba(17, 24, 39, 0.06);
-    --app-inline-code-border: transparent;
-    --app-inline-code-fg: #2d333b;
+    --app-inline-code-border: #ddd6d0;
+    --app-inline-code-fg: #9f4543;
     --app-md-quote-bg: #f1f3f5;
     --app-md-quote-border: #c9d0d8;
     --app-md-quote-fg: #525965;
@@ -61,7 +62,7 @@
     --app-divider: rgba(15, 23, 42, 0.08);
     --app-subtle-bg: rgba(15, 23, 42, 0.04);
     --app-code-bg: #f5f6f7;
-    --app-inline-code-bg: #ebecef;
+    --app-inline-code-bg: #f0ebe7;
 
     /* Diff colors (light) - from hapi-app */
     --app-diff-added-bg: #e6ffed;
@@ -131,8 +132,8 @@
     --app-code-header-bg: #303030;
     --app-code-header-fg: #c4cbd6;
     --app-code-copy-hover-bg: rgba(255, 255, 255, 0.08);
-    --app-inline-code-border: transparent;
-    --app-inline-code-fg: #f5f7fa;
+    --app-inline-code-border: #373737;
+    --app-inline-code-fg: #d97876;
     --app-md-quote-bg: #31363d;
     --app-md-quote-border: #6b7481;
     --app-md-quote-fg: #d7dde6;
@@ -151,7 +152,7 @@
     --app-divider: rgba(255, 255, 255, 0.08);
     --app-subtle-bg: rgba(255, 255, 255, 0.05);
     --app-code-bg: #2a2f35;
-    --app-inline-code-bg: #383e47;
+    --app-inline-code-bg: #212121;
 
     /* Diff colors (dark) - from hapi-app */
     --app-diff-added-bg: #0d2e1f;
@@ -220,8 +221,8 @@
     --app-code-header-bg: #161618;
     --app-code-header-fg: #c4cbd6;
     --app-code-copy-hover-bg: rgba(255, 255, 255, 0.08);
-    --app-inline-code-border: transparent;
-    --app-inline-code-fg: #f5f7fa;
+    --app-inline-code-border: #373737;
+    --app-inline-code-fg: #d97876;
     --app-md-quote-bg: #131316;
     --app-md-quote-border: #3a3a40;
     --app-md-quote-fg: #d7dde6;
@@ -240,7 +241,7 @@
     --app-divider: rgba(255, 255, 255, 0.1);
     --app-subtle-bg: rgba(255, 255, 255, 0.06);
     --app-code-bg: #0e0e10;
-    --app-inline-code-bg: #1a1a1d;
+    --app-inline-code-bg: #212121;
 
     /* Diff colors (oled) */
     --app-diff-added-bg: #07251a;
@@ -452,7 +453,7 @@ html:has(.chat-scroll-y) #root {
     --app-fg: var(--app-chat-message-fg);
     --app-chat-user-fg: var(--app-chat-message-fg);
     --app-chat-user-surface-bg: var(--app-chat-message-bg);
-    --app-message-gutter: calc(var(--app-panel-gutter) + 40px);
+    --app-message-gutter: calc(var(--app-panel-gutter) + var(--app-message-side-inset));
     color: var(--app-fg);
     padding-inline: max(0px, calc(var(--app-message-gutter) - var(--chat-scroll-gutter-inline, 0px)));
 }

@@ -758,7 +758,7 @@ export function ComposerButtons(props: {
     const toolbarJustifyContent = getComposerToolbarJustifyContent(layout.mode)
 
     return (
-        <div className="flex shrink-0 items-center gap-1 py-1">
+        <div className="flex shrink-0 items-center gap-1 px-[10px] py-1">
             <div
                 data-testid="composer-toolbar-items"
                 className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
