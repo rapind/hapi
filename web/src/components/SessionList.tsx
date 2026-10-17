@@ -879,7 +879,7 @@ function SessionItem(props: {
                 type="button"
                 {...longPressHandlers}
                 data-session-scroll-anchor
-                className={`session-list-item group/session-row flex w-full flex-col gap-1 py-2 pl-2.5 pr-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)] select-none rounded-lg ${selected ? 'bg-[var(--app-secondary-bg)]' : ''}`}
+                className={`session-list-item group/session-row flex w-full flex-col gap-1 py-2 pl-[5px] pr-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)] select-none rounded-lg ${selected ? 'bg-[var(--app-secondary-bg)]' : ''}`}
                 style={{ WebkitTouchCallout: 'none' }}
                 aria-current={selected ? 'page' : undefined}
                 aria-describedby={describedBy}
@@ -1134,7 +1134,7 @@ export function SessionList(props: {
         return (
             <div key={sectionKey}>
                 <div
-                    className="group/running flex min-w-0 w-full select-none items-center gap-2 rounded-lg py-1.5 pl-2 pr-2 transition-colors hover:bg-[var(--app-secondary-bg)]"
+                    className="group/running flex min-w-0 w-full select-none items-center gap-2 rounded-lg py-1.5 pl-1 pr-2 transition-colors hover:bg-[var(--app-secondary-bg)]"
                     title={t(titleKey)}
                 >
                     <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" aria-hidden="true">
@@ -1147,7 +1147,7 @@ export function SessionList(props: {
                         ({count})
                     </span>
                 </div>
-                <div className="flex flex-col gap-0.5 ml-3 pl-1 py-1">
+                <div className="flex flex-col gap-0.5 ml-1.5 pl-0.5 py-1">
                     {bucketKeys.map((bucketKey) => {
                         const bucket = RUNNING_BUCKETS.find((b) => b.key === bucketKey)
                         const sessions = runningSessions[bucketKey]
@@ -1193,7 +1193,7 @@ export function SessionList(props: {
         return (
             <div key={group.key} data-session-scroll-anchor>
                 <div
-                    className="group/project sticky top-0 z-10 flex items-center gap-2 bg-[var(--app-bg)] py-1.5 pl-2 pr-2 text-left rounded-lg transition-colors hover:bg-[var(--app-secondary-bg)] min-w-0 w-full select-none"
+                    className="group/project sticky top-0 z-10 flex items-center gap-2 bg-[var(--app-bg)] py-1.5 pl-1 pr-2 text-left rounded-lg transition-colors hover:bg-[var(--app-secondary-bg)] min-w-0 w-full select-none"
                     title={group.directory}
                 >
                     <span className="font-medium text-sm truncate flex-1">
@@ -1232,7 +1232,7 @@ export function SessionList(props: {
         return (
             <div key={group.key} data-session-scroll-anchor>
                 <div
-                    className="group/project sticky top-0 z-10 flex items-center gap-2 bg-[var(--app-bg)] py-1.5 pl-2 pr-2 text-left rounded-lg transition-colors hover:bg-[var(--app-secondary-bg)] min-w-0 w-full select-none"
+                    className="group/project sticky top-0 z-10 flex items-center gap-2 bg-[var(--app-bg)] py-1.5 pl-1 pr-2 text-left rounded-lg transition-colors hover:bg-[var(--app-secondary-bg)] min-w-0 w-full select-none"
                     title={group.directory}
                 >
                     <button
@@ -1274,7 +1274,7 @@ export function SessionList(props: {
                 </div>
 
                 {/* Sessions */}
-                <div hidden={!expanded} className={expanded ? "flex flex-col gap-0.5 ml-3 pl-1 py-1" : "hidden"}>
+                <div hidden={!expanded} className={expanded ? "flex flex-col gap-0.5 ml-1.5 pl-0.5 py-1" : "hidden"}>
                     {group.sessions.map((s, index) => (
                         <div key={s.id} className="contents">
                             {shouldShowPinnedDivider(group.sessions, index) ? (
@@ -1434,7 +1434,7 @@ export function SessionList(props: {
                     </div>
                 ) : null}
                 <div ref={scrollContainerRef} className="app-scroll-y session-list-scrollbar-left scrollbar-auto-hide min-h-0 flex-1">
-                    <SessionListScrollAnchor sessions={props.sessions} className="mx-auto flex w-full max-w-content flex-col gap-1 pl-1.5 pr-2 pb-2">
+                    <SessionListScrollAnchor sessions={props.sessions} className="mx-auto flex w-full max-w-content flex-col gap-1 pl-[3px] pr-2 pb-2">
                         {props.sessions.length === 0 && !props.isLoading ? (
                             <SessionsEmptyState
                                 onNewSession={props.onNewSession}
@@ -1444,7 +1444,7 @@ export function SessionList(props: {
                         {globalPinnedSessions.length > 0 ? (
                             <div key="pinned-section">
                                 <div
-                                    className="group/pinned flex min-w-0 w-full select-none items-center gap-2 rounded-lg py-1.5 pl-2 pr-2 transition-colors hover:bg-[var(--app-secondary-bg)]"
+                                    className="group/pinned flex min-w-0 w-full select-none items-center gap-2 rounded-lg py-1.5 pl-1 pr-2 transition-colors hover:bg-[var(--app-secondary-bg)]"
                                     title={t('sessions.pinnedSection')}
                                 >
                                     <span className="inline-flex min-w-0 items-center gap-1">
@@ -1458,7 +1458,7 @@ export function SessionList(props: {
                                         ({globalPinnedSessions.length})
                                     </span>
                                 </div>
-                                <div className="flex flex-col gap-0.5 ml-3 pl-1 py-1">
+                                <div className="flex flex-col gap-0.5 ml-1.5 pl-0.5 py-1">
                                     {globalPinnedSessions.map((s) => (
                                         <SessionItem
                                             key={s.id}

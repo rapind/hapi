@@ -3,6 +3,9 @@
 @config "../tailwind.config.ts";
 
 :root {
+    --app-chat-header-bg: #fbf0e9;
+    --app-chat-header-fg: #a34c30;
+    --app-composer-fg: #a34c30;
     --app-bg: var(--tg-theme-bg-color, #ffffff);
     --app-fg: var(--tg-theme-text-color, #111827);
     --app-hint: var(--tg-theme-hint-color, #6b7280);
@@ -85,6 +88,9 @@
 }
 
 [data-theme="dark"] {
+    --app-chat-header-bg: #2b211d;
+    --app-chat-header-fg: #e5ac90;
+    --app-composer-fg: #e5ac90;
     /* Primary colors - override fallbacks for non-Telegram browsers */
     --app-bg: var(--tg-theme-bg-color, #1c1c1e);
     --app-fg: var(--tg-theme-text-color, #ffffff);
@@ -162,6 +168,9 @@
 }
 
 [data-theme="oled"] {
+    --app-chat-header-bg: #1c1410;
+    --app-chat-header-fg: #e5ac90;
+    --app-composer-fg: #e5ac90;
     /*
      * Pure-black canvas for OLED panels. Unlike Dark mode we never defer to
      * --tg-theme-* here, otherwise Telegram's gray backgrounds would defeat the

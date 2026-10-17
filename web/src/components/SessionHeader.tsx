@@ -84,8 +84,8 @@ function OutlineIcon(props: { className?: string }) {
 function headerToggleClass(active: boolean): string {
     return `flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
         active
-            ? 'bg-[var(--app-button)] text-[var(--app-button-text)] hover:opacity-90'
-            : 'text-[var(--app-hint)] hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]'
+            ? 'bg-[var(--app-chat-header-fg)] text-[var(--app-chat-header-bg)] hover:opacity-90'
+            : 'text-[var(--app-chat-header-fg)] hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]'
         }`
 }
 
@@ -300,13 +300,13 @@ export function SessionHeader(props: {
 
     return (
         <>
-            <div className="w-full shrink-0 border-b border-[var(--app-border)] bg-[var(--app-bg)] pt-[env(safe-area-inset-top)]">
-                <div className="mx-auto w-full max-w-content flex items-center gap-2 p-3">
+            <div className="w-full shrink-0 border-b border-[var(--app-border)] bg-[var(--app-chat-header-bg)] text-[var(--app-chat-header-fg)] pt-[env(safe-area-inset-top)]">
+                <div className="mx-auto w-full max-w-content flex items-center gap-2 px-3 py-1.5">
                     {/* Back button */}
                     <button
                         type="button"
                         onClick={props.onBack}
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-hint)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)] split:hidden"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-chat-header-fg)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)] split:hidden"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -374,7 +374,7 @@ export function SessionHeader(props: {
                         aria-haspopup="menu"
                         aria-expanded={menuOpen}
                         aria-controls={menuOpen ? menuId : undefined}
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-hint)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-chat-header-fg)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]"
                         title={t('session.more')}
                     >
                         <MoreVerticalIcon />
