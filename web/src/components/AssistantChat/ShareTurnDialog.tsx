@@ -390,7 +390,7 @@ function appendTextFallback(target: DocumentFragment | HTMLElement, snapshot: Sh
     if (snapshot.text.trim().length === 0) return
     const fallback = document.createElement('div')
     fallback.className = snapshot.role === 'user'
-        ? 'happy-user-bubble happy-chat-text ml-auto w-fit min-w-0 max-w-[92%] whitespace-pre-wrap break-words rounded-2xl bg-[var(--app-chat-user-surface-bg)] px-4 py-2.5 text-[var(--app-chat-user-fg)] shadow-none'
+        ? 'happy-user-bubble happy-chat-text ml-auto w-fit min-w-0 max-w-[92%] whitespace-pre-wrap break-words rounded-2xl bg-[var(--app-chat-user-surface-bg)] px-4 py-1.5 text-[var(--app-chat-user-fg)] shadow-none'
         : 'whitespace-pre-wrap break-words rounded-2xl border border-[var(--app-border)] px-4 py-2.5 text-sm leading-6 text-[var(--app-fg)]'
     if (snapshot.role) fallback.dataset.hapiMessageRole = snapshot.role
     fallback.textContent = snapshot.text
