@@ -2108,8 +2108,7 @@ export function HappyComposer(props: {
                                 }`}
                             data-testid="composer-card"
                         >
-                            <div className={`flex min-w-0 flex-1 flex-col ${
-                            isExpanded ? 'min-h-0' : ''
+                            <div className={`flex min-w-0 flex-1 flex-col justify-center ${isExpanded ? 'min-h-0' : ''
                                 }`}>
                                 {attachments.length > 0 ? (
                                     <div className={`flex flex-wrap gap-2 px-4 pt-3 ${
@@ -2124,7 +2123,7 @@ export function HappyComposer(props: {
                                     </div>
                                 ) : null}
 
-                                <div className={`flex px-3 py-2 ${isExpanded ? 'min-h-0 flex-1 items-stretch' : 'items-center'
+                                <div className={`flex px-3 py-1.5 ${isExpanded ? 'min-h-0 flex-1 items-stretch' : 'items-center'
                                     }`}>
                                     {richMentionsEnabled ? (
                                         <div
@@ -2184,7 +2183,7 @@ export function HappyComposer(props: {
 
                             </div>
                             {/* Send stays available beside the input; an empty draft never starts voice. */}
-                            <div className="flex shrink-0 items-end p-2">
+                            <div className="flex shrink-0 items-end p-0.5">
                                 <UnifiedButton
                                     canSend={canSend}
                                     voiceStatus="disconnected"
