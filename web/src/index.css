@@ -4,7 +4,7 @@
 
 :root {
     --app-panel-gutter: 0.75rem;
-    --app-message-side-inset: 50px;
+    --app-message-side-inset: 0px;
     --app-chat-message-fg: var(--app-fg);
     --app-chat-message-bg: var(--app-chat-user-bg);
     --app-sidebar-bg: var(--app-bg);
@@ -92,6 +92,12 @@
     --app-chat-font-size: 1.0625rem;
     --app-chat-line-height: 2rem;
     --app-message-action-size: 1.125rem;
+}
+
+@media (min-width: 640px) {
+    :root {
+        --app-message-side-inset: 50px;
+    }
 }
 
 [data-theme="dark"] {
