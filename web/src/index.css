@@ -4,6 +4,7 @@
 
 :root {
     --app-panel-gutter: 0.75rem;
+    --app-chat-message-fg: var(--app-fg);
     --app-sidebar-bg: #f1f0eb;
     --app-chat-header-bg: #faf9f5;
     --app-chat-header-fg: #353530;
@@ -92,6 +93,7 @@
 }
 
 [data-theme="dark"] {
+    --app-chat-message-fg: #edede9;
     --app-sidebar-bg: #101010;
     --app-chat-header-bg: #141414;
     --app-chat-header-fg: #d8d7d2;
@@ -175,6 +177,7 @@
 }
 
 [data-theme="oled"] {
+    --app-chat-message-fg: #edede9;
     --app-sidebar-bg: #050505;
     --app-chat-header-bg: #080808;
     --app-chat-header-fg: #d8d7d2;
@@ -443,7 +446,11 @@ html:has(.chat-scroll-y) #root {
 }
 
 .chat-scroll-content {
-    padding-inline: max(0px, calc(var(--app-panel-gutter) - var(--chat-scroll-gutter-inline, 0px)));
+    --app-fg: var(--app-chat-message-fg);
+    --app-chat-user-fg: var(--app-chat-message-fg);
+    --app-message-gutter: calc(var(--app-panel-gutter) + 20px);
+    color: var(--app-fg);
+    padding-inline: max(0px, calc(var(--app-message-gutter) - var(--chat-scroll-gutter-inline, 0px)));
 }
 
 .session-list-content {
