@@ -384,7 +384,7 @@ export function StatusBar(props: {
 
             <div className="flex min-w-0 shrink-0 items-baseline gap-2">
                 {reasoningLabel ? (
-                    <span className="whitespace-nowrap text-xs text-[var(--app-hint)]">
+                    <span className="hidden sm:inline whitespace-nowrap text-xs text-[var(--app-hint)]">
                         {reasoningLabel}
                     </span>
                 ) : null}
@@ -396,7 +396,7 @@ export function StatusBar(props: {
                         aria-label={promptModeToggleLabel}
                         title={promptModeToggleLabel}
                         aria-busy={savingPromptMode}
-                        className="cursor-pointer whitespace-nowrap rounded-sm text-xs text-[var(--app-hint)] hover:text-[var(--app-link)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--app-link)] disabled:cursor-default disabled:opacity-50"
+                        className="hidden sm:inline-flex cursor-pointer whitespace-nowrap rounded-sm text-xs text-[var(--app-hint)] hover:text-[var(--app-link)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--app-link)] disabled:cursor-default disabled:opacity-50"
                     >
                         {t(props.codexPromptMode === 'steer' ? 'chat.codexPromptMode.steer' : 'chat.codexPromptMode.queue')}
                     </button>
@@ -417,7 +417,7 @@ export function StatusBar(props: {
                     </span>
                 ) : null}
                 {displayPermissionMode ? (
-                    <span className={`whitespace-nowrap text-xs ${permissionModeColor}`}>
+                    <span className={`hidden sm:inline whitespace-nowrap text-xs ${permissionModeColor}`}>
                         {permissionModeLabel}
                     </span>
                 ) : null}

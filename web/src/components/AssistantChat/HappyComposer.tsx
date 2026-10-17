@@ -1,3 +1,4 @@
+import { CodexPromptModeSettings } from './CodexPromptModeSettings'
 import {
     getCodexCollaborationModeOptions,
     getCopilotAgentModeOptions,
@@ -1531,9 +1532,11 @@ export function HappyComposer(props: {
     const showEffortSettings = Boolean(onEffortChange && supportsEffort(agentFlavor) && !piEffortUnavailable)
     const showFastModeSettings = Boolean(onServiceTierChange)
     const showModelAreaSettings = showModelSettings || showModelEffortSettings || showModelReasoningEffortSettings || showEffortSettings
+    const showPromptModeSettings = agentFlavor === 'codex' && Boolean(props.codexPromptMode && props.onCodexPromptModeChange)
     const showOtherSettings = showFastModeSettings || showCollaborationSettings || showCopilotAgentModeSettings
     const showSettingsButton = Boolean(
-        showCollaborationSettings
+        showPromptModeSettings
+        || showCollaborationSettings
         || showCopilotAgentModeSettings
         || showPermissionSettings
         || showModelSettings
@@ -1616,11 +1619,18 @@ export function HappyComposer(props: {
         const sheetCollaborationSettings = showCollaborationSettings && sheetOthersOn
         const sheetCopilotAgentModeSettings = showCopilotAgentModeSettings && sheetOthersOn
         const sheetModelAreaSettings = sheetModelSettings || sheetModelEffortSettings || sheetModelReasoningEffortSettings || sheetEffortSettings
+        const sheetPromptModeSettings = showPromptModeSettings && sheetOthersOn
         const sheetOtherSettings = sheetFastModeSettings || sheetCollaborationSettings || sheetCopilotAgentModeSettings
-        if (showSettings && (sheetCollaborationSettings || sheetCopilotAgentModeSettings || sheetPermissionSettings || sheetModelSettings || sheetModelEffortSettings || sheetModelReasoningEffortSettings || sheetEffortSettings || sheetFastModeSettings)) {
+        if (showSettings && (sheetPromptModeSettings || sheetCollaborationSettings || sheetCopilotAgentModeSettings || sheetPermissionSettings || sheetModelSettings || sheetModelEffortSettings || sheetModelReasoningEffortSettings || sheetEffortSettings || sheetFastModeSettings)) {
             return (
                 <div ref={settingsOverlayRef} className={`${overlayPositionClass} w-full`}>
                     <FloatingOverlay maxHeight={320}>
+                        {sheetPromptModeSettings && props.codexPromptMode && props.onCodexPromptModeChange ? (
+                            <>
+                                <CodexPromptModeSettings mode={props.codexPromptMode} onChange={props.onCodexPromptModeChange} />
+                                <div className="mx-3 h-px bg-[var(--app-divider)]" />
+                            </>
+                        ) : null}
                         {sheetModelSettings ? (
                             <div className="py-2">
                                 <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
@@ -2002,6 +2012,9 @@ export function HappyComposer(props: {
         return null
     }, [
         showSettings,
+        showPromptModeSettings,
+        props.codexPromptMode,
+        props.onCodexPromptModeChange,
         settingsSection,
         agentFlavor,
         piModels,
