@@ -42,13 +42,14 @@ export class SharedCodexProjection {
     private readonly pendingTitles = new Map<string, string>();
     private readonly completedTitles = new Set<string>();
     private titleRevision = 0;
+    private generation = 0;
     constructor(private readonly session: ApiSessionClient, readonly threadId: string,
         private readonly committed: (id: string) => Promise<void>, private readonly parentThreadId?: string) {
         if (!parentThreadId) for (const [id, turn] of Object.entries(session.getMetadata()?.conversationHistoryTurns ?? {})) this.turns.set(id, turn);
     }
 
     turnFor(id: string): string | undefined { return this.turns.get(id); }
-    reset(): void { this.converter = new AppServerEventConverter(); this.emitted.clear(); }
+    reset(): void { this.converter = new AppServerEventConverter(); this.emitted.clear(); this.generation++; }
     private send(body: Record<string, unknown>, key: string): void {
         if (this.emitted.has(key)) return;
         this.emitted.add(key);
@@ -110,9 +111,14 @@ export class SharedCodexProjection {
                 const firstInTurn = turnId ? [...this.turns].find(([, value]) => value === turnId)?.[0] : undefined;
                 if (turnId) this.turns.set(id, turnId);
                 // Reserve before yielding: live notifications can overlap history.
+                const generation = this.generation;
                 this.emitted.add(`user:${id}`);
                 try { await this.committed(id); }
-                catch (error) { this.emitted.delete(`user:${id}`); throw error; }
+                catch (error) {
+                    if (generation === this.generation) this.emitted.delete(`user:${id}`);
+                    throw error;
+                }
+                if (generation !== this.generation) return;
                 const text = inputText(item.content);
                 if (text) this.session.sendUserMessage(text, undefined, id);
                 this.session.updateMetadata(metadata => ({ ...metadata, conversationHistoryTurns: Object.fromEntries(this.turns),

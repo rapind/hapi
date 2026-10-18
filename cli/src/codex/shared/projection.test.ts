@@ -57,6 +57,27 @@ describe('shared history projection', () => {
         expect(user).toHaveBeenCalledTimes(1);
     });
 
+    it.each([false, true])('ignores stale confirmation across reconnect (failure: %s)', async failOld => {
+        let finishOld!: () => void;
+        const committed = vi.fn().mockImplementationOnce(() => new Promise<void>((resolve, reject) => {
+            finishOld = () => failOld ? reject(new Error('old write failed')) : resolve();
+        })).mockResolvedValue(undefined);
+        const user = vi.fn();
+        const session = { getMetadata: () => ({}), sendAgentMessage: vi.fn(),
+            sendUserMessage: user, updateMetadata: vi.fn() } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const params = { threadId: 'thread', turnId: 'turn', item: { id: 'prompt',
+            type: 'userMessage', content: [{ type: 'text', text: 'hello' }] } };
+        const old = projection.notification('item/started', params).catch(error => error);
+        projection.reset();
+        await projection.notification('item/completed', params);
+        finishOld();
+        await old;
+        await projection.notification('item/completed', params);
+        expect(user).toHaveBeenCalledTimes(1);
+        expect(committed).toHaveBeenCalledTimes(2);
+    });
+
     it.each([undefined, 'root'])('persists proposals without approval and replays the same IDs (parent: %s)', async parentThreadId => {
         const send = vi.fn();
         const session = { getMetadata: () => ({}), sendAgentMessage: send } as unknown as ApiSessionClient;
