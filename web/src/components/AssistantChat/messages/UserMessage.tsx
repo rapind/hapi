@@ -86,7 +86,7 @@ export function HappyUserMessage() {
             >
                 <div className="ml-auto w-full max-w-[92%]">
                     <CliOutputBlock text={cliText} />
-                    <MessageActions align="end" copyText={cliText} messageElementId={elementId} />
+                    <MessageActions align="end" copyText={cliText} allowReadAloud={false} messageElementId={elementId} />
                 </div>
             </MessagePrimitive.Root>
         )

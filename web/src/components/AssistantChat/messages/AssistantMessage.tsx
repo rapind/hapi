@@ -86,6 +86,7 @@ export function HappyAssistantMessage() {
             <MessageActions
                 align="start"
                 copyText={copyText || undefined}
+                allowReadAloud={!isCliOutput}
                 metadata={metadata}
                 messageElementId={elementId}
                 showFork={showForkCurrent}

@@ -20,6 +20,7 @@ export type MessageHistoryAction = {
 type MessageActionsProps = {
     align: 'start' | 'end'
     copyText?: string
+    allowReadAloud?: boolean
     metadata?: Omit<MessageMetadataProps, 'className'>
     messageElementId?: string
     showFork?: boolean
@@ -49,6 +50,7 @@ export function selectThreadIsRunning(state: MessageActionsAuiState): boolean {
 export function MessageActions({
     align,
     copyText,
+    allowReadAloud = true,
     metadata,
     messageElementId,
     showFork = false,
@@ -117,10 +119,10 @@ export function MessageActions({
                 {align === 'end' && hasMetadata && metadata ? <MessageInfoPopover metadata={metadata} /> : null}
                 {align === 'end' ? shareButton : null}
                 {align === 'end' ? historyButtons : null}
-                {align === 'end' && copyText ? <MessageSpeechButton text={copyText} /> : null}
+                {align === 'end' && copyText && allowReadAloud ? <MessageSpeechButton text={copyText} /> : null}
                 {align === 'end' ? copyButton : null}
                 {align === 'start' ? copyButton : null}
-                {align === 'start' && copyText ? <MessageSpeechButton text={copyText} /> : null}
+                {align === 'start' && copyText && allowReadAloud ? <MessageSpeechButton text={copyText} /> : null}
                 {align === 'start' ? historyButtons : null}
                 {align === 'start' ? shareButton : null}
                 {align === 'start' && hasMetadata && metadata ? <MessageInfoPopover metadata={metadata} /> : null}

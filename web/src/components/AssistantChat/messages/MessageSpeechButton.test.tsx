@@ -115,6 +115,35 @@ describe('message read aloud', () => {
             '# Heading\n\n- **First** &amp; `second`\n- [Third](https://example.com)\n\n![A diagram](https://example.com/image.png)\n\n```sh\necho hello\n```'
         )
         fireEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
-        expect(spoken[0].text).toBe('Heading First & second Third A diagram echo hello')
+        expect(spoken[0].text).toBe('Heading First & Third')
+    })
+
+    it('reads the conversational text around code, terminal prompts and Git commit hashes', () => {
+        mount(
+            'The update is ready (352467a9).\n\n```sh\ngit status --short\n```\n\n    bun run test\n\n$ git log -1\n\nAll tests pass. See [the details](https://example.com/commit/15c8e95a) or run `git diff`.'
+        )
+        fireEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+        expect(spoken[0].text).toBe('The update is ready. All tests pass. See the details or run.')
+    })
+
+    it('does not mistake ordinary numbers and words for Git hashes', () => {
+        mount('The mural was defaced. We checked 20261018 records and fixed 42 issues. Commit deadbeef is deployed.')
+        fireEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+        expect(spoken[0].text).toBe(
+            'The mural was defaced. We checked 20261018 records and fixed 42 issues. Commit is deployed.'
+        )
+    })
+
+    it('hides read aloud when a message contains only code or commit hashes', () => {
+        mount('```ts\nconst value = 42\n```\n\n`git status`\n\n352467a9')
+        expect(screen.queryByRole('button', { name: 'Read aloud' })).toBeNull()
+    })
+
+    it('omits full SHA-1 and SHA-256 commit links and notification metadata', () => {
+        mount(
+            'The fix is deployed. [0123456789abcdef0123456789abcdef01234567](https://example.com/commit/0123456789abcdef0123456789abcdef01234567)\n\n0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n\nAll checks passed.\n\nAGENT_NOTIFY_SUMMARY {"summary":"Done","status":"done"}'
+        )
+        fireEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+        expect(spoken[0].text).toBe('The fix is deployed. All checks passed.')
     })
 })
