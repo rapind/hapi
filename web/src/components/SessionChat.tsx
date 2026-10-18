@@ -121,7 +121,6 @@ import { useVoiceOptional } from '@/lib/voice-context'
 import { AgentTerminalView } from '@/components/AgentTerminal/AgentTerminalView'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { VoiceBackendSession, registerSessionStore, registerVoiceHooksStore, voiceHooks } from '@/realtime'
-import { isRemoteTerminalSupported } from '@/utils/terminalSupport'
 
 type SessionModelSelection = { provider: string; modelId: string } | string | null
 
@@ -234,60 +233,6 @@ export function shouldClearReasoningEffortForModelChange(args: {
  */
 export function shouldAutoClearPendingSchedule(pending: PendingSchedule | null): boolean {
     return pending !== null && pending.type === 'absolute'
-}
-
-/**
- * True if the keystroke matches the scratchlist-mode toggle shortcut
- * (Ctrl/Cmd + Shift + S, no Alt). Pure / exported for unit tests.
- *
- * Convention: matches the v1 always-visible panel's shortcut so muscle
- * memory carries over. Sibling globals follow the same modifier shape
- * (Ctrl/Cmd-m cycles agent model in HappyComposer).
- */
-export function isScratchlistToggleHotkey(e: {
-    metaKey: boolean
-    ctrlKey: boolean
-    shiftKey: boolean
-    altKey: boolean
-    key: string
-}): boolean {
-    if (!(e.metaKey || e.ctrlKey)) return false
-    if (!e.shiftKey) return false
-    if (e.altKey) return false
-    return e.key === 'S' || e.key === 's'
-}
-
-/**
- * True when the global scratchlist hotkey should be SKIPPED for the
- * given event target. Window-level shortcuts that fire regardless of
- * focus can quietly toggle modes "behind" modal dialogs (rename,
- * schedule picker, FUE callout) and that's the kind of UX bug the bot
- * caught on PR #798.
- *
- * Block targets:
- *   - any descendant of an open dialog (Radix UI's DialogContent renders
- *     role="dialog", as do FueCallout / ScheduleTimePicker / ImagePreview)
- *   - HTMLInputElement (single-line inputs)
- *   - HTMLSelectElement
- *   - any contentEditable host
- *
- * NOT blocked:
- *   - HTMLTextAreaElement (the composer textarea is the normal focus
- *     target when the operator presses the hotkey - blocking it would
- *     defeat the shortcut)
- *   - the document body / unfocused targets
- *
- * Pure / exported for unit tests.
- */
-export function isScratchlistHotkeyBlockedTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false
-    if (target.closest('[role="dialog"]') !== null) return true
-    if (target instanceof HTMLInputElement) return true
-    if (target instanceof HTMLSelectElement) return true
-    // isContentEditable is the authoritative check in real browsers but
-    // jsdom doesn't implement it; the attribute fallback covers both.
-    if (target.isContentEditable === true) return true
-    return target.getAttribute('contenteditable') === 'true'
 }
 
 /**
@@ -686,7 +631,6 @@ function SessionChatInner(props: SessionChatProps) {
         props.messages.length,
         props.cursorChatOnDisk
     )
-    const terminalSupported = isRemoteTerminalSupported(props.session.metadata)
     // Offer the agent terminal only for an ACTIVE PTY session: a 'remote'/SDK
     // session has no agent PTY, and an archived/inactive one has no live PTY (and
     // no buffer once the runner exits), so its terminal would just be an empty,
@@ -765,43 +709,6 @@ function SessionChatInner(props: SessionChatProps) {
     // remounts SessionChatInner from scratch and `scratchlistMode`
     // initializes to false again. (Previous effect-based reset was
     // racy on first paint - see public-export comment for context.)
-    const handleScratchlistToggle = useCallback(() => {
-        if (isScratchlistParking) return
-        setScratchlistMode((m) => !m)
-    }, [isScratchlistParking])
-    /**
-     * Global keyboard shortcut: Ctrl/Cmd + Shift + S toggles scratchlist
-     * mode (open/close drawer + flip composer routing).
-     *
-     * Convention matches the v1 always-visible panel's shortcut so muscle
-     * memory carries over. Other composer-adjacent globals in the app use
-     * the same modifier shape: Ctrl/Cmd-m cycles agent model in
-     * HappyComposer. Ctrl/Cmd-Shift-S is unreserved by Chrome / Firefox /
-     * Safari at the app level (browser Save As is Ctrl-S / Cmd-S, no
-     * Shift), so requiring Shift keeps the user's save-page muscle memory
-     * working. Bound at SessionChat scope (not the drawer) because the
-     * drawer is unmounted while mode is off — a drawer-scoped listener
-     * couldn't reopen it.
-     *
-     * Skipped when focus is inside an open dialog or single-line input
-     * (see isScratchlistHotkeyBlockedTarget). Otherwise fires for any
-     * focus target - composer textarea is the expected case so it's
-     * deliberately allowed. Window-level shortcut without target
-     * filtering would silently toggle mode "behind" modal dialogs
-     * (rename, schedule picker, FUE callout); the bot caught this on
-     * PR #798.
-     */
-    useEffect(() => {
-        const onKeyDown = (e: globalThis.KeyboardEvent) => {
-            if (isScratchlistParking) return
-            if (!isScratchlistToggleHotkey(e)) return
-            if (isScratchlistHotkeyBlockedTarget(e.target)) return
-            e.preventDefault()
-            setScratchlistMode((m) => !m)
-        }
-        window.addEventListener('keydown', onKeyDown)
-        return () => window.removeEventListener('keydown', onKeyDown)
-    }, [isScratchlistParking])
     /**
      * Global select-all takeover: see applyGlobalSelectAll. Bound at
      * window scope because the broken case is focus on the page body /
@@ -1248,7 +1155,6 @@ function SessionChatInner(props: SessionChatProps) {
     ), [agentFlavor, cursorModelEffortOptions, props.session.model])
     const {
         abortSession,
-        switchSession,
         setPermissionMode,
         setCollaborationMode,
         setCopilotAgentMode,
@@ -1665,12 +1571,6 @@ function SessionChatInner(props: SessionChatProps) {
         props.onRefresh()
     }, [abortSession, props.onRefresh])
 
-    // Switch to remote handler
-    const handleSwitchToRemote = useCallback(async () => {
-        await switchSession()
-        props.onRefresh()
-    }, [switchSession, props.onRefresh])
-
     const handleToggleFiles = useCallback(() => {
         setOutlineOpen(false)
         navigate({
@@ -1683,14 +1583,6 @@ function SessionChatInner(props: SessionChatProps) {
     const handleToggleOutline = useCallback(() => {
         setOutlineOpen((open) => !open)
     }, [])
-
-    const handleViewTerminal = useCallback(() => {
-        navigate({
-            to: '/sessions/$sessionId/terminal',
-            params: { sessionId: props.session.id },
-            ...PRESERVE_SESSION_SIDEBAR_SCROLL,
-        })
-    }, [navigate, props.session.id])
 
     // Scheduled message state — lifted here so useHappyRuntime can read the ref.
     //
@@ -2040,7 +1932,6 @@ function SessionChatInner(props: SessionChatProps) {
                         sendAcceptance={sendAcceptance}
                         sendSettlement={props.sendSettlement}
                         onSchedule={updatePendingSchedule}
-                        onClearSchedule={() => updatePendingSchedule(null)}
                         permissionMode={props.session.permissionMode}
                         collaborationMode={codexCollaborationModeSupported ? props.session.collaborationMode : undefined}
                         copilotAgentMode={agentFlavor === 'copilot' ? props.session.copilotAgentMode : undefined}
@@ -2104,7 +1995,6 @@ function SessionChatInner(props: SessionChatProps) {
                         contextCacheRead={reduced.latestUsage?.cacheRead}
                         contextWindow={reduced.latestUsage?.contextWindow ?? piContextWindow}
                         contextModel={reduced.latestUsage?.model ?? props.session.model}
-                        controlledByUser={controlledByUser}
                         onCollaborationModeChange={
                             codexCollaborationModeSupported && props.session.active && !controlledByUser
                                 ? handleCollaborationModeChange
@@ -2202,9 +2092,6 @@ function SessionChatInner(props: SessionChatProps) {
                                 ? handleServiceTierChange
                                 : undefined
                         }
-                        onSwitchToRemote={handleSwitchToRemote}
-                        onTerminal={props.session.active && terminalSupported ? handleViewTerminal : undefined}
-                        terminalUnsupported={props.session.active && !terminalSupported}
                         autocompleteSuggestions={props.autocompleteSuggestions}
                         voiceStatus={voice?.status}
                         voiceMicMuted={voice?.micMuted}
@@ -2212,8 +2099,6 @@ function SessionChatInner(props: SessionChatProps) {
                         onVoiceMicToggle={voice && voiceBackendReady ? handleVoiceMicToggle : undefined}
                         voiceTranscriptionApi={props.api}
                         scratchlistMode={scratchlistMode}
-                        scratchlistCount={scratchlist.entries.length}
-                        onScratchlistToggle={handleScratchlistToggle}
                         onParkScratchlist={onParkScratchlist}
                         onScratchlistParkingChange={setIsScratchlistParking}
                         sendError={props.sendError ?? null}

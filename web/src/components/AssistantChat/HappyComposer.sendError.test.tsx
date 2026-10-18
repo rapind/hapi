@@ -114,21 +114,12 @@ vi.mock('@/components/AssistantChat/SortableComposerAttachments', () => ({
 vi.mock('@/components/AssistantChat/ComposerButtons', () => ({
     ComposerButtons: (props: {
         onSend: () => void
-        onSchedule: (pending: PendingSchedule) => void
-        onClearSchedule: () => void
         pendingSchedule: PendingSchedule | null
-        expanded: boolean
-        onExpandedToggle: () => void
         modelValueLabel?: string
         modelValueDisabled?: boolean
         onModelValueToggle?: () => void
     }) => (
         <div>
-            <button type="button" onClick={props.onExpandedToggle}>
-                {props.expanded ? 'collapse' : 'expand'}
-            </button>
-            <button type="button" onClick={() => props.onSchedule({ type: 'absolute', ms: 9000 })}>select schedule</button>
-            <button type="button" onClick={props.onClearSchedule}>clear schedule</button>
             {props.modelValueLabel ? (
                 <button type="button" disabled={props.modelValueDisabled} onClick={props.onModelValueToggle}>{props.modelValueLabel}</button>
             ) : null}
@@ -234,7 +225,6 @@ function ComposerHarness(props: {
                 sendAcceptance={sendAcceptance}
                 sendSettlement={sendSettlement}
                 onSchedule={setSchedule}
-                onClearSchedule={() => setSchedule(null)}
                 sendError={sendError}
                 onClearSendError={() => {
                     clearErrorCallsRef.current += 1
@@ -314,46 +304,6 @@ describe('HappyComposer send-error atomic restore', () => {
     afterEach(() => {
         cleanup()
         runtime.setSnapshot = null
-    })
-
-    it('collapses an expanded composer only after an accepted send succeeds', async () => {
-        const controls = renderComposer('message', null)
-        fireEvent.click(screen.getByRole('button', { name: 'expand' }))
-        expect(screen.getByTestId('composer-shell')).toHaveAttribute('data-expanded', 'true')
-
-        send()
-        expect(screen.getByTestId('composer-shell')).toHaveAttribute('data-expanded', 'true')
-
-        act(() => controls.current!.acceptSend())
-        expect(screen.getByTestId('composer-shell')).toHaveAttribute('data-expanded', 'true')
-
-        act(() => controls.current!.settleSend())
-        await waitFor(() => expect(screen.getByTestId('composer-shell')).not.toHaveAttribute('data-expanded'))
-    })
-
-    it('keeps the composer expanded when an accepted send later fails', async () => {
-        const controls = renderComposer('message', null)
-        fireEvent.click(screen.getByRole('button', { name: 'expand' }))
-        send()
-
-        act(() => controls.current!.acceptSend())
-        act(() => controls.current!.settleSend(fail(1, 'message', null)))
-
-        await waitFor(() => expect(input()).toHaveValue('message'))
-        expect(screen.getByTestId('composer-shell')).toHaveAttribute('data-expanded', 'true')
-    })
-
-    it('keeps the composer expanded when an attachment send later fails', () => {
-        const controls = renderComposer('', null)
-        act(() => controls.current!.addAttachment())
-        fireEvent.click(screen.getByRole('button', { name: 'expand' }))
-        send()
-
-        act(() => controls.current!.acceptSend())
-        act(() => controls.current!.settleAttachmentSendFailure())
-
-        expect(screen.getByTestId('composer-shell')).toHaveAttribute('data-expanded', 'true')
-        expect(screen.queryByTestId('composer-send-error')).toBeNull()
     })
 
     it('restores untouched text and its absolute schedule after accepted-send clear', async () => {
@@ -515,18 +465,6 @@ describe('HappyComposer send-error atomic restore', () => {
         act(() => controls.current!.addAttachment())
         send()
         setError(controls, fail(1, '', null))
-
-        await waitFor(() => expect(input()).toHaveValue(''))
-        expect(screen.getByTestId('pending-schedule')).toHaveTextContent('null')
-    })
-
-    it('does not restore after the user selects then clears a new schedule', async () => {
-        const controls = renderComposer()
-        send()
-        acceptAndClearSchedule(controls)
-        fireEvent.click(screen.getByRole('button', { name: 'select schedule' }))
-        fireEvent.click(screen.getByRole('button', { name: 'clear schedule' }))
-        setError(controls, fail(1))
 
         await waitFor(() => expect(input()).toHaveValue(''))
         expect(screen.getByTestId('pending-schedule')).toHaveTextContent('null')

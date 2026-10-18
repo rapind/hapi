@@ -11,7 +11,6 @@ function Preview(props: { onVoiceToggle: () => void }) {
             <I18nProvider>
                 <HappyComposer
                     onVoiceToggle={props.onVoiceToggle}
-                    onTerminal={vi.fn()}
                     onSchedule={vi.fn()}
                 />
             </I18nProvider>

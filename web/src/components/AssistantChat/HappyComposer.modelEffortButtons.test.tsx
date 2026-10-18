@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n-context'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import type { ComposerSendIntent } from '@/lib/messageDelivery'
-import type { ComposerToolbarLayout } from '@/hooks/useComposerToolbarLayout'
 import { HappyComposer } from './HappyComposer'
 
 /**
@@ -35,7 +34,6 @@ const runtime = vi.hoisted(() => ({
     pendingSendIntentRef: { current: 'default' },
     sentIntents: [] as ComposerSendIntent[],
     narrowViewport: false,
-    toolbarLayout: null as ComposerToolbarLayout | null,
 }))
 
 vi.mock('@assistant-ui/react', async () => {
@@ -93,13 +91,6 @@ vi.mock('@assistant-ui/react', async () => {
         },
     }
 })
-vi.mock('@/hooks/useComposerToolbarLayout', async () => {
-    const actual = await import('@/hooks/useComposerToolbarLayout')
-    return {
-        ...actual,
-        useComposerToolbarLayout: () => ({ layout: runtime.toolbarLayout ?? actual.DEFAULT_COMPOSER_TOOLBAR_LAYOUT }),
-    }
-})
 vi.mock('@/hooks/useNarrowViewport', () => ({
     useNarrowViewport: () => runtime.narrowViewport,
 }))
@@ -145,15 +136,14 @@ describe('HappyComposer generic model/effort value buttons', () => {
         cleanup()
         runtime.setSnapshot = null
         runtime.narrowViewport = false
-        runtime.toolbarLayout = null
         runtime.snapshot.thread.isDisabled = false
         runtime.sentIntents = []
     })
 
-    it('shows model and effort value buttons for Claude on wide viewports', () => {
+    it('shows only the model button for Claude on wide viewports', () => {
         renderComposer('claude')
         expect(screen.getByRole('button', { name: 'Sonnet 4' })).toBeTruthy()
-        expect(screen.getByRole('button', { name: 'High' })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: 'High' })).toBeNull()
         expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
     })
 
@@ -196,23 +186,6 @@ describe('HappyComposer generic model/effort value buttons', () => {
         expect(screen.getByText('Effort')).toBeTruthy()
     })
 
-    it('opens only the Effort section from the effort button (anchored open)', () => {
-        renderComposer('claude')
-        fireEvent.click(toolbarButton('High'))
-        expect(screen.getByText('Effort')).toBeTruthy()
-        expect(screen.queryByText('Model')).toBeNull()
-        expect(screen.queryByText('Permission Mode')).toBeNull()
-    })
-
-    it('switches from the Model to the Effort section without closing the sheet', () => {
-        renderComposer('claude')
-        fireEvent.click(toolbarButton('Sonnet 4'))
-        expect(screen.getByText('Model')).toBeTruthy()
-        fireEvent.click(toolbarButton('High'))
-        expect(screen.getByText('Effort')).toBeTruthy()
-        expect(screen.queryByText('Model')).toBeNull()
-    })
-
     it('keeps Model before Permission in the full menu', () => {
         renderComposer('claude')
         fireEvent.click(toolbarButton('Sonnet 4'))
@@ -220,16 +193,6 @@ describe('HappyComposer generic model/effort value buttons', () => {
         const permission = screen.getByText('Permission Mode')
         expect(model.compareDocumentPosition(permission) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(screen.getByText('Effort')).toBeTruthy()
-    })
-
-    it('opens the full menu from an effort-only sheet using the model button', () => {
-        renderComposer('claude')
-        fireEvent.click(toolbarButton('High'))
-        expect(screen.queryByText('Model')).toBeNull()
-        fireEvent.click(toolbarButton('Sonnet 4'))
-        expect(screen.getByText('Model')).toBeTruthy()
-        expect(screen.getByText('Effort')).toBeTruthy()
-        expect(screen.getByText('Permission Mode')).toBeTruthy()
     })
 
     it('shows generic value buttons for Pi with the provider-qualified model label', () => {
@@ -240,9 +203,9 @@ describe('HappyComposer generic model/effort value buttons', () => {
             ],
             piSelectedModel: { provider: 'gemini', modelId: 'gemini-2.5-pro' },
         })
-        // Pi uses the same value buttons as every other flavor.
+        // Pi uses the same model button as every other flavor.
         expect(screen.getByRole('button', { name: 'Gemini 2.5 Pro' })).toBeTruthy()
-        expect(screen.getByRole('button', { name: 'High' })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: 'High' })).toBeNull()
         expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
     })
 
@@ -260,20 +223,6 @@ describe('HappyComposer generic model/effort value buttons', () => {
         expect(screen.getAllByText('Gemini 2.5 Pro').length).toBeGreaterThan(1)
         expect(screen.getByText('Vertex Gemini 2.5 Pro')).toBeTruthy()
         expect(screen.getByText('Effort')).toBeTruthy()
-    })
-
-    it('keeps the model menu reachable when a saved toolbar layout omits it', () => {
-        runtime.narrowViewport = true
-        runtime.toolbarLayout = {
-            mode: 'left',
-            left: ['attachment', 'expand', 'terminal'],
-            right: [],
-            hidden: ['settings', 'abort'],
-        }
-        renderComposer('claude')
-        // The model menu stays reachable regardless of the persisted layout.
-        expect(screen.getByRole('button', { name: 'Sonnet 4' })).toBeTruthy()
-        expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
     })
 
     it('keeps the Pi model settings trigger live mid-turn on narrow viewports', () => {
@@ -388,12 +337,9 @@ describe('HappyComposer generic model/effort value buttons', () => {
             piSelectedModel: { provider: 'gemini', modelId: 'gemini-2.5-pro' },
             onEffortChange: (level) => effortChanges.push(level),
         })
-        // Open the sheet from the 'High' value button, then re-click the 'High' row.
-        fireEvent.click(toolbarButton('High'))
-        const effortRows = screen.getAllByRole('button', { name: 'High' })
-        expect(effortRows.length).toBeGreaterThan(1)
-        // The sheet renders before the toolbar in the DOM, so the first match is the row.
-        fireEvent.click(effortRows[0])
+        // Open the sheet from the model button, then re-click the selected 'High' row.
+        fireEvent.click(toolbarButton('Gemini 2.5 Pro'))
+        fireEvent.click(screen.getByRole('button', { name: 'High' }))
         expect(effortChanges).toEqual([null])
     })
 
@@ -451,12 +397,5 @@ describe('HappyComposer generic model/effort value buttons', () => {
         expect(screen.queryByText('Model')).toBeNull()
     })
 
-    it('toggles the settings sheet closed when the effort value button is clicked again', () => {
-        renderComposer('claude')
-        const effortButton = screen.getAllByRole('button', { name: 'High' })[0]
-        fireEvent.click(effortButton)
-        expect(screen.getByText('Effort')).toBeTruthy()
-        fireEvent.click(effortButton)
-        expect(screen.queryByText('Effort')).toBeNull()
-    })
+
 })

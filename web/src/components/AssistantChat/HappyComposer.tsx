@@ -21,7 +21,6 @@ import {
     useRef,
     useState
 } from 'react'
-import { useNarrowViewport } from '@/hooks/useNarrowViewport'
 import { isRichComposerMentionsEnabled } from '@/lib/composerSegments'
 import type { SessionMentionResolveResult } from '@/components/AssistantChat/RichComposerInput'
 import {
@@ -36,8 +35,7 @@ import { useActiveSuggestions } from '@/hooks/useActiveSuggestions'
 import { applySuggestion } from '@/utils/applySuggestion'
 import { usePlatform } from '@/hooks/usePlatform'
 import { usePWAInstall } from '@/hooks/usePWAInstall'
-import { supportsEffort, supportsModelChange, PI_THINKING_LEVEL_LABELS } from '@hapi/protocol'
-import type { PiThinkingLevel } from '@hapi/protocol'
+import { supportsEffort, supportsModelChange } from '@hapi/protocol'
 import { markSkillUsed } from '@/lib/recent-skills'
 import { useComposerDraft } from '@/hooks/useComposerDraft'
 import type { AttachmentDraftInput } from '@/lib/composer-attachment-drafts'
@@ -304,7 +302,6 @@ export function HappyComposer(props: {
     contextWindow?: number | null
     /** Model for the context-window heuristic; see StatusBar.contextModel. */
     contextModel?: string | null
-    controlledByUser?: boolean
     concurrentClients?: boolean
     agentFlavor?: string | null
     availableModelOptions?: Array<{ value: string | null; label: string }>
@@ -335,9 +332,6 @@ export function HappyComposer(props: {
     serviceTier?: string | null
     /** When provided, a Fast-mode toggle renders (Codex GPT-5.5 / GPT-5.4 only). */
     onServiceTierChange?: (serviceTier: string | null) => void
-    onSwitchToRemote?: () => void
-    onTerminal?: () => void
-    terminalUnsupported?: boolean
     autocompletePrefixes?: string[]
     autocompleteSuggestions?: (query: string) => Promise<Suggestion[]>
     // Voice assistant props
@@ -349,7 +343,6 @@ export function HappyComposer(props: {
     // Schedule props (lifted from internal state when provided)
     pendingSchedule?: PendingSchedule | null
     onSchedule?: (pending: PendingSchedule) => void
-    onClearSchedule?: () => void
     // Scratchlist drawer props - SessionChat owns the state. Threaded
     // straight through to ComposerButtons. When undefined, the toggle
     // button doesn't render (back-compat for any other consumer).
@@ -411,7 +404,6 @@ export function HappyComposer(props: {
         contextCacheRead,
         contextWindow,
         contextModel,
-        controlledByUser = false,
         concurrentClients = false,
         agentFlavor,
         availableModelOptions,
@@ -432,14 +424,10 @@ export function HappyComposer(props: {
         onEffortChange,
         serviceTier: rawServiceTier,
         onServiceTierChange,
-        onSwitchToRemote,
-        onTerminal,
-        terminalUnsupported = false,
         autocompletePrefixes = ['@', '/', '$'],
         autocompleteSuggestions = defaultSuggestionHandler,
         pendingSchedule: pendingScheduleProp,
         onSchedule: onScheduleProp,
-        onClearSchedule: onClearScheduleProp,
         sendError = null,
         onClearSendError,
         onSuppressSendErrorRestore,
@@ -513,16 +501,9 @@ export function HappyComposer(props: {
     const lastSendAcceptanceRef = useRef(props.sendAcceptance)
     const pendingSendAttemptIdRef = useRef<string | null>(null)
     const [showSettings, setShowSettings] = useState(false)
-    // Anchored settings sheet: the model/effort value buttons open only their
-    // own section; the gear (null) opens the full sheet.
-    const [settingsSection, setSettingsSection] = useState<'model' | 'effort' | null>(null)
     const [isAborting, setIsAborting] = useState(false)
-    const [isSwitching, setIsSwitching] = useState(false)
-    // pendingSchedule is controlled externally when onSchedule prop is provided; otherwise local state
-    const [pendingScheduleLocal, setPendingScheduleLocal] = useState<PendingSchedule | null>(null)
-    const isControlled = onScheduleProp !== undefined
-    const pendingSchedule = isControlled ? (pendingScheduleProp ?? null) : pendingScheduleLocal
-    const setPendingSchedule = isControlled ? onScheduleProp : setPendingScheduleLocal
+    // SessionChat owns the pending schedule; it is only restored after a failed scheduled send.
+    const pendingSchedule = onScheduleProp !== undefined ? (pendingScheduleProp ?? null) : null
 
     useEffect(() => {
         const acceptance = props.sendAcceptance
@@ -552,9 +533,7 @@ export function HappyComposer(props: {
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const richInputRef = useRef<RichComposerInputHandle>(null)
-    const settingsButtonRef = useRef<HTMLButtonElement>(null)
     const modelValueButtonRef = useRef<HTMLButtonElement>(null)
-    const effortValueButtonRef = useRef<HTMLButtonElement>(null)
     const settingsOverlayRef = useRef<HTMLDivElement>(null)
     // `composer.text === ''` alone is not enough to identify the empty state
     // created by a send. A user can type and delete a fresh draft before the
@@ -617,14 +596,9 @@ export function HappyComposer(props: {
         (file) => api.composer().addAttachment(file),
     )
     const canHydrateAttachments = props.canRestoreAttachments ?? active
-    const hiddenAttachmentStatePending =
-        !canHydrateAttachments
-        && (draftHydration.sessionId !== sessionId || !draftHydration.complete)
     const hasHiddenAttachments =
         !canHydrateAttachments && draftHydration.hasStoredAttachments
     const hasAnyAttachments = hasAttachments || hasHiddenAttachments
-    const blocksScheduling =
-        hasAttachments || hasHiddenAttachments || hiddenAttachmentStatePending
     const canSend = (hasText || hasAnyAttachments) && attachmentsReady && !controlsDisabled
 
     useEffect(() => {
@@ -910,11 +884,6 @@ export function HappyComposer(props: {
     }, [api, suggestions, inputState, autocompletePrefixes, haptic, richMentionsEnabled, handleUserEdit])
 
     const abortDisabled = controlsDisabled || isAborting || !threadIsRunning
-    const switchDisabled = controlsDisabled || isSwitching || !controlledByUser
-    const showSwitchButton = Boolean(controlledByUser && onSwitchToRemote)
-    const showTerminalButton = Boolean(onTerminal || terminalUnsupported)
-    const terminalDisabled = controlsDisabled || terminalUnsupported
-    const terminalLabel = terminalUnsupported ? t('terminal.unsupportedWindows') : t('composer.terminal')
 
     useEffect(() => {
         if (!isAborting) return
@@ -922,29 +891,12 @@ export function HappyComposer(props: {
         setIsAborting(false)
     }, [isAborting, threadIsRunning])
 
-    useEffect(() => {
-        if (!isSwitching) return
-        if (controlledByUser) return
-        setIsSwitching(false)
-    }, [isSwitching, controlledByUser])
-
     const handleAbort = useCallback(() => {
         if (abortDisabled) return
         haptic('error')
         setIsAborting(true)
         api.thread().cancelRun()
     }, [abortDisabled, api, haptic])
-
-    const handleSwitch = useCallback(async () => {
-        if (switchDisabled || !onSwitchToRemote) return
-        haptic('light')
-        setIsSwitching(true)
-        try {
-            await onSwitchToRemote()
-        } catch {
-            setIsSwitching(false)
-        }
-    }, [switchDisabled, onSwitchToRemote, haptic])
 
     const permissionModeOptions = useMemo(
         () => getPermissionModeOptionsForFlavor(agentFlavor).filter(option => !concurrentClients || option.mode !== 'safe-yolo'),
@@ -1043,28 +995,6 @@ export function HappyComposer(props: {
         () => permissionModeOptions.map((option) => option.mode),
         [permissionModeOptions]
     )
-
-    const handleUserSchedule = useCallback((nextPendingSchedule: PendingSchedule) => {
-        userScheduleGenerationRef.current += 1
-        if (sendError) onClearSendError?.()
-        setPendingSchedule(nextPendingSchedule)
-    }, [onClearSendError, sendError, setPendingSchedule])
-
-    const handleUserClearSchedule = useCallback(() => {
-        userScheduleGenerationRef.current += 1
-        if (sendError) onClearSendError?.()
-        if (isControlled) {
-            onClearScheduleProp?.()
-        } else {
-            setPendingScheduleLocal(null)
-        }
-    }, [isControlled, onClearScheduleProp, onClearSendError, sendError])
-    // Preserve the original controlled-mode contract: without a parent clear
-    // handler the schedule button opens the picker instead of claiming it can
-    // clear a value it does not own.
-    const onUserClearSchedule = isControlled && !onClearScheduleProp
-        ? undefined
-        : handleUserClearSchedule
 
     const resetPendingSendIntent = useCallback(() => {
         if (pendingSendIntentRef) pendingSendIntentRef.current = 'default'
@@ -1352,27 +1282,16 @@ export function HappyComposer(props: {
         }
     }, [api, pendingSchedule])
 
-    // Opens (or closes) the settings sheet. `section` anchors the sheet to a
-    // single section ('model' / 'effort'); the gear passes nothing = full sheet.
-    // Re-clicking with a different anchor while open switches the anchor
-    // instead of closing, so model->effort moves between sections directly.
-    const handleSettingsToggle = useCallback((section: 'model' | 'effort' | null = null) => {
+    const handleSettingsToggle = useCallback(() => {
         haptic('light')
-        if (showSettings && section !== settingsSection) {
-            // Open with a different anchor: switch sections, keep the sheet up.
-            setSettingsSection(section)
-            return
-        }
         if (showSettings) {
             setCursorDrillDownBase(null)
             setCursorDrillDownDefaultVariant(null)
             setShowSettings(false)
-            setSettingsSection(null)
             return
         }
-        setSettingsSection(section)
         setShowSettings(true)
-    }, [haptic, showSettings, settingsSection])
+    }, [haptic, showSettings])
 
     const clearCursorDrillDown = useCallback(() => {
         setCursorDrillDownBase(null)
@@ -1382,7 +1301,6 @@ export function HappyComposer(props: {
     const dismissSettings = useCallback(() => {
         clearCursorDrillDown()
         setShowSettings(false)
-        setSettingsSection(null)
     }, [clearCursorDrillDown])
 
     const handleModelChange = useCallback((nextModel: { provider: string; modelId: string } | string | null) => {
@@ -1440,9 +1358,7 @@ export function HappyComposer(props: {
             const target = event.target
             if (!(target instanceof Node)) return
             if (settingsOverlayRef.current?.contains(target)) return
-            if (settingsButtonRef.current?.contains(target)) return
             if (modelValueButtonRef.current?.contains(target)) return
-            if (effortValueButtonRef.current?.contains(target)) return
             dismissSettings()
         }
 
@@ -1550,7 +1466,6 @@ export function HappyComposer(props: {
 
 
     // The model name opens the full settings sheet at every viewport width.
-    const isNarrowViewport = useNarrowViewport()
     // Pi turns run for minutes with thread.isDisabled set the whole time, so
     // Pi keeps its model/effort controls live mid-turn (#1442) — the generic
     // disable rule (controlsDisabled) would lock them for the entire turn.
@@ -1571,32 +1486,9 @@ export function HappyComposer(props: {
         const option = modelOptions.find((candidate) => candidate.value === normalizedKey)
         return option?.label ?? rawKey ?? undefined
     }, [showSettingsButton, onModelChange, agentFlavor, selectedPiModel, model, modelOptions, selectedModelBase, t])
-    const effortValueLabel = useMemo(() => {
-        if (isNarrowViewport) return undefined
-        if (!onEffortChange || !supportsEffort(agentFlavor)) return undefined
-        // Pi: without a resolved catalog entry there is no capability map to
-        // derive levels from; hide the button until the selected model is known.
-        if (agentFlavor === 'pi') {
-            if (!selectedPiModel || selectedPiModel.reasoning === false) return undefined
-            const effectiveLevel = effort && isThinkingLevelSupported(effort, selectedPiModel?.thinkingLevelMap)
-                ? effort
-                : getHighestThinkingLevel(selectedPiModel?.thinkingLevelMap)
-            return effectiveLevel
-                ? (PI_THINKING_LEVEL_LABELS[effectiveLevel as PiThinkingLevel] ?? effectiveLevel)
-                : undefined
-        }
-        const option = claudeEffortOptions.find((candidate) => candidate.value === effort)
-        return option?.label ?? (effort ? effort : undefined)
-    }, [isNarrowViewport, onEffortChange, agentFlavor, selectedPiModel, effort, claudeEffortOptions])
-
     const handleModelValueToggle = useCallback(() => {
         if (modelEffortControlsDisabled) return
-        handleSettingsToggle(null)
-    }, [modelEffortControlsDisabled, handleSettingsToggle])
-
-    const handleEffortValueToggle = useCallback(() => {
-        if (modelEffortControlsDisabled) return
-        handleSettingsToggle('effort')
+        handleSettingsToggle()
     }, [modelEffortControlsDisabled, handleSettingsToggle])
 
     const overlayPositionClass = isExpanded
@@ -1605,21 +1497,16 @@ export function HappyComposer(props: {
 
     const overlays = useMemo(() => {
         // Unified settings sheet for every flavor (Pi included).
-        // Anchored open (settingsSection): a model/effort value button expands
-        // only its own area; the gear (null) expands the full sheet.
-        const sheetModelAreaOn = settingsSection !== 'effort'
-        const sheetEffortAreaOn = settingsSection !== 'model'
-        const sheetOthersOn = settingsSection === null
-        const sheetModelSettings = showModelSettings && sheetModelAreaOn
-        const sheetModelEffortSettings = showModelEffortSettings && sheetModelAreaOn
-        const sheetModelReasoningEffortSettings = showModelReasoningEffortSettings && sheetEffortAreaOn
-        const sheetEffortSettings = showEffortSettings && sheetEffortAreaOn
-        const sheetPermissionSettings = showPermissionSettings && sheetOthersOn
-        const sheetFastModeSettings = showFastModeSettings && sheetOthersOn
-        const sheetCollaborationSettings = showCollaborationSettings && sheetOthersOn
-        const sheetCopilotAgentModeSettings = showCopilotAgentModeSettings && sheetOthersOn
+        const sheetModelSettings = showModelSettings
+        const sheetModelEffortSettings = showModelEffortSettings
+        const sheetModelReasoningEffortSettings = showModelReasoningEffortSettings
+        const sheetEffortSettings = showEffortSettings
+        const sheetPermissionSettings = showPermissionSettings
+        const sheetFastModeSettings = showFastModeSettings
+        const sheetCollaborationSettings = showCollaborationSettings
+        const sheetCopilotAgentModeSettings = showCopilotAgentModeSettings
         const sheetModelAreaSettings = sheetModelSettings || sheetModelEffortSettings || sheetModelReasoningEffortSettings || sheetEffortSettings
-        const sheetPromptModeSettings = showPromptModeSettings && sheetOthersOn
+        const sheetPromptModeSettings = showPromptModeSettings
         const sheetOtherSettings = sheetFastModeSettings || sheetCollaborationSettings || sheetCopilotAgentModeSettings
         if (showSettings && (sheetPromptModeSettings || sheetCollaborationSettings || sheetCopilotAgentModeSettings || sheetPermissionSettings || sheetModelSettings || sheetModelEffortSettings || sheetModelReasoningEffortSettings || sheetEffortSettings || sheetFastModeSettings)) {
             return (
@@ -2015,7 +1902,6 @@ export function HappyComposer(props: {
         showPromptModeSettings,
         props.codexPromptMode,
         props.onCodexPromptModeChange,
-        settingsSection,
         agentFlavor,
         piModels,
         piSelectedModel,
@@ -2235,47 +2121,22 @@ export function HappyComposer(props: {
                             }
                                     canSend={canSend}
                                     controlsDisabled={controlsDisabled}
-                                    showSettingsButton={showSettingsButton}
-                                    settingsButtonRef={settingsButtonRef}
-                                    settingsDisabled={modelEffortControlsDisabled}
                                     modelValueButtonRef={modelValueButtonRef}
-                                    effortValueButtonRef={effortValueButtonRef}
-                                    onSettingsToggle={handleModelValueToggle}
-                                    expanded={isExpanded}
-                                    onExpandedToggle={handleExpandedToggle}
-                                    showTerminalButton={showTerminalButton}
-                                    terminalDisabled={terminalDisabled}
-                                    terminalLabel={terminalLabel}
-                                    onTerminal={onTerminal ?? (() => {})}
                                     showAbortButton={showAbortButton}
                                     abortDisabled={abortDisabled}
                                     isAborting={isAborting}
                                     onAbort={handleAbort}
-                                    showSwitchButton={showSwitchButton}
-                                    switchDisabled={switchDisabled}
-                                    isSwitching={isSwitching}
-                                    onSwitch={handleSwitch}
                                     voiceEnabled={false}
                                     dictationEnabled={false}
                                     voiceStatus="disconnected"
-                                    voiceMicMuted={false}
                                     onVoiceToggle={() => { }}
                                     onSend={handleSend}
                                     pendingSchedule={pendingSchedule}
-                                    onSchedule={handleUserSchedule}
-                                    onClearSchedule={onUserClearSchedule}
-                                    hasAttachments={blocksScheduling}
                                     modelValueLabel={modelValueLabel}
                                     modelValueDisabled={modelEffortControlsDisabled}
-                                    modelValueOpen={showSettings && settingsSection !== 'effort'}
+                                    modelValueOpen={showSettings}
                                     onModelValueToggle={handleModelValueToggle}
-                                    effortValueLabel={effortValueLabel}
-                                    effortValueDisabled={modelEffortControlsDisabled}
-                                    effortValueOpen={showSettings && settingsSection !== 'model'}
-                                    onEffortValueToggle={handleEffortValueToggle}
                                     scratchlistMode={props.scratchlistMode}
-                                    scratchlistCount={props.scratchlistCount}
-                                    onScratchlistToggle={props.onScratchlistToggle}
                                     omitPrimaryButton
                                 />
                     </ComposerPrimitive.Root>

@@ -11,7 +11,6 @@ import {
     ComposerButtons,
     ComposerExpandButton,
     DictationButton,
-    getComposerToolbarJustifyContent,
     isComposerPrimaryFillHeight,
     isLargeEmptyVoicePrimary,
     shouldShowDraftVoiceButton,
@@ -364,7 +363,7 @@ describe('ComposerExpandButton', () => {
 describe('ComposerButtons responsive toolbar', () => {
     afterEach(cleanup)
 
-    it('keeps toolbar actions non-shrinking inside a horizontal scroll area', () => {
+    it('shows only attachment, model, and stop in the toolbar', () => {
         const noop = () => {}
         render(
             <RuntimeProviders>
@@ -372,29 +371,18 @@ describe('ComposerButtons responsive toolbar', () => {
                     <ComposerButtons
                         canSend
                         controlsDisabled={false}
-                        showSettingsButton
-                        onSettingsToggle={noop}
-                        expanded={false}
-                        onExpandedToggle={noop}
-                        showTerminalButton
-                        terminalDisabled={false}
-                        terminalLabel="Terminal"
-                        onTerminal={noop}
                         showAbortButton
                         abortDisabled={false}
                         isAborting={false}
                         onAbort={noop}
-                        showSwitchButton
-                        switchDisabled={false}
-                        isSwitching={false}
-                        onSwitch={noop}
                         voiceEnabled
                         dictationEnabled
                         voiceStatus="disconnected"
                         onVoiceToggle={noop}
                         onSend={noop}
-                        onSchedule={noop}
-                        onScratchlistToggle={noop}
+                        modelValueLabel="Opus"
+                        onModelValueToggle={noop}
+                        omitPrimaryButton
                     />
                 </div>
             </RuntimeProviders>,
@@ -403,19 +391,11 @@ describe('ComposerButtons responsive toolbar', () => {
         const toolbar = screen.getByTestId('composer-toolbar-items')
         expect(toolbar.className).toContain('overflow-x-auto')
         const toolbarButtons = within(toolbar).getAllByRole('button')
-        expect(toolbarButtons.length).toBeGreaterThanOrEqual(4)
-        for (const label of [/expand message editor/i, 'Terminal', /schedule send/i, /dictate/i]) {
-            expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
-        }
+        expect(toolbarButtons.map((button) => button.getAttribute('aria-label'))).toEqual(['Attach file', 'Opus', 'Abort'])
         for (const button of toolbarButtons) {
             expect(button.closest('.shrink-0')).not.toBeNull()
         }
     })
 
-    it('uses overflow-safe alignment for centered and right-aligned layouts', () => {
-        expect(getComposerToolbarJustifyContent('center')).toBe('safe center')
-        expect(getComposerToolbarJustifyContent('right')).toBe('safe end')
-        expect(getComposerToolbarJustifyContent('left')).toBe('flex-start')
-        expect(getComposerToolbarJustifyContent('split')).toBe('flex-start')
-    })
+
 })

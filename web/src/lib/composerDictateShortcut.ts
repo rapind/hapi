@@ -23,8 +23,7 @@ export function isDictateToggleHotkey(e: {
 /**
  * True when the global dictate hotkey should be SKIPPED for the event target.
  *
- * Same dialog / single-line input guards as scratchlist
- * (`isScratchlistHotkeyBlockedTarget`), but the rich composer (contentEditable)
+ * Skips dialogs and single-line inputs, but the rich composer (contentEditable)
  * is allowed so the shortcut works while typing in the main input.
  */
 export function isDictateHotkeyBlockedTarget(target: EventTarget | null): boolean {
