@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ComponentProps, PropsWithChildren } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n-context'
 import {
     MessageActions,
@@ -83,6 +83,7 @@ describe('MessageActions useAuiState selector (#1380)', () => {
 })
 
 describe('MessageActions', () => {
+    afterEach(() => vi.unstubAllGlobals())
     beforeEach(() => {
         copy.mockReset()
         onShareTurn.mockReset()
@@ -96,6 +97,24 @@ describe('MessageActions', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
 
         expect(copy).toHaveBeenCalledWith('message body')
+    })
+
+    it('reads readable message text with the default voice and lets the user stop', () => {
+        const speak = vi.fn()
+        const cancel = vi.fn()
+        vi.stubGlobal('speechSynthesis', { speak, cancel })
+        vi.stubGlobal('SpeechSynthesisUtterance', class {
+            constructor(public text: string) {}
+        })
+        renderActions({ align: 'start', copyText: '**Hello** [Dave](https://example.com).' })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Read aloud' }))
+
+        expect(speak).toHaveBeenCalledWith(expect.objectContaining({ text: 'Hello Dave.' }))
+        expect(speak.mock.calls[0][0].voice).toBeUndefined()
+        fireEvent.click(screen.getByRole('button', { name: 'Stop reading' }))
+        expect(cancel).toHaveBeenCalled()
+        expect(screen.getByRole('button', { name: 'Read aloud' })).toBeTruthy()
     })
 
     it('shows meaningful assistant metadata in a popover without invoke time', () => {

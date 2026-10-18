@@ -9,6 +9,7 @@ import { MessageTimestamp } from './MessageTimestamp'
 import { cn } from '@/lib/utils'
 import { ShareTurnButton } from './ShareTurnButton'
 import { MessageActionButton } from './MessageActionButton'
+import { MessageSpeechButton } from './MessageSpeechButton'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
 export type MessageHistoryAction = {
@@ -116,8 +117,10 @@ export function MessageActions({
                 {align === 'end' && hasMetadata && metadata ? <MessageInfoPopover metadata={metadata} /> : null}
                 {align === 'end' ? shareButton : null}
                 {align === 'end' ? historyButtons : null}
+                {align === 'end' && copyText ? <MessageSpeechButton text={copyText} /> : null}
                 {align === 'end' ? copyButton : null}
                 {align === 'start' ? copyButton : null}
+                {align === 'start' && copyText ? <MessageSpeechButton text={copyText} /> : null}
                 {align === 'start' ? historyButtons : null}
                 {align === 'start' ? shareButton : null}
                 {align === 'start' && hasMetadata && metadata ? <MessageInfoPopover metadata={metadata} /> : null}
