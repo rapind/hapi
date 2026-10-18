@@ -41,7 +41,9 @@ export type MessageWindowState = {
 export const VISIBLE_WINDOW_SIZE = 400
 export const HISTORY_WINDOW_SIZE = 600
 export const INITIAL_PAGE_SIZE = 20
-const AGENT_RUN_WINDOW_SIZE = 800
+// Subagent activity (Codex agent runs, Claude sidechain rows) renders inside
+// one card, so it gets its own budget instead of evicting the transcript.
+const SUBAGENT_WINDOW_SIZE = 800
 const OLDER_LOAD_WINDOW_SIZE = 800
 const PAGE_SIZE = 200
 const CACHED_REENTRY_PAGE_SIZE = 20
@@ -439,7 +441,7 @@ function sliceForTrim<T>(
         : { kept: items.slice(items.length - limit), dropped: items.slice(0, items.length - limit) }
 }
 
-function isCodexAgentRunMessage(message: DecryptedMessage): boolean {
+function isSubagentActivityMessage(message: DecryptedMessage): boolean {
     const outer = message.content
     if (!outer || typeof outer !== 'object' || (outer as { role?: unknown }).role !== 'agent') {
         return false
@@ -447,9 +449,11 @@ function isCodexAgentRunMessage(message: DecryptedMessage): boolean {
     const content = (outer as { content?: unknown }).content
     if (!content || typeof content !== 'object') return false
     const payload = content as { type?: unknown; data?: unknown }
-    if (payload.type !== 'codex' || !payload.data || typeof payload.data !== 'object') {
-        return false
+    if (!payload.data || typeof payload.data !== 'object') return false
+    if (payload.type === 'output') {
+        return (payload.data as { isSidechain?: unknown }).isSidechain === true
     }
+    if (payload.type !== 'codex') return false
     const type = (payload.data as { type?: unknown }).type
     return type === 'agent-run-start' || type === 'agent-run-update' || type === 'agent-run-trace'
 }
@@ -499,13 +503,13 @@ function trimPreservingQueued(
     const queued = messages.filter(isQueuedForInvocation)
     const queuedIds = new Set(queued.map((message) => message.id))
     const nonQueued = messages.filter((message) => !queuedIds.has(message.id))
-    const agentRuns = nonQueued.filter(isCodexAgentRunMessage)
-    const regular = nonQueued.filter((message) => !isCodexAgentRunMessage(message))
+    const subagent = nonQueued.filter(isSubagentActivityMessage)
+    const regular = nonQueued.filter((message) => !isSubagentActivityMessage(message))
     const regularTrim = sliceForTrim(regular, Math.max(0, regularLimit - queued.length), mode)
-    const agentRunTrim = sliceForTrim(agentRuns, AGENT_RUN_WINDOW_SIZE, mode)
+    const subagentTrim = sliceForTrim(subagent, SUBAGENT_WINDOW_SIZE, mode)
     return {
-        kept: mergeMessages([...regularTrim.kept, ...agentRunTrim.kept], queued),
-        dropped: [...regularTrim.dropped, ...agentRunTrim.dropped]
+        kept: mergeMessages([...regularTrim.kept, ...subagentTrim.kept], queued),
+        dropped: [...regularTrim.dropped, ...subagentTrim.dropped]
     }
 }
 

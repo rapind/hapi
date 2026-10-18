@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import { getPersonalThemeColors } from '@/themes/personal'
 import type { ThemeColorKeyId } from './useThemeColors'
 
 export type ColorScheme = 'light' | 'dark' | 'oled'
 export type ColorThemePreset =
     | 'default'
+    | 'personal'
     | 'notion'
     | 'one'
     | 'proof'
@@ -50,6 +52,7 @@ const COLOR_THEME_KEY = 'hapi-color-theme'
 
 const COLOR_THEME_OPTIONS: ReadonlyArray<ColorThemeOption> = [
     { value: 'default', labelKey: 'settings.display.colorTheme.default', preview: { light: '#ffffff', dark: '#1c1c1e', accent: '#111827' } },
+    { value: 'personal', labelKey: 'settings.display.colorTheme.personal', preview: { light: '#faf9f5', dark: '#141414', accent: '#d97876' } },
     { value: 'notion', labelKey: 'settings.display.colorTheme.notion', preview: { light: '#fafafa', dark: '#191919', accent: '#3183d8' } },
     { value: 'one', labelKey: 'settings.display.colorTheme.one', preview: { light: '#fbfbff', dark: '#1f2433', accent: '#526fff' } },
     { value: 'proof', labelKey: 'settings.display.colorTheme.proof', preview: { light: '#f8f7f2', dark: '#18231f', accent: '#2f7d5b' } },
@@ -68,7 +71,7 @@ const COLOR_THEME_OPTIONS: ReadonlyArray<ColorThemeOption> = [
     { value: 'nord', labelKey: 'settings.display.colorTheme.nord', preview: { light: '#eceff4', dark: '#2e3440', accent: '#88c0d0' } },
 ]
 
-const PALETTES: Record<Exclude<ColorThemePreset, 'default'>, Record<'light' | 'dark', ThemePalette>> = {
+const PALETTES: Record<Exclude<ColorThemePreset, 'default' | 'personal'>, Record<'light' | 'dark', ThemePalette>> = {
     notion: {
         light: palette('#3183d8', '#fafafa', '#37352f', '#787774', '#f1f1ef'),
         dark: palette('#3183d8', '#191919', '#d9d9d8', '#9b9a97', '#252525'),
@@ -205,11 +208,20 @@ export function getColorThemeStorageKey(): string {
 }
 
 export function getColorThemeBackground(theme: ColorThemePreset, scheme: ColorScheme): string | null {
+    if (theme === 'personal') return getPersonalThemeColors(scheme)['--app-bg']!
     return theme === 'default' ? null : PALETTES[theme][toPaletteScheme(scheme)].background
 }
 
 export function getColorThemePickerValue(theme: ColorThemePreset, scheme: ColorScheme, id: ThemeColorKeyId): string | null {
     if (theme === 'default') return null
+    if (theme === 'personal') {
+        const tokens = getPersonalThemeColors(scheme)
+        const keys: Record<ThemeColorKeyId, string> = {
+            background: '--app-bg', surface: '--app-secondary-bg', text: '--app-fg',
+            hint: '--app-hint', accent: '--app-link', border: '--app-border', userBubble: '--app-chat-user-bg',
+        }
+        return tokens[keys[id]]!
+    }
     const palette = PALETTES[theme][toPaletteScheme(scheme)]
     const values: Record<ThemeColorKeyId, string> = {
         background: palette.background,
@@ -229,8 +241,12 @@ export function applyColorTheme(theme: ColorThemePreset = getStoredColorTheme(),
     const root = document.documentElement
     root.setAttribute('data-color-theme', theme)
 
-    if (theme === 'default') {
-        removeThemeProperties(root)
+    removeThemeProperties(root)
+    if (theme === 'default') return
+    if (theme === 'personal') {
+        for (const [key, value] of Object.entries(getPersonalThemeColors(scheme))) {
+            root.style.setProperty(key, value)
+        }
         return
     }
 
@@ -287,6 +303,7 @@ function removeThemeProperties(root: HTMLElement): void {
         '--app-inline-code-bg', '--app-inline-code-fg', '--app-md-quote-bg', '--app-md-quote-border', '--app-md-quote-fg', '--app-md-table-bg',
         '--app-md-table-head-bg', '--app-reasoning-bg', '--app-border', '--app-divider', '--app-subtle-bg', '--app-scrollbar-thumb', '--app-scrollbar-thumb-hover',
     ]
+    properties.push(...Object.keys(getPersonalThemeColors('light')))
     for (const property of properties) root.style.removeProperty(property)
 }
 

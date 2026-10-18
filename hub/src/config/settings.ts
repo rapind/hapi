@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import { withSettingsFileLock } from '@hapi/protocol/settingsFileLock'
 
 export interface Settings {
+    newChatPreferences?: Record<string, import('@hapi/protocol').ChatCreationPreferences>
     machineId?: string
     machineIdConfirmedByServer?: boolean
     runnerAutoStartWhenRunningHappy?: boolean
@@ -51,6 +52,11 @@ export interface Settings {
      * Env vars still win when set at process start (ops override).
      */
     providerCredentials?: Partial<Record<string, string>>
+    /**
+     * Cap (seconds) on one ElevenLabs ConvAI conversation. Env
+     * ELEVENLABS_MAX_DURATION_SECONDS still wins when set at process start.
+     */
+    elevenLabsMaxDurationSeconds?: number
 }
 
 export function getSettingsFile(dataDir: string): string {

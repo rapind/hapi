@@ -6,6 +6,7 @@ import {
     getOrCreateSession,
     adoptPreallocatedSession,
     getSession,
+    getSessionActivity,
     getSessionByNamespace,
     getSessions,
     getSessionsByNamespace,
@@ -130,6 +131,10 @@ export class SessionStore {
 
     touchSessionUpdatedAt(id: string, updatedAt: number, namespace: string): boolean {
         return touchSessionUpdatedAt(this.db, id, updatedAt, namespace)
+    }
+
+    getSessionActivity(id: string): { updatedAt: number; namespace: string } | null {
+        return getSessionActivity(this.db, id)
     }
 
     getSession(id: string): StoredSession | null {

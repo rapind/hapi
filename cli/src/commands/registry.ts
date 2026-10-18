@@ -1,3 +1,4 @@
+import { spawnPeerCommand } from './spawnPeer'
 import chalk from 'chalk'
 import { agyCommand } from './agy'
 import { authCommand } from './auth'
@@ -21,6 +22,7 @@ import { notifyCommand } from './notify'
 import { hubCommand } from './hub'
 import { pingPeerCommand } from './pingPeer'
 import { inspectPeerCommand } from './inspectPeer'
+import { archivePeerCommand } from './archivePeer'
 import type { CommandContext, CommandDefinition } from './types'
 
 // Gemini CLI was sunset (Google stopped serving the consumer Gemini CLI on
@@ -62,7 +64,9 @@ const COMMANDS: CommandDefinition[] = [
     runnerCommand,
     notifyCommand,
     pingPeerCommand,
-    inspectPeerCommand
+    archivePeerCommand,
+    inspectPeerCommand,
+    spawnPeerCommand
 ]
 
 const commandMap = new Map<string, CommandDefinition>()

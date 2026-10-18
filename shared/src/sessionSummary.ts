@@ -51,6 +51,7 @@ export type SessionSummary = {
     active: boolean
     thinking: boolean
     activeAt: number
+    createdAt: number
     updatedAt: number
     pinned?: boolean
     globalPinned?: boolean
@@ -210,6 +211,7 @@ export function toSessionSummary(session: Session): SessionSummary {
         active: session.active,
         thinking: session.thinking,
         activeAt: session.activeAt,
+        createdAt: session.createdAt,
         updatedAt: session.updatedAt,
         pinned: session.pinned ?? false,
         globalPinned: session.globalPinned ?? false,

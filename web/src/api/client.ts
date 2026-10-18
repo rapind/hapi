@@ -97,6 +97,12 @@ export interface TranscriptionCredentialStatus {
         geminiLive: MaskedCredentialStatus
         qwenRealtime: MaskedCredentialStatus
     }
+    /** Optional: older hub versions won't send this. */
+    elevenLabsMaxDurationSeconds?: {
+        value: number
+        source: ProviderCredentialSource
+        editable: boolean
+    }
 }
 
 export interface TranscriptionCredentialsUpdate {
@@ -111,6 +117,8 @@ export interface TranscriptionCredentialsUpdate {
     }
     geminiLive?: string | null
     qwenRealtime?: string | null
+    /** null resets to the hub default (1800s) */
+    elevenLabsMaxDurationSeconds?: number | null
 }
 
 type ApiClientOptions = {
@@ -716,6 +724,13 @@ export class ApiClient {
         })
     }
 
+    async setCodexPromptMode(sessionId: string, mode: MessageDeliveryMode): Promise<void> {
+        await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/codex-prompt-mode`, {
+            method: 'POST',
+            body: JSON.stringify({ mode })
+        })
+    }
+
     async setServiceTier(sessionId: string, serviceTier: string | null): Promise<void> {
         await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/service-tier`, {
             method: 'POST',
@@ -833,6 +848,10 @@ export class ApiClient {
         )
     }
 
+    async importCreationPreferences(preferences: import('@hapi/protocol').ChatCreationPreferences): Promise<import('@hapi/protocol').ChatCreationPreferences> {
+        return await this.request('/api/new-chat-preferences/import', { method: 'POST', body: JSON.stringify(preferences) })
+    }
+
     async spawnSession(
         machineId: string,
         directory: string,
@@ -847,24 +866,27 @@ export class ApiClient {
         serviceTier?: 'fast' | 'standard',
         collaborationMode?: CodexCollaborationMode,
         copilotAgentMode?: CopilotAgentMode,
-        startingMode?: 'remote' | 'pty'
+        startingMode?: 'remote' | 'pty',
+        codexPromptMode?: MessageDeliveryMode
     ): Promise<SpawnResponse> {
-        return await this.request<SpawnResponse>(`/api/machines/${encodeURIComponent(machineId)}/spawn`, {
+        return await this.request<SpawnResponse>('/api/sessions/create', {
             method: 'POST',
             body: JSON.stringify({
+                machineId,
                 directory,
                 agent,
-                model,
-                modelReasoningEffort,
-                yolo,
-                sessionType,
-                worktreeName,
-                effort,
-                permissionMode,
-                serviceTier,
-                collaborationMode,
-                copilotAgentMode,
-                startingMode
+                model: model ?? null,
+                modelReasoningEffort: modelReasoningEffort ?? null,
+                yolo: yolo ?? null,
+                sessionType: sessionType ?? 'simple',
+                worktreeName: worktreeName ?? null,
+                effort: effort ?? null,
+                permissionMode: permissionMode ?? null,
+                serviceTier: serviceTier ?? null,
+                collaborationMode: collaborationMode ?? null,
+                copilotAgentMode: copilotAgentMode ?? null,
+                startingMode: startingMode ?? null,
+                codexPromptMode
             })
         })
     }

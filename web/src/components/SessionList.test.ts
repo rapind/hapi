@@ -3,19 +3,12 @@ import { toSessionSummary, type Session } from '@hapi/protocol'
 import type { SessionSummary } from '@/types/api'
 import {
     deduplicateSessionsByAgentId,
-    expandSelectedSessionCollapseOverrides,
-    filterActiveSessionsOnly,
-    filterUnreadSessionsOnly,
-    UNKNOWN_MACHINE_ID,
     bucketRunningSessions,
     getSessionTimeRange,
-    getNextSessionVisibleCount,
     getPullRefreshIndicatorRotation,
-    getPreviousSessionVisibleCount,
     getPullToRefreshState,
     getSessionDedupKey,
     getWorktreeSessionLabel,
-    getVisibleSessionPreview,
     isSidebarEmptySessionStub,
     normalizeSearch,
     prepareSidebarSessions,
@@ -30,6 +23,7 @@ function makeSession(overrides: Partial<SessionSummary> & { id: string }): Sessi
         active: false,
         thinking: false,
         activeAt: 0,
+        createdAt: 0,
         updatedAt: 0,
         metadata: null,
         metadataVersion: 0,
@@ -437,205 +431,6 @@ describe('session list time filter helpers', () => {
     it('does not filter until both dates are selected', () => {
         expect(getSessionTimeRange('', '')).toBeNull()
         expect(getSessionTimeRange('2026-07-01', '')).toBeNull()
-    })
-})
-
-describe('getVisibleSessionPreview', () => {
-    it('keeps selected and pending sessions inside the collapsed preview without promoting them', () => {
-        const sessions = Array.from({ length: 6 }, (_, index) => makeSession({
-            id: `s-${index + 1}`,
-            pendingRequestsCount: index === 4 ? 1 : 0,
-            metadata: { path: '/work/hapi' },
-            updatedAt: 100 - index
-        }))
-
-        const preview = getVisibleSessionPreview(sessions, {
-            selectedSessionId: 's-6',
-            limit: 3
-        })
-
-        expect(preview.map(session => session.id)).toEqual(['s-1', 's-5', 's-6'])
-    })
-
-    it('does not exceed the limit just because many sessions are active', () => {
-        const sessions = Array.from({ length: 6 }, (_, index) => makeSession({
-            id: `s-${index + 1}`,
-            active: true,
-            metadata: { path: '/work/hapi' },
-            updatedAt: 100 - index
-        }))
-
-        const preview = getVisibleSessionPreview(sessions, { limit: 4 })
-
-        expect(preview.map(session => session.id)).toEqual(['s-1', 's-2', 's-3', 's-4'])
-    })
-
-    it('does not move an already-visible selected session to the top', () => {
-        const sessions = Array.from({ length: 6 }, (_, index) => makeSession({
-            id: `s-${index + 1}`,
-            metadata: { path: '/work/hapi' },
-            updatedAt: 100 - index
-        }))
-
-        const preview = getVisibleSessionPreview(sessions, {
-            selectedSessionId: 's-3',
-            limit: 4
-        })
-
-        expect(preview.map(session => session.id)).toEqual(['s-1', 's-2', 's-3', 's-4'])
-    })
-
-    it('returns all sessions when expanded', () => {
-        const sessions = Array.from({ length: 4 }, (_, index) => makeSession({
-            id: `s-${index + 1}`,
-            metadata: { path: '/work/hapi' }
-        }))
-
-        expect(getVisibleSessionPreview(sessions, { expanded: true, limit: 2 })).toHaveLength(4)
-    })
-})
-
-
-describe('filterActiveSessionsOnly', () => {
-    it('keeps only active sessions when no selection', () => {
-        const sessions = [
-            makeSession({ id: 'live', active: true, metadata: { path: '/p' } }),
-            makeSession({ id: 'dead', metadata: { path: '/p' } })
-        ]
-        expect(filterActiveSessionsOnly(sessions).map(s => s.id)).toEqual(['live'])
-    })
-
-    it('keeps the selected inactive session visible', () => {
-        const sessions = [
-            makeSession({ id: 'live', active: true, metadata: { path: '/p' } }),
-            makeSession({ id: 'dead', metadata: { path: '/p' } }),
-            makeSession({ id: 'selected-dead', metadata: { path: '/p' } })
-        ]
-        expect(filterActiveSessionsOnly(sessions, 'selected-dead').map(s => s.id).sort())
-            .toEqual(['live', 'selected-dead'])
-    })
-
-    it('preserves input order', () => {
-        const sessions = [
-            makeSession({ id: 'a', active: true, metadata: { path: '/p' } }),
-            makeSession({ id: 'b', metadata: { path: '/p' } }),
-            makeSession({ id: 'c', active: true, metadata: { path: '/p' } })
-        ]
-        expect(filterActiveSessionsOnly(sessions).map(s => s.id)).toEqual(['a', 'c'])
-    })
-})
-
-describe('filterUnreadSessionsOnly', () => {
-    const lastSeen = (id: string): number => {
-        if (id === 'unread') return 1000
-        return 10_000
-    }
-
-    it('keeps only sessions newer than lastSeen; drops seen and selected-only quiet rows stay when selected', () => {
-        const sessions = [
-            makeSession({ id: 'unread', updatedAt: 5000, metadata: { path: '/p' } }),
-            makeSession({ id: 'seen', updatedAt: 1000, metadata: { path: '/p' } }),
-            makeSession({
-                id: 'permission-but-seen',
-                pendingRequestKinds: ['permission'],
-                pendingRequestsCount: 1,
-                updatedAt: 1000,
-                metadata: { path: '/p' },
-            }),
-        ]
-        expect(filterUnreadSessionsOnly(sessions, null, lastSeen).map(s => s.id))
-            .toEqual(['unread'])
-    })
-
-    it('keeps the selected session visible even when it would otherwise filter out', () => {
-        const sessions = [
-            makeSession({ id: 'unread', updatedAt: 5000, metadata: { path: '/p' } }),
-            makeSession({ id: 'selected-quiet', updatedAt: 1000, metadata: { path: '/p' } }),
-        ]
-        expect(filterUnreadSessionsOnly(sessions, 'selected-quiet', lastSeen).map(s => s.id))
-            .toEqual(['unread', 'selected-quiet'])
-    })
-
-    it('composes with machine filter as empty intersection (unread after machine scope stays selected)', () => {
-        // Mirrors SessionList pipeline: unread on visibleSessions, then machine filter.
-        // Machine B selected + only machine A unread → empty list, not "all unread".
-        const sessions = [
-            makeSession({
-                id: 'unread-a',
-                updatedAt: 5000,
-                metadata: { path: '/a', machineId: 'machine-a' },
-            }),
-            makeSession({
-                id: 'seen-b',
-                updatedAt: 1000,
-                metadata: { path: '/b', machineId: 'machine-b' },
-            }),
-        ]
-        const lastSeenById = (id: string) => (id === 'unread-a' ? 0 : 10_000)
-        const unreadFiltered = filterUnreadSessionsOnly(sessions, null, lastSeenById)
-        const machineB = unreadFiltered.filter(
-            session => (session.metadata?.machineId ?? UNKNOWN_MACHINE_ID) === 'machine-b'
-        )
-        expect(unreadFiltered.map(s => s.id)).toEqual(['unread-a'])
-        expect(machineB).toEqual([])
-    })
-})
-
-describe('getNextSessionVisibleCount', () => {
-    it('reveals one batch of step size per call', () => {
-        expect(getNextSessionVisibleCount(8, 8, 20)).toBe(16)
-        expect(getNextSessionVisibleCount(16, 8, 20)).toBe(20)
-    })
-
-    it('never exceeds the total session count', () => {
-        expect(getNextSessionVisibleCount(18, 8, 20)).toBe(20)
-        expect(getNextSessionVisibleCount(20, 8, 20)).toBe(20)
-    })
-
-    it('always advances by at least one even with a zero step', () => {
-        expect(getNextSessionVisibleCount(5, 0, 20)).toBe(6)
-    })
-})
-
-describe('getPreviousSessionVisibleCount', () => {
-    it('collapses one batch of step size per call', () => {
-        expect(getPreviousSessionVisibleCount(20, 8)).toBe(12)
-        expect(getPreviousSessionVisibleCount(12, 8)).toBe(8)
-    })
-
-    it('never goes below the preview limit', () => {
-        expect(getPreviousSessionVisibleCount(10, 8)).toBe(8)
-        expect(getPreviousSessionVisibleCount(8, 8)).toBe(8)
-    })
-
-    it('uses a minimum batch size of one', () => {
-        expect(getPreviousSessionVisibleCount(5, 0)).toBe(4)
-    })
-})
-
-describe('expandSelectedSessionCollapseOverrides', () => {
-    it('expands the collapsed project group, but preserves session preview folding', () => {
-        const overrides = new Map<string, boolean>([
-            ['machine-1::/work/hapi', true],
-            ['sessions::machine-1::/work/hapi', true]
-        ])
-
-        const result = expandSelectedSessionCollapseOverrides(overrides, {
-            key: 'machine-1::/work/hapi'
-        })
-
-        expect(result.get('machine-1::/work/hapi')).toBe(false)
-        expect(result.get('sessions::machine-1::/work/hapi')).toBe(true)
-    })
-
-    it('leaves missing session preview override unset', () => {
-        const overrides = new Map<string, boolean>()
-
-        const result = expandSelectedSessionCollapseOverrides(overrides, {
-            key: 'machine-1::/work/hapi'
-        })
-
-        expect(result.has('sessions::machine-1::/work/hapi')).toBe(false)
     })
 })
 

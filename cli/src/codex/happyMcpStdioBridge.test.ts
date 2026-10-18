@@ -123,6 +123,15 @@ describe('runHappyMcpStdioBridge tool forwarding', () => {
         })
     })
 
+    it('forwards explicit spawn options unchanged', async () => {
+        await runHappyMcpStdioBridge(['--url', 'http://127.0.0.1:43006', '--tools', 'spawn_peer'])
+        const handler = harness.tools.get('spawn_peer')!
+        expect(handler).toBeDefined()
+        const args = { message: 'Review', agent: 'claude', model: null, yolo: false }
+        await handler(args)
+        expect(harness.callTool).toHaveBeenCalledWith({ name: 'spawn_peer', arguments: args })
+    })
+
     it('registers ping_peer when included in --tools', async () => {
         await runHappyMcpStdioBridge([
             '--url',
@@ -176,4 +185,25 @@ describe('runHappyMcpStdioBridge tool forwarding', () => {
         ])
     })
 
+})
+
+describe('archive_peer forwarding', () => {
+    beforeEach(() => { harness.tools.clear(); harness.configs.clear(); harness.callTool.mockReset() })
+    it('forwards self selection and explicit targets unchanged', async () => {
+        harness.callTool.mockResolvedValue({ content: [{ type: 'text', text: 'Archived' }], isError: false })
+        await runHappyMcpStdioBridge(['--url', 'http://127.0.0.1:43006', '--tools', 'archive_peer'])
+        const archive = harness.tools.get('archive_peer')!
+        await archive({})
+        expect(harness.callTool).toHaveBeenLastCalledWith({ name: 'archive_peer', arguments: {} })
+        await archive({ sessionIdPrefix: 'reviewer-1' })
+        expect(harness.callTool).toHaveBeenLastCalledWith({ name: 'archive_peer', arguments: { sessionIdPrefix: 'reviewer-1' } })
+    })
+    it('does not claim success if self-archive closes the HTTP transport', async () => {
+        harness.callTool.mockRejectedValue(new Error('connection reset'))
+        await runHappyMcpStdioBridge(['--url', 'http://127.0.0.1:43006', '--tools', 'archive_peer'])
+        const result = await harness.tools.get('archive_peer')!({}) as { isError: boolean; content: { text: string }[] }
+        expect(result.isError).toBe(true)
+        expect(result.content[0]?.text).toContain('unconfirmed')
+        expect(harness.callTool).toHaveBeenCalledTimes(1)
+    })
 })

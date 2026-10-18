@@ -1,3 +1,4 @@
+import { SpawnPeerInputSchema, SPAWN_PEER_DESCRIPTION } from '@/modules/common/spawnPeerTool';
 /**
  * HAPI MCP STDIO Bridge
  *
@@ -23,7 +24,9 @@ import {
   SESSION_ID_PREFIX_PARAM_DESCRIPTION,
 } from '@hapi/protocol/sessionCitation';
 
-const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'ping_peer', 'inspect_peer'];
+import { ARCHIVE_PEER_TOOL_DESCRIPTION, archivePeerInputSchema } from '@/modules/common/archivePeerTool';
+
+const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'ping_peer', 'inspect_peer', 'archive_peer', 'spawn_peer'];
 
 function parseArgs(argv: string[]): { url: string | null; toolNames: Set<string> } {
   let url: string | null = null;
@@ -36,6 +39,11 @@ function parseArgs(argv: string[]): { url: string | null; toolNames: Set<string>
     } else if (a === '--tools' && i + 1 < argv.length) {
       toolNames = new Set(argv[i + 1].split(',').map((name) => name.trim()).filter(Boolean));
       i++;
+    } else if (a === '--hapi-session-id' && i + 1 < argv.length) {
+      // Orphan-reap stamp only (#2003); consume so the value is not left as a stray argv token.
+      i++;
+    } else if (a.startsWith('--hapi-session-id=')) {
+      // `--hapi-session-id=<uuid>` form — nothing further to consume.
     }
   }
   return { url, toolNames };
@@ -233,6 +241,21 @@ export async function runHappyMcpStdioBridge(argv: string[]): Promise<void> {
       ),
     });
 
+    if (toolNames.has('spawn_peer')) {
+      server.registerTool<any, any>('spawn_peer', {
+        description: SPAWN_PEER_DESCRIPTION,
+        title: 'Create Peer Chat',
+        inputSchema: SpawnPeerInputSchema,
+      }, async (args: Record<string, unknown>) => {
+        try {
+          const client = await ensureHttpClient();
+          return await client.callTool({ name: 'spawn_peer', arguments: args }) as any;
+        } catch (error) {
+          return { content: [{ type: 'text' as const, text: String(error) }], isError: true };
+        }
+      });
+    }
+
     if (toolNames.has('inspect_peer')) {
       server.registerTool<any, any>(
         'inspect_peer',
@@ -256,6 +279,24 @@ export async function runHappyMcpStdioBridge(argv: string[]): Promise<void> {
           }
         }
       );
+    }
+
+    if (toolNames.has('archive_peer')) {
+      server.registerTool<any, any>('archive_peer', {
+        description: ARCHIVE_PEER_TOOL_DESCRIPTION,
+        title: 'Archive Peer Session',
+        inputSchema: archivePeerInputSchema,
+      }, async (args: Record<string, unknown>) => {
+        try {
+          const client = await ensureHttpClient();
+          return await client.callTool({ name: 'archive_peer', arguments: args }) as any;
+        } catch {
+          return {
+            content: [{ type: 'text' as const, text: 'Archive outcome is unconfirmed. Self-archiving can close this connection; inspect the target chat before retrying.' }],
+            isError: true,
+          };
+        }
+      });
     }
 
     const listPeersInputSchema: z.ZodTypeAny = z.object({

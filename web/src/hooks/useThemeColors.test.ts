@@ -101,6 +101,37 @@ describe('useThemeColors', () => {
         expect(document.documentElement.style.getPropertyValue('--app-link').trim()).toBe('#526fff')
     })
 
+    it.each([false, true])('retains existing preset and custom inline code colors: %s', (custom) => {
+        localStorage.setItem('hapi-color-theme', 'one')
+        if (custom) {
+            localStorage.setItem('hapi-theme-colors', JSON.stringify({ dark: { text: '#eeeeee', surface: '#333333' } }))
+        }
+        setScheme('dark')
+
+        applyThemeColors()
+
+        expect(document.documentElement.style.getPropertyValue('--app-inline-code-fg')).toBe(custom ? '#eeeeee' : '#d8dee9')
+        expect(document.documentElement.style.getPropertyValue('--app-inline-code-bg')).toBe(custom ? '#333333' : document.documentElement.style.getPropertyValue('--app-code-bg'))
+        if (custom) {
+            expect(document.documentElement.style.getPropertyValue('--app-fg')).toBe('#eeeeee')
+            expect(document.documentElement.style.getPropertyValue('--app-secondary-bg')).toBe('#333333')
+        }
+    })
+
+    it('preserves personal semantic colors when general text and surface colors are customized', () => {
+        localStorage.setItem('hapi-color-theme', 'personal')
+        localStorage.setItem('hapi-theme-colors', JSON.stringify({ dark: { text: '#ffffff', surface: '#444444', hint: '#bbbbbb' } }))
+        setScheme('dark')
+
+        applyThemeColors()
+
+        const style = document.documentElement.style
+        expect(style.getPropertyValue('--app-inline-code-fg')).toBe('#d97876')
+        expect(style.getPropertyValue('--app-inline-code-bg')).toBe('#212121')
+        expect(style.getPropertyValue('--app-chat-message-fg')).toBe('#edede9')
+        expect(style.getPropertyValue('--app-tool-card-title')).toBe('#85847e')
+    })
+
     it('uses the active color theme as the custom color picker baseline', () => {
         localStorage.setItem('hapi-color-theme', 'one')
         setScheme('light')

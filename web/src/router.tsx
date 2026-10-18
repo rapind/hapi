@@ -116,25 +116,6 @@ function PlusIcon(props: { className?: string }) {
     )
 }
 
-function FolderOpenIcon(props: { className?: string }) {
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={props.className}
-        >
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-        </svg>
-    )
-}
-
 function SettingsIcon(props: { className?: string }) {
     return (
         <svg
@@ -188,12 +169,6 @@ function SessionsPage() {
         }
         return byId
     }, [machines])
-    // Workspace browsing is opt-in per runner (`--workspace-root`); only show
-    // browse affordances when at least one machine reported roots.
-    const canBrowse = useMemo(
-        () => machines.some(m => (m.metadata?.workspaceRoots?.length ?? 0) > 0),
-        [machines]
-    )
     const sessionMatch = matchRoute({ to: '/sessions/$sessionId', fuzzy: true })
     const selectedSessionId = sessionMatch && sessionMatch.sessionId !== 'new' ? sessionMatch.sessionId : null
     const selectedSession = useMemo(
@@ -224,7 +199,7 @@ function SessionsPage() {
         <>
             <div className="flex h-full min-h-0">
             <div
-                className={`${isSessionsIndex ? 'flex' : 'hidden split:flex'} w-full shrink-0 flex-col bg-[var(--app-bg)]`}
+                    className={`${isSessionsIndex ? 'flex' : 'hidden split:flex'} app-session-sidebar w-full shrink-0 flex-col bg-[var(--app-bg)]`}
                 style={{ '--sidebar-w': `${sidebar.width}px` } as React.CSSProperties}
             >
                 <div className="flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
@@ -243,22 +218,11 @@ function SessionsPage() {
                             ...PRESERVE_SESSION_SIDEBAR_SCROLL,
                         })}
                         onNewSessionInDirectory={handleNewSessionInDirectory}
-                        onBrowse={canBrowse ? () => navigate({ to: '/browse' }) : undefined}
                         onRefresh={handleRefresh}
                         isLoading={isLoading}
                         renderHeader={false}
                         headerActions={(
-                            <div className="flex items-center gap-2">
-                                {canBrowse && (
-                                    <button
-                                        type="button"
-                                        onClick={() => navigate({ to: '/browse' })}
-                                        className="p-1.5 rounded-full text-[var(--app-hint)] hover:text-[var(--app-fg)] hover:bg-[var(--app-subtle-bg)] transition-colors"
-                                        title={t('browse.nav')}
-                                    >
-                                        <FolderOpenIcon className="h-5 w-5" />
-                                    </button>
-                                )}
+                                <div className="flex w-full items-center justify-between gap-2">
                                 <button
                                     type="button"
                                     onClick={() => navigate({ to: '/settings' })}

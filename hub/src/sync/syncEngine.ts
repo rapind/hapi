@@ -2091,6 +2091,29 @@ export class SyncEngine {
         await this.rpcGateway.switchSession(sessionId, to)
     }
 
+    async setCodexPromptMode(sessionId: string, mode: MessageDeliveryMode): Promise<void> {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+            const session = this.sessionCache.getSession(sessionId) ?? this.sessionCache.refreshSession(sessionId)
+            if (!session) throw new Error('Session not found')
+            if (session.metadata?.flavor !== 'codex') throw new Error('Follow-up mode is only supported for Codex sessions')
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                { ...session.metadata, codexPromptMode: mode },
+                session.metadataVersion,
+                session.namespace,
+                { touchUpdatedAt: false }
+            )
+            if (result.result === 'success') {
+                this.sessionCache.refreshSession(sessionId)
+                this.emitCliSessionMetadataUpdate(sessionId)
+                return
+            }
+            if (result.result === 'error') throw new Error('Failed to update follow-up mode')
+            this.sessionCache.refreshSession(sessionId)
+        }
+        throw new Error('Session was modified concurrently. Please try again.')
+    }
+
     async renameSession(sessionId: string, name: string): Promise<void> {
         await this.sessionCache.renameSession(sessionId, name)
     }
@@ -2181,8 +2204,10 @@ export class SyncEngine {
         startingMode?: 'remote' | 'pty',
         // Required for fresh machine spawns so the runner stamps the HAPI id on
         // argv before the first webhook (#1911 Major: unreapable window).
-        namespace?: string
-    ): ReturnType<RpcGateway['spawnSession']> {
+        namespace?: string,
+        codexPromptMode?: 'queue' | 'steer',
+        creationMetadata?: Pick<import('@hapi/protocol').Metadata, 'launchOrigin'>
+    ): Promise<Awaited<ReturnType<RpcGateway['spawnSession']>> & { sessionId?: string }> {
         // Fresh machine spawns historically omitted existingSessionId, so
         // buildCliArgs could not stamp --hapi-session-id / --existing-session-id.
         // A runner restart before the first webhook then left no persisted PID
@@ -2200,9 +2225,11 @@ export class SyncEngine {
                     path: directory,
                     host: machine?.metadata?.host ?? 'unknown',
                     flavor: agent,
+                    ...(agent === 'codex' ? { codexPromptMode: codexPromptMode ?? 'queue' } : {}),
                     machineId,
                     startedBy: 'runner',
                     startedFromRunner: true,
+                    ...creationMetadata,
                 },
                 null,
                 namespace,
@@ -2243,6 +2270,7 @@ export class SyncEngine {
             if (preallocated && allocatedSessionId) {
                 return {
                     type: 'error',
+                    sessionId: allocatedSessionId,
                     message: error instanceof Error ? error.message : String(error),
                 }
             }
@@ -2278,7 +2306,7 @@ export class SyncEngine {
             // Matches the throw-path keep-stub policy above (#1911 Critical).
             // Archive of these stubs is allowed via isMachineSpawnPreallocatedStub
             // hatch in archiveSession (no hostPid → no process to confirm).
-            return result
+            return { ...result, sessionId: allocatedSessionId }
         }
 
         // Runner must bind the preallocated id — a divergent success id leaves
@@ -2294,6 +2322,7 @@ export class SyncEngine {
             )
             return {
                 type: 'error',
+                sessionId: allocatedSessionId,
                 message: `Runner reported unexpected session id ${result.sessionId} (expected ${allocatedSessionId})`,
             }
         }

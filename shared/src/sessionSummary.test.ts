@@ -69,6 +69,10 @@ describe('getPendingRequestKinds', () => {
 })
 
 describe('toSessionSummary', () => {
+    it('preserves creation time independently of later activity', () => {
+        const session = makeSession({ createdAt: 100, updatedAt: 900 })
+        expect(toSessionSummary(session)).toHaveProperty('createdAt', 100)
+    })
     it('includes the pinned state', () => {
         expect(toSessionSummary(makeSession({ pinned: true })).pinned).toBe(true)
         expect(toSessionSummary(makeSession({ globalPinned: true })).globalPinned).toBe(true)

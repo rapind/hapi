@@ -42,13 +42,14 @@ export class SharedCodexProjection {
     private readonly pendingTitles = new Map<string, string>();
     private readonly completedTitles = new Set<string>();
     private titleRevision = 0;
+    private generation = 0;
     constructor(private readonly session: ApiSessionClient, readonly threadId: string,
         private readonly committed: (id: string) => Promise<void>, private readonly parentThreadId?: string) {
         if (!parentThreadId) for (const [id, turn] of Object.entries(session.getMetadata()?.conversationHistoryTurns ?? {})) this.turns.set(id, turn);
     }
 
     turnFor(id: string): string | undefined { return this.turns.get(id); }
-    reset(): void { this.converter = new AppServerEventConverter(); this.emitted.clear(); }
+    reset(): void { this.converter = new AppServerEventConverter(); this.emitted.clear(); this.generation++; }
     private send(body: Record<string, unknown>, key: string): void {
         if (this.emitted.has(key)) return;
         this.emitted.add(key);
@@ -90,7 +91,7 @@ export class SharedCodexProjection {
         await this.project(method, params, modelAtReceipt);
     }
 
-    private async project(method: string, params: unknown, modelAtReceipt?: string): Promise<void> {
+    private async project(method: string, params: unknown, modelAtReceipt?: string, fromHistory = false): Promise<void> {
         if (method.startsWith('codex/event/')) return;
         const p = record(params);
         const item = record(p.item);
@@ -106,15 +107,28 @@ export class SharedCodexProjection {
         const itemId = string(item.id) ?? string(p.itemId);
         if (!this.parentThreadId && (method === 'item/started' || method === 'item/completed') && item.type === 'userMessage') {
             const id = string(item.clientId ?? item.clientUserMessageId) ?? (itemId ? `codex:${this.threadId}:user:${itemId}` : undefined);
-            if (id) {
+            if (id && !this.emitted.has(`user:${id}`)) {
+                // Reserve before yielding: live notifications can overlap history.
+                const generation = this.generation;
+                this.emitted.add(`user:${id}`);
+                try { await this.committed(id); }
+                catch (error) {
+                    if (generation === this.generation) this.emitted.delete(`user:${id}`);
+                    throw error;
+                }
+                if (generation !== this.generation) return;
                 const firstInTurn = turnId ? [...this.turns].find(([, value]) => value === turnId)?.[0] : undefined;
                 if (turnId) this.turns.set(id, turnId);
-                await this.committed(id);
                 const text = inputText(item.content);
                 if (text) this.session.sendUserMessage(text, undefined, id);
-                this.session.updateMetadata(metadata => ({ ...metadata, conversationHistoryTurns: Object.fromEntries(this.turns),
-                    ...(turnId && (!firstInTurn || firstInTurn === id) ? { conversationHistoryPoints: { ...metadata.conversationHistoryPoints, [id]: true } } : {})
-                }));
+                const historyPoint = turnId && (!firstInTurn || firstInTurn === id);
+                const metadata = this.session.getMetadata();
+                if (turnId && (metadata?.conversationHistoryTurns?.[id] !== turnId
+                    || (historyPoint && metadata?.conversationHistoryPoints?.[id] !== true))) {
+                    this.session.updateMetadata(current => ({ ...current, conversationHistoryTurns: Object.fromEntries(this.turns),
+                        ...(historyPoint ? { conversationHistoryPoints: { ...current.conversationHistoryPoints, [id]: true } } : {})
+                    }));
+                }
             }
         }
         if (this.parentThreadId && (method === 'turn/started' || method === 'turn/completed')) {
@@ -146,6 +160,20 @@ export class SharedCodexProjection {
                 this.send({ type: 'tool-call', name: event.name, callId, input: event.input ?? event.arguments }, key);
             } else if (event.type === 'codex_tool_call_end' && callId) {
                 this.send({ type: 'tool-call-result', callId, output: event.output, is_error: event.is_error }, key);
+            } else if (event.type === 'compaction_started') {
+                // History replay re-projects every completed item's start;
+                // a finished compaction must not announce a live status.
+                if (fromHistory) continue;
+                if (this.parentThreadId) {
+                    this.send({ type: 'compaction_started', statusText: '📦 Compaction started' }, key);
+                } else {
+                    // Status UI listens on session events; an agent message
+                    // would render as a normal assistant bubble instead.
+                    // Dedup is in-memory only (this.emitted set).
+                    if (this.emitted.has(key)) continue;
+                    this.emitted.add(key);
+                    this.session.sendSessionEvent({ type: 'message', message: '📦 Compaction started' });
+                }
             } else if (event.type === 'token_count' || event.type === 'context_compacted' || event.type.startsWith('thread_goal_')) {
                 const model = event.type === 'token_count' && turnId ? this.turnModels.get(turnId) : undefined;
                 this.send({ ...event, ...(model ? { model } : {}), flavor: 'codex', scope: { role: 'parent', threadId: this.threadId }, scope_role: 'parent', thread_id: this.threadId }, key);
@@ -191,7 +219,7 @@ export class SharedCodexProjection {
                 if (!this.parentThreadId && string(record(item).id) && pendingTitle && !this.completedTitles.has(titleKey)) {
                     this.pendingTitles.set(titleKey, pendingTitle);
                 }
-                await this.project('item/started', params);
+                await this.project('item/started', params, undefined, true);
                 // Active snapshots can contain partial assistant text. Do not
                 // settle it under the final stable id and suppress completion.
                 if (turn.status !== 'inProgress' || record(item).status === 'completed' || record(item).type === 'userMessage') {
@@ -203,7 +231,7 @@ export class SharedCodexProjection {
                         }
                         this.pendingTitles.delete(titleKey);
                     }
-                    await this.project('item/completed', params);
+                    await this.project('item/completed', params, undefined, true);
                 }
             }
         }

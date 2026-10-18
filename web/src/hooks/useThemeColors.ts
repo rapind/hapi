@@ -244,7 +244,8 @@ export function applyThemeColors(): void {
     if (!isBrowser()) return
 
     const scheme = getThemeScheme()
-    applyColorTheme(getStoredColorTheme(), scheme as ColorScheme)
+    const theme = getStoredColorTheme()
+    applyColorTheme(theme, scheme as ColorScheme)
 
     const overrides = getStoredThemeColors()[scheme] ?? {}
     const rootStyle = document.documentElement.style
@@ -255,6 +256,7 @@ export function applyThemeColors(): void {
         if (!hex) continue
 
         for (const cssVar of key.targets) {
+            if (theme === 'personal' && cssVar.startsWith('--app-inline-code-')) continue
             rootStyle.setProperty(cssVar, hex)
         }
 

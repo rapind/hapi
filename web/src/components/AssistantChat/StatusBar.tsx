@@ -7,12 +7,11 @@ import {
 } from '@hapi/protocol'
 import type { PermissionModeTone } from '@hapi/protocol'
 import * as Popover from '@radix-ui/react-popover'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { AgentState, CodexCollaborationMode, PermissionMode } from '@/types/api'
 import type { ConversationStatus } from '@/realtime/types'
 import { getContextBudgetTokens } from '@/chat/modelConfig'
 import {
-    formatReasoningLabel,
     formatCompactReasoningLabel,
     getReasoningEffortForFlavor,
     shouldShowReasoningStatusLabel
@@ -207,6 +206,8 @@ export function StatusBar(props: {
      */
     contextModel?: string | null
     model?: string | null
+    codexPromptMode?: 'queue' | 'steer'
+    onCodexPromptModeChange?: (mode: 'queue' | 'steer') => Promise<void>
     modelReasoningEffort?: string | null
     effort?: string | null
     serviceTier?: string | null
@@ -215,8 +216,11 @@ export function StatusBar(props: {
     copilotAgentMode?: import('@hapi/protocol').CopilotAgentMode
     agentFlavor?: string | null
     voiceStatus?: ConversationStatus
+    inline?: boolean
 }) {
     const { t } = useTranslation()
+    const [savingPromptMode, setSavingPromptMode] = useState(false)
+    const [promptModeError, setPromptModeError] = useState(false)
     const { preferences: headerMetadata } = useSessionHeaderMetadata()
     const connectionStatus = useMemo(
         () => getConnectionStatus(props.active, props.thinking, props.agentState, props.voiceStatus, props.backgroundTaskCount ?? 0, t),
@@ -284,15 +288,29 @@ export function StatusBar(props: {
     )
     const displaysReasoning = shouldShowReasoningStatusLabel(props.agentFlavor, reasoningEffort)
     const reasoningLabel = displaysReasoning
-        ? formatReasoningLabel(reasoningEffort, headerMetadata.showLabels)
-        : null
-    const compactReasoningLabel = displaysReasoning
         ? formatCompactReasoningLabel(reasoningEffort)
         : null
     const codexFastMode = shouldShowCodexFastBadge(props.agentFlavor, props.serviceTier)
 
-    return (
-        <div className="flex min-w-0 items-baseline justify-between gap-2 px-2 pb-1">
+    const nextPromptMode = props.codexPromptMode === 'steer' ? 'queue' : 'steer'
+    const promptModeToggleLabel = t('chat.codexPromptMode.toggle', {
+        mode: t(nextPromptMode === 'steer' ? 'chat.codexPromptMode.steer' : 'chat.codexPromptMode.queue')
+    })
+    const togglePromptMode = async () => {
+        if (savingPromptMode || !props.onCodexPromptModeChange) return
+        setSavingPromptMode(true)
+        setPromptModeError(false)
+        try {
+            await props.onCodexPromptModeChange(nextPromptMode)
+        } catch {
+            setPromptModeError(true)
+        } finally {
+            setSavingPromptMode(false)
+        }
+    }
+
+    const statusBar = (
+        <div data-testid="composer-status" className={props.inline ? "flex shrink-0 items-center gap-3" : "flex min-w-0 items-baseline justify-between gap-2 px-2 pb-1"}>
             <div className="flex min-w-0 items-baseline gap-2">
                 <div className="relative top-px sm:top-0.5 flex shrink-0 items-center gap-1.5">
                     <span
@@ -366,10 +384,22 @@ export function StatusBar(props: {
 
             <div className="flex min-w-0 shrink-0 items-baseline gap-2">
                 {reasoningLabel ? (
-                    <span className="whitespace-nowrap text-xs text-[var(--app-hint)]">
-                        <span className="sm:hidden">{compactReasoningLabel}</span>
-                        <span className="hidden sm:inline">{reasoningLabel}</span>
+                    <span className="hidden sm:inline whitespace-nowrap text-xs text-[var(--app-hint)]">
+                        {reasoningLabel}
                     </span>
+                ) : null}
+                {props.agentFlavor === 'codex' && props.codexPromptMode ? (
+                    <button
+                        type="button"
+                        onClick={() => void togglePromptMode()}
+                        disabled={savingPromptMode || !props.onCodexPromptModeChange}
+                        aria-label={promptModeToggleLabel}
+                        title={promptModeToggleLabel}
+                        aria-busy={savingPromptMode}
+                        className="hidden sm:inline-flex cursor-pointer whitespace-nowrap rounded-sm text-xs text-[var(--app-hint)] hover:text-[var(--app-link)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--app-link)] disabled:cursor-default disabled:opacity-50"
+                    >
+                        {t(props.codexPromptMode === 'steer' ? 'chat.codexPromptMode.steer' : 'chat.codexPromptMode.queue')}
+                    </button>
                 ) : null}
                 {codexFastMode ? (
                     <span className="whitespace-nowrap text-xs text-[#34C759]">
@@ -387,11 +417,18 @@ export function StatusBar(props: {
                     </span>
                 ) : null}
                 {displayPermissionMode ? (
-                    <span className={`whitespace-nowrap text-xs ${permissionModeColor}`}>
+                    <span className={`hidden sm:inline whitespace-nowrap text-xs ${permissionModeColor}`}>
                         {permissionModeLabel}
                     </span>
                 ) : null}
             </div>
         </div>
+    )
+
+    return (
+        <>
+            {statusBar}
+            {promptModeError ? <div role="alert" className="px-2 pb-1 text-xs text-red-500">{t('chat.codexPromptMode.error')}</div> : null}
+        </>
     )
 }

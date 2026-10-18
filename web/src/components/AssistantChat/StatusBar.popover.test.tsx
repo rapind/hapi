@@ -49,7 +49,7 @@ describe('StatusBar context details popover', () => {
         expect(thinkingLabel.parentElement?.className.split(' ')).toContain('sm:top-0.5')
     })
 
-    it('uses an effort-only reasoning label on mobile and the full label on desktop', () => {
+    it('shows only the effort value at every viewport width', () => {
         render(
             <I18nProvider>
                 <StatusBar
@@ -63,10 +63,8 @@ describe('StatusBar context details popover', () => {
             </I18nProvider>
         )
 
-        expect(screen.getByText('xhigh').className.split(' ')).toContain('sm:hidden')
-        const desktopLabel = screen.getByText('reasoning xhigh')
-        expect(desktopLabel.className.split(' ')).toContain('hidden')
-        expect(desktopLabel.className.split(' ')).toContain('sm:inline')
+        expect(screen.getByText('xhigh')).toBeInTheDocument()
+        expect(screen.queryByText(/reasoning xhigh/)).not.toBeInTheDocument()
     })
 
     it('keeps the Codex default reasoning label when model effort is absent', () => {
@@ -82,8 +80,8 @@ describe('StatusBar context details popover', () => {
             </I18nProvider>
         )
 
-        expect(screen.getByText('default').className.split(' ')).toContain('sm:hidden')
-        expect(screen.getByText('reasoning default').className.split(' ')).toContain('sm:inline')
+        expect(screen.getByText('default')).toBeInTheDocument()
+        expect(screen.queryByText('reasoning default')).not.toBeInTheDocument()
     })
 
     it('uses Pi ordinary effort instead of model reasoning effort', () => {
@@ -100,8 +98,8 @@ describe('StatusBar context details popover', () => {
             </I18nProvider>
         )
 
-        expect(screen.getByText('max').className.split(' ')).toContain('sm:hidden')
-        expect(screen.getByText('reasoning max').className.split(' ')).toContain('sm:inline')
+        expect(screen.getByText('max')).toBeInTheDocument()
+        expect(screen.queryByText('reasoning max')).not.toBeInTheDocument()
         expect(screen.queryByText('reasoning xhigh')).not.toBeInTheDocument()
     })
 
