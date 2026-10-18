@@ -112,13 +112,12 @@ describe('ToolGroupCard', () => {
         const view = renderCard(makeGroup())
 
         expect(screen.getByRole('button', { name: /inspect a\.ts/i })).toHaveAttribute('aria-expanded', 'false')
-        expect(screen.getByText('Run 1 · Read 1')).toBeInTheDocument()
+        expect(screen.queryByText('Run 1 · Read 1')).not.toBeInTheDocument()
         expect(screen.queryByText('2 actions')).not.toBeInTheDocument()
-        expect(screen.getByText('Run 1 · Read 1')).toHaveClass('text-xs', 'font-normal', 'text-[var(--app-hint)]')
         expect(screen.queryByText('src/a.ts')).not.toBeInTheDocument()
         expect(screen.queryByText('bun test')).not.toBeInTheDocument()
 
-        expect(view.container.innerHTML).toContain('bg-[var(--app-tool-group-bg)]')
+        expect(view.container.innerHTML).toContain('bg-transparent')
     })
 
     it('derives completed group wall-clock timing from the earliest start and latest finish', () => {
@@ -137,7 +136,7 @@ describe('ToolGroupCard', () => {
         })
     })
 
-    it('shows group start, live duration, and a spinner while collapsed and running', () => {
+    it('hides live timing until expansion while retaining the running spinner', () => {
         const startedAt = Date.now() - 5_000
         const completed = makeToolBlock('read-1', 'Read')
         completed.tool.startedAt = startedAt
@@ -156,13 +155,17 @@ describe('ToolGroupCard', () => {
         })
         const view = renderCard(group)
 
+        expect(screen.queryByText('Started')).not.toBeInTheDocument()
+        expect(screen.queryByText('Duration')).not.toBeInTheDocument()
+        expect(screen.queryByText('Finished')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { expanded: false }))
         expect(screen.getByText('Started')).toBeInTheDocument()
         expect(screen.getByText('Duration')).toBeInTheDocument()
         expect(screen.queryByText('Finished')).not.toBeInTheDocument()
         expect(within(view.container).getByLabelText('Running')).toBeInTheDocument()
     })
 
-    it('shows final timing in the collapsed header after every tool finishes', () => {
+    it('shows completed timing only after expansion', () => {
         const startedAt = Date.now() - 4_000
         const first = makeToolBlock('read-1', 'Read')
         first.tool.startedAt = startedAt
@@ -173,6 +176,10 @@ describe('ToolGroupCard', () => {
 
         renderCard(makeGroup({ tools: [first, second] }))
 
+        expect(screen.queryByText('Started')).not.toBeInTheDocument()
+        expect(screen.queryByText('Duration')).not.toBeInTheDocument()
+        expect(screen.queryByText('Finished')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { expanded: false }))
         expect(screen.getByText('Started')).toBeInTheDocument()
         expect(screen.getByText('Finished')).toBeInTheDocument()
         expect(screen.getByText('Duration')).toBeInTheDocument()
@@ -187,7 +194,7 @@ describe('ToolGroupCard', () => {
         fireEvent.click(groupToggle)
         expect(groupToggle).toHaveAttribute('aria-expanded', 'true')
         expect(view.container.querySelector('svg[data-state="open"]')).toBeInTheDocument()
-        expect(screen.getByText('Run 1 · Read 1')).toBeInTheDocument()
+        expect(screen.queryByText('Run 1 · Read 1')).not.toBeInTheDocument()
         expect(screen.queryByText('2 actions')).not.toBeInTheDocument()
         expect(screen.getByText('src/a.ts')).toBeInTheDocument()
         expect(screen.getByText('bun test')).toBeInTheDocument()
@@ -283,7 +290,7 @@ describe('ToolGroupCard', () => {
         }))
 
         expect(screen.getByRole('button', { name: /tool activity/i })).toBeInTheDocument()
-        expect(screen.getByText('25 actions')).toBeInTheDocument()
+        expect(screen.queryByText('25 actions')).not.toBeInTheDocument()
         expect(screen.queryByText('Use tool +24')).not.toBeInTheDocument()
         expect(screen.queryByText('Tool 25')).not.toBeInTheDocument()
 

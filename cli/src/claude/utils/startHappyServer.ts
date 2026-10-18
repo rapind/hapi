@@ -1,3 +1,5 @@
+import { SpawnPeerInputSchema, SPAWN_PEER_DESCRIPTION, type SpawnPeerInput } from '@/modules/common/spawnPeerTool'
+import { spawnPeer } from '@/modules/pingPeer/pingPeer'
 /**
  * HAPI MCP server
  * Provides HAPI CLI specific tools including chat session title management
@@ -26,8 +28,10 @@ import {
     PING_PEER_TOOL_DESCRIPTION,
     SESSION_ID_PREFIX_PARAM_DESCRIPTION,
 } from '@hapi/protocol/sessionCitation'
-import { PingPeerError, formatInspectPeerReport, formatPeerSessionsList, inspectPeer, listPeerSessions, peerListFetchLimit, pingPeer } from "@/modules/pingPeer/pingPeer";
+import { PingPeerError, archivePeer, formatInspectPeerReport, formatPeerSessionsList, inspectPeer, listPeerSessions, peerListFetchLimit, pingPeer } from "@/modules/pingPeer/pingPeer";
 import { applySessionDisplayRename, normalizeSessionDisplayTitle } from "@/agent/sessionDisplayRename";
+
+import { ARCHIVE_PEER_TOOL_DESCRIPTION, archivePeerInputSchema } from '@/modules/common/archivePeerTool';
 
 type StartHappyServerOptions = {
     /**
@@ -48,7 +52,8 @@ const CLAUDE_MANUAL_APPROVAL_HAPI_TOOLS = new Set([
     'display_media',
     'display_video',
     'ping_peer',
-    'inspect_peer'
+    'inspect_peer',
+    'spawn_peer'
 ]);
 
 /**
@@ -298,6 +303,19 @@ function createHapiMcpServer(
         }
     });
 
+    mcp.registerTool<any, any>('spawn_peer', {
+        description: SPAWN_PEER_DESCRIPTION,
+        title: 'Create Peer Chat',
+        inputSchema: SpawnPeerInputSchema,
+    }, async (args: SpawnPeerInput) => {
+        try {
+            const result = await spawnPeer(args, { currentSessionId: client.sessionId });
+            return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], isError: false };
+        } catch (error) {
+            return { content: [{ type: 'text' as const, text: error instanceof Error ? error.message : String(error) }], isError: true };
+        }
+    });
+
     mcp.registerTool<any, any>('ping_peer', {
         description: PING_PEER_TOOL_DESCRIPTION,
         title: 'Ping Peer Session',
@@ -421,6 +439,28 @@ function createHapiMcpServer(
     });
 
 
+    mcp.registerTool<any, any>('archive_peer', {
+        description: ARCHIVE_PEER_TOOL_DESCRIPTION,
+        title: 'Archive Peer Session',
+        inputSchema: archivePeerInputSchema,
+    }, async (args: { sessionIdPrefix?: string }) => {
+        try {
+            const result = await archivePeer({
+                sessionIdPrefix: args.sessionIdPrefix,
+                currentSessionId: client.sessionId,
+            });
+            return {
+                content: [{ type: 'text' as const, text: `${result.alreadyArchived ? 'Already archived' : 'Archived'} ${result.sessionId} (${result.name}). History is retained; use Reopen to continue.` }],
+                isError: false,
+            };
+        } catch (error) {
+            return {
+                content: [{ type: 'text' as const, text: `Failed to archive session: ${error instanceof Error ? error.message : String(error)}` }],
+                isError: true,
+            };
+        }
+    });
+
     if (skillLookup) {
         mcp.registerTool<any, any>('skill_lookup', {
             description: 'Load a HAPI skill by exact name. When a user message starts with $name, call this tool with that name before acting.',
@@ -541,8 +581,8 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
     }));
 
     const toolNames = enableChangeTitle
-        ? ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'ping_peer', 'inspect_peer']
-        : ['display_image', 'display_video', 'display_media', 'list_peers', 'ping_peer', 'inspect_peer'];
+        ? ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'ping_peer', 'inspect_peer', 'archive_peer', 'spawn_peer']
+        : ['display_image', 'display_video', 'display_media', 'list_peers', 'ping_peer', 'inspect_peer', 'archive_peer', 'spawn_peer'];
     if (options.skillLookup) {
         toolNames.push('skill_lookup');
     }

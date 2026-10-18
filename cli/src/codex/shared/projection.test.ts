@@ -4,6 +4,114 @@ import { SharedCodexProjection, inputText } from './projection';
 import { codexPlanProposalId } from './plan';
 
 describe('shared history projection', () => {
+    it('projects each user item once until a reconnect requests durable replay', async () => {
+        const user = vi.fn();
+        const committed = vi.fn(async () => {});
+        const session = { getMetadata: () => ({}), sendAgentMessage: vi.fn(),
+            sendUserMessage: user, updateMetadata: vi.fn() } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const snapshot = { turns: [{ id: 'turn', status: 'completed', items: [
+            { id: 'prompt', clientId: 'local-prompt', type: 'userMessage', content: [{ type: 'text', text: 'hello' }] }
+        ] }] };
+
+        await projection.history(snapshot);
+        await projection.history(snapshot);
+        expect(user).toHaveBeenCalledTimes(1);
+        expect(committed).toHaveBeenCalledTimes(1);
+
+        projection.reset();
+        await projection.history(snapshot);
+        expect(user).toHaveBeenCalledTimes(2);
+        expect(user.mock.calls[1]).toEqual(user.mock.calls[0]);
+    });
+
+    it('reserves a user item while durable confirmation overlaps live history', async () => {
+        let confirm!: () => void;
+        const committed = vi.fn(() => new Promise<void>(resolve => { confirm = resolve; }));
+        const user = vi.fn();
+        const session = { getMetadata: () => ({}), sendAgentMessage: vi.fn(),
+            sendUserMessage: user, updateMetadata: vi.fn() } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const item = { id: 'prompt', clientId: 'local-prompt', type: 'userMessage',
+            content: [{ type: 'text', text: 'hello' }] };
+        const live = projection.notification('item/started', { threadId: 'thread', turnId: 'turn', item });
+        const history = projection.history({ turns: [{ id: 'turn', status: 'completed', items: [item] }] });
+        expect(committed).toHaveBeenCalledTimes(1);
+        confirm();
+        await Promise.all([live, history]);
+        expect(user).toHaveBeenCalledTimes(1);
+    });
+
+    it('allows retry after durable user confirmation fails', async () => {
+        const committed = vi.fn().mockRejectedValueOnce(new Error('disk unavailable')).mockResolvedValue(undefined);
+        const user = vi.fn();
+        const session = { getMetadata: () => ({}), sendAgentMessage: vi.fn(),
+            sendUserMessage: user, updateMetadata: vi.fn() } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const params = { threadId: 'thread', turnId: 'turn', item: { id: 'prompt',
+            type: 'userMessage', content: [{ type: 'text', text: 'hello' }] } };
+        await expect(projection.notification('item/started', params)).rejects.toThrow('disk unavailable');
+        expect(user).not.toHaveBeenCalled();
+        await projection.notification('item/completed', params);
+        expect(committed).toHaveBeenCalledTimes(2);
+        expect(user).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([false, true])('ignores stale confirmation across reconnect (failure: %s)', async failOld => {
+        let finishOld!: () => void;
+        const committed = vi.fn().mockImplementationOnce(() => new Promise<void>((resolve, reject) => {
+            finishOld = () => failOld ? reject(new Error('old write failed')) : resolve();
+        })).mockResolvedValue(undefined);
+        const user = vi.fn();
+        const session = { getMetadata: () => ({}), sendAgentMessage: vi.fn(),
+            sendUserMessage: user, updateMetadata: vi.fn() } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const params = { threadId: 'thread', turnId: 'turn', item: { id: 'prompt',
+            type: 'userMessage', content: [{ type: 'text', text: 'hello' }] } };
+        const old = projection.notification('item/started', params).catch(error => error);
+        projection.reset();
+        await projection.notification('item/completed', params);
+        finishOld();
+        await old;
+        await projection.notification('item/completed', params);
+        expect(user).toHaveBeenCalledTimes(1);
+        expect(committed).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retain an unconfirmed turn mapping across reset', async () => {
+        let confirm!: () => void;
+        const committed = vi.fn().mockImplementationOnce(() => new Promise<void>(resolve => { confirm = resolve; }))
+            .mockResolvedValue(undefined);
+        let metadata = {} as Record<string, unknown>;
+        const session = { getMetadata: () => metadata, sendAgentMessage: vi.fn(), sendUserMessage: vi.fn(),
+            updateMetadata: (change: (value: Record<string, unknown>) => Record<string, unknown>) => { metadata = change(metadata); }
+        } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const item = (id: string) => ({ id, clientId: id, type: 'userMessage', content: [{ type: 'text', text: id }] });
+        const old = projection.notification('item/started', { threadId: 'thread', turnId: 'turn', item: item('later') });
+        projection.reset();
+        await projection.history({ turns: [{ id: 'turn', status: 'completed', items: [item('first'), item('later')] }] });
+        confirm(); await old;
+        expect(metadata.conversationHistoryPoints).toEqual({ first: true });
+    });
+
+    it('replays durable messages without republishing unchanged history metadata', async () => {
+        const updateMetadata = vi.fn(); const user = vi.fn(); const committed = vi.fn(async () => {});
+        const metadata = { conversationHistoryTurns: { prompt: 'turn' }, conversationHistoryPoints: { prompt: true } };
+        const session = { getMetadata: () => metadata, sendAgentMessage: vi.fn(),
+            sendUserMessage: user, updateMetadata } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const snapshot = { turns: [{ id: 'turn', status: 'completed', items: [
+            { id: 'native', clientId: 'prompt', type: 'userMessage', content: [{ type: 'text', text: 'hello' }] }
+        ] }] };
+        await projection.history(snapshot);
+        projection.reset();
+        await projection.history(snapshot);
+        expect(committed).toHaveBeenCalledTimes(2);
+        expect(user).toHaveBeenCalledTimes(2);
+        expect(updateMetadata).not.toHaveBeenCalled();
+    });
+
     it.each([undefined, 'root'])('persists proposals without approval and replays the same IDs (parent: %s)', async parentThreadId => {
         const send = vi.fn();
         const session = { getMetadata: () => ({}), sendAgentMessage: send } as unknown as ApiSessionClient;
@@ -105,5 +213,46 @@ describe('shared history projection', () => {
         expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'agent-run-trace', agentId: 'child', message: expect.objectContaining({ message: 'child answer' }) }), expect.any(String));
         await projection.notification('item/completed', { threadId: 'child', turnId: 'turn', item: { id: 'prompt', type: 'userMessage', content: [{ type: 'text', text: 'child prompt' }], clientId: 'cid' } });
         expect(user).not.toHaveBeenCalled(); expect(committed).not.toHaveBeenCalled();
+    });
+
+    it('announces parent compaction start via session event, deduping repeats', async () => {
+        const send = vi.fn(); const sendEvent = vi.fn();
+        const session = { getMetadata: () => ({}), sendAgentMessage: send, sendSessionEvent: sendEvent } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', async () => {});
+        const params = { threadId: 'thread', turnId: 'turn', item: { id: 'c1', type: 'contextCompaction' } };
+        await projection.notification('item/started', params);
+        await projection.notification('item/started', params);
+        await projection.notification('item/started', { threadId: 'thread', turnId: 'turn', item: { id: 'c2', type: 'contextCompaction' } });
+        expect(send).not.toHaveBeenCalled();
+        expect(sendEvent.mock.calls).toEqual([
+            [{ type: 'message', message: '📦 Compaction started' }],
+            [{ type: 'message', message: '📦 Compaction started' }]
+        ]);
+    });
+    it('keeps child compaction start as trace with statusText, never a parent status', async () => {
+        const send = vi.fn(); const sendEvent = vi.fn();
+        const session = { getMetadata: () => ({}), sendAgentMessage: send, sendSessionEvent: sendEvent } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'child', async () => {}, 'root');
+        await projection.notification('item/started', { threadId: 'child', turnId: 'turn', item: { id: 'c1', type: 'contextCompaction' } });
+        expect(sendEvent).not.toHaveBeenCalled();
+        expect(send).toHaveBeenCalledTimes(1);
+        const [body] = send.mock.calls[0];
+        expect(body.type).toBe('agent-run-trace');
+        expect(body.message.type).toBe('compaction_started');
+        expect(body.message.statusText).toBe('📦 Compaction started');
+    });
+    it('emits live compaction start but not for completed history replay', async () => {
+        const send = vi.fn(); const sendEvent = vi.fn();
+        const session = { getMetadata: () => ({}), sendAgentMessage: send, sendSessionEvent: sendEvent } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', async () => {});
+        await projection.history({ turns: [{ id: 'turn', status: 'completed',
+            items: [{ id: 'c1', type: 'contextCompaction' }] }] });
+        expect(sendEvent).not.toHaveBeenCalled();
+        expect(send.mock.calls.map(([b]) => b).some((b) => b.message === '📦 Compaction started')).toBe(false);
+        expect(send.mock.calls.map(([b]) => b)).toContainEqual(expect.objectContaining({ type: 'context_compacted' }));
+        send.mockClear();
+        await projection.notification('item/started', { threadId: 'thread', turnId: 'live', item: { id: 'c9', type: 'contextCompaction' } });
+        expect(send).not.toHaveBeenCalled();
+        expect(sendEvent).toHaveBeenCalledWith({ type: 'message', message: '📦 Compaction started' });
     });
 });

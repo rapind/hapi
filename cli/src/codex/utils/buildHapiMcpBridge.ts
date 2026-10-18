@@ -84,12 +84,16 @@ export async function buildHapiMcpBridge(
         enableChangeTitle: options.enableChangeTitle,
         skillLookup: options.skillLookup
     });
+    // Stamp the hub row id so orphanReap can find MCP helpers after the agent
+    // root dies without a full tree kill (#2003 / #1911 follow-up).
     const bridgeCommand = getHappyCliCommand([
         'mcp',
         '--url',
         happyServer.url,
         '--tools',
-        happyServer.toolNames.join(',')
+        happyServer.toolNames.join(','),
+        '--hapi-session-id',
+        client.sessionId,
     ]);
     const tools: Record<string, McpServerToolConfig> = {
         display_image: {
@@ -111,6 +115,7 @@ export async function buildHapiMcpBridge(
     tools.list_peers = {
         approval_mode: 'approve'
     };
+    tools.archive_peer = { approval_mode: 'approve' };
     // ping_peer / inspect_peer are registered on the HTTP MCP server / stdio
     // bridge, but are not auto-approved: they target another session (resume +
     // inject, or read peer histories).

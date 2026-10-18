@@ -111,6 +111,28 @@ function makeReasoningMessage(id: string, streamId: string, seq: number, at: num
     } as DecryptedMessage
 }
 
+function makeClaudeSidechainMessage(id: string, seq: number, at: number): DecryptedMessage {
+    return {
+        id,
+        seq,
+        localId: null,
+        content: {
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'assistant',
+                    uuid: id,
+                    isSidechain: true,
+                    message: { role: 'assistant', content: [{ type: 'text', text: id }] }
+                }
+            }
+        },
+        createdAt: at,
+        invokedAt: at
+    } as DecryptedMessage
+}
+
 function makeAgentRunMessage(id: string, seq: number, at: number): DecryptedMessage {
     return {
         id,
@@ -1701,5 +1723,56 @@ describe('reasoning snapshot compaction', () => {
         const state = getMessageWindowState(id)
         expect(state.oldestSeq).toBe(2)
         expect(state.newestSeq).toBe(3)
+    })
+})
+
+describe('Claude subagent rows', () => {
+    // A long Claude subagent run stores hundreds of sidechain rows after the
+    // top-level Task call. Those rows render inside one Task card, so they must
+    // not push the top-level transcript out of the window.
+    async function loadSubagentHeavyHistory(id: string): Promise<void> {
+        const latest = Array.from({ length: 200 }, (_, index) => {
+            const seq = 401 + index
+            return makeClaudeSidechainMessage(`side-${seq}`, seq, seq)
+        })
+        const older = [
+            ...Array.from({ length: 50 }, (_, index) => {
+                const seq = index + 1
+                return makeAgentMessage({ id: `top-${seq}`, seq, at: seq })
+            }),
+            ...Array.from({ length: 350 }, (_, index) => {
+                const seq = 51 + index
+                return makeClaudeSidechainMessage(`side-${seq}`, seq, seq)
+            })
+        ]
+        const api = createApi(vi.fn()
+            .mockResolvedValueOnce(latestResponse(latest, { hasMore: true, nextBeforeAt: 401, nextBeforeSeq: 401 }))
+            .mockResolvedValueOnce(beforeResponse(older, { hasMore: false, nextBeforeAt: null, nextBeforeSeq: null })))
+        await syncTailMessages(api, id)
+        await fetchOlderMessages(api, id)
+        expect(getMessageWindowState(id).messages.map((message) => message.id)).toContain('top-1')
+    }
+
+    it('keeps top-level rows when a live subagent row arrives in tail view', async () => {
+        const id = sessionId('claude-subagent-live')
+        await loadSubagentHeavyHistory(id)
+
+        ingestIncomingMessages(id, [makeClaudeSidechainMessage('side-601', 601, 601)])
+
+        const ids = getMessageWindowState(id).messages.map((message) => message.id)
+        expect(ids).toContain('top-1')
+        expect(ids).toContain('top-50')
+        expect(ids.at(-1)).toBe('side-601')
+    })
+
+    it('keeps top-level rows when the session is activated again', async () => {
+        const id = sessionId('claude-subagent-reentry')
+        await loadSubagentHeavyHistory(id)
+
+        activateMessageWindow(id)
+
+        const ids = getMessageWindowState(id).messages.map((message) => message.id)
+        expect(ids).toContain('top-1')
+        expect(ids).toContain('top-50')
     })
 })

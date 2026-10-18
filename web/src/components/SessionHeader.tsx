@@ -1,32 +1,21 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { useIsMutating, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import type { Session } from '@/types/api'
 import type { ApiClient } from '@/api/client'
 import { isTelegramApp } from '@/hooks/useTelegram'
-import { sessionModelMutationKey, useSessionActions } from '@/hooks/mutations/useSessionActions'
+import { useSessionActions } from '@/hooks/mutations/useSessionActions'
 import { SessionActionMenu } from '@/components/SessionActionMenu'
 import { SessionExportDialog } from '@/components/SessionExportDialog'
 import { RenameSessionDialog } from '@/components/RenameSessionDialog'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useScratchlistCount } from '@/lib/use-scratchlist-count'
 import { formatReopenError } from '@/lib/reopenError'
-import { formatReasoningLabel, getReasoningEffortForFlavor } from '@/lib/codexStatusLabels'
 import { retargetSharePendingTransfer } from '@/lib/sharePendingState'
-import { getSessionModelLabel } from '@/lib/sessionModelLabel'
 import { useTranslation } from '@/lib/use-translation'
-import { AgentFlavorIcon } from '@/components/AgentFlavorIcon'
-import { isFastServiceTier } from '@/components/AssistantChat/codexFastMode'
 import { getSessionTitle } from '@/lib/sessionTitle'
 import { useToast } from '@/lib/toast-context'
 import { queryKeys } from '@/lib/query-keys'
 import { markCodexSessionsImported } from '@/lib/codexImportedSessions'
-import { useMachines } from '@/hooks/queries/useMachines'
-import { useMachineLabels } from '@/hooks/useMachineLabels'
-import { formatAbsoluteDateTime, formatRelativeTime } from '@/lib/relativeTime'
-import { useSessionHeaderMetadata } from '@/hooks/useSessionHeaderMetadata'
-import { formatSessionHeaderTimestamp } from '@/lib/sessionHeaderTimestamp'
-import { selectMobileSessionHeaderSecondary } from '@/lib/sessionHeaderMobileMetadata'
-import { useMinuteTick } from '@/hooks/useMinuteTick'
 import { markSessionUnread } from '@/lib/sessionLastSeen'
 
 /** Same preference order as session-list chips: display label → host → short id. */
@@ -95,9 +84,9 @@ function OutlineIcon(props: { className?: string }) {
 function headerToggleClass(active: boolean): string {
     return `flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
         active
-            ? 'bg-[var(--app-button)] text-[var(--app-button-text)] hover:opacity-90'
-            : 'text-[var(--app-hint)] hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]'
-    }`
+            ? 'bg-[var(--app-chat-header-fg)] text-[var(--app-chat-header-bg)] hover:opacity-90'
+            : 'text-[var(--app-chat-header-fg)] hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]'
+        }`
 }
 
 function TerminalIcon(props: { className?: string }) {
@@ -126,16 +115,6 @@ function MoreVerticalIcon(props: { className?: string }) {
     )
 }
 
-function ModelChangingStatus() {
-    const { t } = useTranslation()
-    return (
-        <span data-testid="session-header-model-changing" className="inline-flex items-center gap-1" title={t('session.modelChange.pendingTooltip')}>
-            <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 animate-spin rounded-full border border-current border-r-transparent" />
-            <span>{t('session.modelChange.pending')}</span>
-        </span>
-    )
-}
-
 export function SessionHeader(props: {
     session: Session
     serviceTier?: string | null
@@ -154,65 +133,17 @@ export function SessionHeader(props: {
     onSessionDeleted?: () => void
     onSessionReopened?: (newSessionId: string) => void | Promise<void>
 }) {
-    const { t, locale } = useTranslation()
+    const { t } = useTranslation()
     const queryClient = useQueryClient()
     const { addToast } = useToast()
     const { session, api, onSessionDeleted, onSessionReopened } = props
     const title = useMemo(() => getSessionTitle(session), [session])
-    const worktreeBranch = session.metadata?.worktree?.branch?.trim() || null
-    const { preferences: headerMetadata } = useSessionHeaderMetadata()
-    const modelLabel = getSessionModelLabel(session)
-    const isModelChanging = useIsMutating({
-        mutationKey: sessionModelMutationKey(session.id),
-        exact: true,
-    }) > 0
-    const agentFlavor = session.metadata?.flavor ?? null
-    const agentLabel = agentFlavor?.trim() || null
-    const reasoningEffort = getReasoningEffortForFlavor(
-        agentFlavor,
-        session.modelReasoningEffort,
-        session.effort
-    )
-    const reasoningLabel = reasoningEffort
-        ? formatReasoningLabel(reasoningEffort, headerMetadata.showLabels)
-        : null
-    // Match expected Fast badge semantics (#1004): only explicit service tier, no effort/model heuristics.
-    const showFastBadge = agentFlavor === 'codex' && isFastServiceTier(props.serviceTier ?? session.serviceTier)
-    const createdAtLabel = headerMetadata.createdAt ? formatSessionHeaderTimestamp(session.createdAt, locale) : null
-    const updatedAtLabel = headerMetadata.updatedAt ? formatSessionHeaderTimestamp(session.updatedAt, locale) : null
     const codexSessionId = session.metadata?.flavor === 'codex'
         ? session.metadata.codexSessionId?.trim() || null
         : null
     const piSessionId = session.metadata?.flavor === 'pi'
         ? session.metadata.piSessionId?.trim() || null
         : null
-    const { machines } = useMachines(api, Boolean(api))
-    const machineLabelsById = useMachineLabels(machines)
-    const machineLabel = useMemo(
-        () => resolveSessionHeaderMachineLabel(session, machineLabelsById),
-        [session, machineLabelsById]
-    )
-    const lastActiveAt = session.activeAt || session.updatedAt || session.createdAt
-    // Relative labels cross minute/hour boundaries without new patches; tick
-    // once a minute so "just now" does not freeze forever on inactive sessions.
-    const relativeTimeTick = useMinuteTick(headerMetadata.lastActive)
-    const ageLabel = useMemo(
-        () => (headerMetadata.lastActive && lastActiveAt > 0 ? formatRelativeTime(lastActiveAt, t) : null),
-        [headerMetadata.lastActive, lastActiveAt, t, relativeTimeTick]
-    )
-    const ageAbsolute = ageLabel ? formatAbsoluteDateTime(lastActiveAt) : null
-    const mobileSecondary = selectMobileSessionHeaderSecondary({
-        model: headerMetadata.model && modelLabel !== null,
-        reasoning: headerMetadata.reasoning && reasoningLabel !== null,
-        machine: headerMetadata.machine && machineLabel !== null,
-        lastActive: ageLabel !== null,
-        updatedAt: updatedAtLabel !== null,
-        createdAt: createdAtLabel !== null,
-        worktree: headerMetadata.worktree && Boolean(worktreeBranch),
-        fastMode: headerMetadata.fastMode && showFastBadge,
-    })
-    const showMobileMetadata = (headerMetadata.agent && agentLabel !== null) || mobileSecondary !== null
-
     const [menuOpen, setMenuOpen] = useState(false)
     const [menuAnchorPoint, setMenuAnchorPoint] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
     const menuId = useId()
@@ -223,6 +154,39 @@ export function SessionHeader(props: {
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [isSyncingCodex, setIsSyncingCodex] = useState(false)
     const [isSyncingPi, setIsSyncingPi] = useState(false)
+    const fullscreenSupported = typeof document !== 'undefined'
+        && document.fullscreenEnabled
+        && typeof document.documentElement.requestFullscreen === 'function'
+    const [fullscreen, setFullscreen] = useState(() => typeof document !== 'undefined' && document.fullscreenElement === document.documentElement)
+    const [fullscreenPending, setFullscreenPending] = useState(false)
+
+    useEffect(() => {
+        const updateFullscreen = () => setFullscreen(document.fullscreenElement === document.documentElement)
+        document.addEventListener('fullscreenchange', updateFullscreen)
+        return () => document.removeEventListener('fullscreenchange', updateFullscreen)
+    }, [])
+
+    const toggleFullscreen = async () => {
+        if (fullscreenPending) return
+        setFullscreenPending(true)
+        try {
+            if (document.fullscreenElement) {
+                await document.exitFullscreen()
+            } else {
+                await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+            }
+        } catch (error) {
+            addToast({
+                title: t('session.fullscreen.failed'),
+                body: error instanceof Error ? error.message : t('dialog.error.default'),
+                sessionId: session.id,
+                url: `/sessions/${session.id}`,
+            })
+        } finally {
+            setFullscreenPending(false)
+        }
+    }
+
 
     const { archiveSession, reopenSession, renameSession, suggestSessionTitle, updateSessionSummary, setPinMode, deleteSession, isPending } = useSessionActions(
         api,
@@ -369,13 +333,13 @@ export function SessionHeader(props: {
 
     return (
         <>
-            <div className="bg-[var(--app-bg)] pt-[env(safe-area-inset-top)]">
-                <div className="mx-auto w-full max-w-content flex items-center gap-2 p-3">
+            <div className="w-full shrink-0 border-b border-[var(--app-border)] bg-[var(--app-chat-header-bg)] text-[var(--app-chat-header-fg)] pt-[env(safe-area-inset-top)]">
+                <div className="mx-auto w-full max-w-content flex items-center gap-2 px-[var(--app-panel-gutter)] py-0.5">
                     {/* Back button */}
                     <button
                         type="button"
                         onClick={props.onBack}
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-hint)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-chat-header-fg)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)] split:hidden"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -392,68 +356,8 @@ export function SessionHeader(props: {
                         </svg>
                     </button>
 
-                    {/* Session info - two lines: title and path */}
-                    <div className="min-w-0 flex-1">
-                        <div className="truncate font-semibold">
-                            {title}
-                        </div>
-                        {showMobileMetadata ? (
-                            <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden text-xs text-[var(--app-hint)] sm:hidden">
-                                {headerMetadata.agent && agentLabel ? (
-                                    <span className="inline-flex shrink-0 items-center gap-1">
-                                        <AgentFlavorIcon flavor={session.metadata?.flavor} className="h-3.5 w-3.5 shrink-0 -translate-y-px" />
-                                        {agentLabel}
-                                    </span>
-                                ) : null}
-                                {mobileSecondary === 'model' && modelLabel ? <span className="inline-flex truncate items-center gap-1.5">{headerMetadata.showLabels ? `${t(modelLabel.key)}: ` : ''}{modelLabel.value}{isModelChanging ? <ModelChangingStatus /> : null}</span> : null}
-                                {mobileSecondary === 'reasoning' && reasoningLabel ? <span className="truncate">{reasoningLabel}</span> : null}
-                                {mobileSecondary === 'machine' && machineLabel ? <span className="truncate">{headerMetadata.showLabels ? `${t('session.item.machine')}: ` : ''}{machineLabel}</span> : null}
-                                {mobileSecondary === 'lastActive' && ageLabel ? <span className="truncate" title={ageAbsolute ?? undefined}>{ageLabel}</span> : null}
-                                {mobileSecondary === 'updatedAt' && updatedAtLabel ? <span className="truncate">{headerMetadata.showLabels ? `${t('session.header.updatedAt')}: ` : ''}{updatedAtLabel}</span> : null}
-                                {mobileSecondary === 'createdAt' && createdAtLabel ? <span className="truncate">{headerMetadata.showLabels ? `${t('session.header.createdAt')}: ` : ''}{createdAtLabel}</span> : null}
-                                {mobileSecondary === 'worktree' && worktreeBranch ? <span className="truncate">{headerMetadata.showLabels ? `${t('session.item.worktree')}: ` : ''}{worktreeBranch}</span> : null}
-                                {mobileSecondary === 'fastMode' ? <span className="truncate text-[#34C759]">fast</span> : null}
-                            </div>
-                        ) : null}
-                        <div className="hidden flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--app-hint)] sm:flex">
-                            {headerMetadata.agent && agentLabel ? (
-                                <span className="inline-flex items-center gap-1">
-                                    <AgentFlavorIcon flavor={session.metadata?.flavor} className="h-3.5 w-3.5 shrink-0 -translate-y-px" />
-                                    {agentLabel}
-                                </span>
-                            ) : null}
-                            {headerMetadata.machine && machineLabel ? (
-                                <span data-testid="session-header-machine" className="max-w-[12rem] truncate" title={machineLabel}>
-                                    {headerMetadata.showLabels ? `${t('session.item.machine')}: ` : ''}{machineLabel}
-                                </span>
-                            ) : null}
-                            {ageLabel ? (
-                                <span data-testid="session-header-age" title={ageAbsolute ?? undefined}>
-                                    {ageLabel}
-                                </span>
-                            ) : null}
-                            {headerMetadata.model && modelLabel ? (
-                                <span className="inline-flex items-center gap-1.5">
-                                    <span>{headerMetadata.showLabels ? `${t(modelLabel.key)}: ` : ''}{modelLabel.value}</span>
-                                    {isModelChanging ? <ModelChangingStatus /> : null}
-                                </span>
-                            ) : null}
-                            {headerMetadata.reasoning && reasoningLabel ? (
-                                <span data-testid="session-header-reasoning">
-                                    {reasoningLabel}
-                                </span>
-                            ) : null}
-                            {headerMetadata.fastMode && showFastBadge ? (
-                                <span data-testid="session-header-fast" className="text-[#34C759]">
-                                    fast
-                                </span>
-                            ) : null}
-                            {createdAtLabel ? <span>{headerMetadata.showLabels ? `${t('session.header.createdAt')}: ` : ''}{createdAtLabel}</span> : null}
-                            {updatedAtLabel ? <span>{headerMetadata.showLabels ? `${t('session.header.updatedAt')}: ` : ''}{updatedAtLabel}</span> : null}
-                            {headerMetadata.worktree && worktreeBranch ? (
-                                <span>{headerMetadata.showLabels ? `${t('session.item.worktree')}: ` : ''}{worktreeBranch}</span>
-                            ) : null}
-                        </div>
+                    <div className="min-w-0 flex-1 truncate text-sm font-medium" title={title}>
+                        {title}
                     </div>
 
                     {props.onToggleFiles ? (
@@ -495,6 +399,22 @@ export function SessionHeader(props: {
                         </button>
                     ) : null}
 
+                    {fullscreenSupported ? (
+                        <button
+                            type="button"
+                            onClick={() => void toggleFullscreen()}
+                            disabled={fullscreenPending}
+                            title={t(fullscreen ? 'session.fullscreen.exit' : 'session.fullscreen.enter')}
+                            aria-label={t(fullscreen ? 'session.fullscreen.exit' : 'session.fullscreen.enter')}
+                            aria-pressed={fullscreen}
+                            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-chat-header-fg)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)] disabled:opacity-50"
+                        >
+                            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                                <path d={fullscreen ? 'M8 3v5H3m18 0h-5V3M3 16h5v5m8 0v-5h5' : 'M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5'} />
+                            </svg>
+                        </button>
+                    ) : null}
+
                     <button
                         type="button"
                         onClick={handleMenuToggle}
@@ -503,7 +423,7 @@ export function SessionHeader(props: {
                         aria-haspopup="menu"
                         aria-expanded={menuOpen}
                         aria-controls={menuOpen ? menuId : undefined}
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-hint)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-chat-header-fg)] transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-fg)]"
                         title={t('session.more')}
                     >
                         <MoreVerticalIcon />

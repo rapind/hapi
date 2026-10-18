@@ -11,6 +11,7 @@ function makeSession(overrides: Partial<SessionSummary> & { id: string }): Sessi
         active: false,
         thinking: false,
         activeAt: 0,
+        createdAt: 0,
         updatedAt: 0,
         metadata: null,
         metadataVersion: 0,

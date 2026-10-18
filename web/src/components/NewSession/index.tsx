@@ -1,3 +1,4 @@
+import { useSharedCreationPreferences } from './sharedPreferences'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { ApiClient } from '@/api/client'
 import type { CodexDuplicateSessionGroup, CodexLocalSessionSummary, Machine, PiLocalSessionSummary } from '@/types/api'
@@ -44,6 +45,7 @@ import { isOpencodeReasoningEffortValid } from './types'
 import type { AgentType, LaunchEffort, CodexReasoningEffort, NewSessionServiceTier, SessionType } from './types'
 import { ActionButtons } from './ActionButtons'
 import { AgentSelector } from './AgentSelector'
+import { CodexPromptModeSelector } from './CodexPromptModeSelector'
 import { CollaborationModeSelector } from './CollaborationModeSelector'
 import { CodexImportActions } from './CodexImportActions'
 import { PiImportActions } from './PiImportActions'
@@ -100,6 +102,8 @@ export function NewSession(props: {
     const { sessions, refetch: refetchSessions } = useSessions(props.api)
     const { getRecentPaths, addRecentPath, getLastUsedMachineId, setLastUsedMachineId } = useRecentPaths()
 
+    const sharedPreferences = useSharedCreationPreferences(props.api, props.machines)
+    const initializedSharedPreferencesRef = useRef(false)
     const [machineId, setMachineId] = useState<string | null>(props.initialMachineId ?? null)
     const [directory, setDirectory] = useState(props.initialDirectory ?? '')
     const [suppressSuggestions, setSuppressSuggestions] = useState(false)
@@ -120,6 +124,7 @@ export function NewSession(props: {
     const [modelReasoningEffort, setModelReasoningEffort] = useState<CodexReasoningEffort>('default')
     const [opencodeSelectedModel, setOpencodeSelectedModel] = useState<string | null | undefined>(undefined)
     const [serviceTier, setServiceTier] = useState<NewSessionServiceTier>('standard')
+    const [codexPromptMode, setCodexPromptMode] = useState<'queue' | 'steer'>('queue')
     const [collaborationMode, setCollaborationMode] = useState<CodexCollaborationMode>('default')
     const [copilotAgentMode, setCopilotAgentMode] = useState<CopilotAgentMode>('interactive')
     const [yoloMode, setYoloMode] = useState(loadPreferredYoloMode)
@@ -155,7 +160,8 @@ export function NewSession(props: {
     const [isDuplicateMergeConfirmOpen, setIsDuplicateMergeConfirmOpen] = useState(false)
     const [isMergingDuplicateSessions, setIsMergingDuplicateSessions] = useState(false)
     const isFormDisabled = Boolean(
-        isCreating
+        !sharedPreferences.data
+        || isCreating
         || isPending
         || props.isLoading
         || isImportingCodexSession
@@ -165,6 +171,20 @@ export function NewSession(props: {
     )
     const worktreeInputRef = useRef<HTMLInputElement>(null)
     const preserveRestoredDraftRef = useRef(false)
+
+    useEffect(() => {
+        if (!sharedPreferences.data || initializedSharedPreferencesRef.current || props.machines.length === 0) return
+        initializedSharedPreferencesRef.current = true
+        if (restoredFromBrowseRef.current) return
+        setAgent(sharedPreferences.data.lastAgent ?? 'claude')
+        const savedMachine = sharedPreferences.data.lastMachineId
+        const selectedMachine = props.initialMachineId
+            ?? (props.machines.some(m => m.id === savedMachine) ? savedMachine : props.machines[0]?.id)
+        if (selectedMachine) {
+            setMachineId(selectedMachine)
+            if (props.initialDirectory === undefined) setDirectory(sharedPreferences.data.machines[selectedMachine]?.directory ?? '')
+        }
+    }, [sharedPreferences.data, props.initialMachineId, props.initialDirectory, props.machines])
 
     useEffect(() => {
         if (sessionType === 'worktree') {
@@ -181,6 +201,7 @@ export function NewSession(props: {
         setGrokPermissionMode('default')
         setNativePermissionMode('default')
         setServiceTier('standard')
+        setCodexPromptMode('queue')
         setCollaborationMode('default')
         setCopilotAgentMode('interactive')
         if (agent !== 'cursor') {
@@ -253,6 +274,7 @@ export function NewSession(props: {
             draft.agent === 'agy' && draft.model !== 'auto' ? draft.model : null
         )
         setServiceTier(draft.serviceTier)
+        setCodexPromptMode(draft.codexPromptMode ?? 'queue')
         setCollaborationMode(draft.collaborationMode)
         setCopilotAgentMode(draft.copilotAgentMode)
         setYoloMode(draft.yoloMode)
@@ -874,15 +896,31 @@ export function NewSession(props: {
             return
         }
 
+        const saved = sharedPreferences.data?.machines[machineId]?.agents[agent]
         const preferred = resolvePreferredLaunchSettings(
             agent,
-            loadPreferredLaunchSettings(machineId, agent),
-            legacyYoloAgent === agent
+            sharedPreferences.data ? {
+                model: saved?.model ?? 'auto', cursorSelectedBase: 'auto',
+                codexPromptMode: saved?.codexPromptMode,
+                effort: saved?.effort ?? 'auto', modelReasoningEffort: saved?.modelReasoningEffort ?? 'default',
+                permissionMode: saved?.permissionMode ?? undefined
+            } : loadPreferredLaunchSettings(machineId, agent),
+            !sharedPreferences.data && legacyYoloAgent === agent
         )
+        if (sharedPreferences.data) {
+            setServiceTier(saved?.serviceTier ?? 'standard')
+            setCollaborationMode(saved?.collaborationMode ?? 'default')
+            setCopilotAgentMode(saved?.copilotAgentMode ?? 'interactive')
+            setYoloMode(saved?.yolo ?? false)
+            setGrokPermissionMode(agent === 'grok' ? (saved?.permissionMode as GrokPermissionMode ?? 'default') : 'default')
+            setSessionType(saved?.sessionType ?? 'simple')
+            setWorktreeName(saved?.worktreeName ?? '')
+        }
 
         setModel(agent === 'opencode' ? 'auto' : preferred.model)
         setCursorSelectedBase(preferred.cursorSelectedBase)
         setEffort(preferred.effort)
+        setCodexPromptMode(preferred.codexPromptMode ?? 'queue')
         setModelReasoningEffort(preferred.modelReasoningEffort)
         if (usesSharedPermissionMode) {
             setNativePermissionMode(preferred.permissionMode ?? 'default')
@@ -894,7 +932,7 @@ export function NewSession(props: {
         setAgySelectedModel(
             agent === 'agy' && preferred.model !== 'auto' ? preferred.model : null
         )
-    }, [agent, legacyYoloAgent, machineId, usesSharedPermissionMode])
+    }, [agent, legacyYoloAgent, machineId, usesSharedPermissionMode, sharedPreferences.data])
 
     useEffect(() => {
         if (
@@ -1375,13 +1413,13 @@ export function NewSession(props: {
         setSelectedPiImportSessionId(null)
         setPiImportSessions([])
         setPiImportMachineId(null)
-        const paths = getRecentPaths(newMachineId)
+        const paths = [sharedPreferences.data?.machines[newMachineId]?.directory, ...getRecentPaths(newMachineId)].filter((path): path is string => Boolean(path))
         if (paths[0]) {
             setDirectory(paths[0])
         } else {
             setDirectory('')
         }
-    }, [getRecentPaths])
+    }, [getRecentPaths, sharedPreferences.data])
 
     const handleCursorBaseChange = useCallback((baseKey: string) => {
         if (baseKey === 'auto') {
@@ -1430,6 +1468,7 @@ export function NewSession(props: {
             modelReasoningEffort,
             serviceTier,
             collaborationMode,
+            ...(agent === 'codex' ? { codexPromptMode } : {}),
             copilotAgentMode,
             yoloMode,
             nativePermissionMode,
@@ -1450,6 +1489,7 @@ export function NewSession(props: {
         modelReasoningEffort,
         serviceTier,
         collaborationMode,
+        codexPromptMode,
         copilotAgentMode,
         yoloMode,
         nativePermissionMode,
@@ -1580,6 +1620,7 @@ export function NewSession(props: {
                 ? modelReasoningEffort
                 : undefined
             const preferredLaunchSettings = {
+                ...(agent === 'codex' ? { codexPromptMode } : {}),
                 model: agent === 'agy'
                     ? (agySelectedModel ?? 'auto')
                     : agent === 'opencode'
@@ -1679,11 +1720,14 @@ export function NewSession(props: {
                 worktreeName: sessionType === 'worktree' ? (worktreeName.trim() || undefined) : undefined,
                 serviceTier: resolvedServiceTier,
                 collaborationMode: resolvedCollaborationMode,
+                codexPromptMode: agent === 'codex' ? codexPromptMode : undefined,
                 copilotAgentMode: agent === 'copilot' ? copilotAgentMode : undefined,
+                startingMode: sharedPreferences.data?.machines[machineId]?.agents[agent]?.startingMode ?? undefined,
             })
 
 
             if (result.type === 'success') {
+                if (result.preferencesWarning) addToast({ title: 'New Chat settings', body: result.preferencesWarning, sessionId: result.sessionId, url: `/sessions/${result.sessionId}` })
                 haptic.notification('success')
                 savePreferredLaunchSettings(machineId, agent, preferredLaunchSettings)
                 clearNewSessionFormDraft()
@@ -1994,6 +2038,12 @@ export function NewSession(props: {
                 }}
                 onYoloToggle={setYoloMode}
             />
+            {!selectedCodexImportSession ? <CodexPromptModeSelector
+                agent={agent}
+                value={codexPromptMode}
+                isDisabled={isFormDisabled}
+                onChange={setCodexPromptMode}
+            /> : null}
             <CollaborationModeSelector
                 agent={agent}
                 value={collaborationMode}
@@ -2013,9 +2063,10 @@ export function NewSession(props: {
                 onChange={setServiceTier}
             />
 
-            {(error ?? spawnError) ? (
+            {(sharedPreferences.error ?? error ?? spawnError) ? (
                 <div className="px-3 py-2 text-sm text-red-600">
-                    {error ?? spawnError}
+                    {sharedPreferences.error ?? error ?? spawnError}
+                    {sharedPreferences.error ? <button type="button" className="ml-2 underline" onClick={sharedPreferences.retry}>{t('button.retry')}</button> : null}
                 </div>
             ) : null}
 

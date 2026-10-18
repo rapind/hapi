@@ -11,8 +11,11 @@ import {
     ComposerButtons,
     ComposerExpandButton,
     DictationButton,
-    getComposerToolbarJustifyContent,
+    isComposerPrimaryFillHeight,
+    isLargeEmptyVoicePrimary,
+    shouldShowDraftVoiceButton,
     UnifiedButton,
+    unifiedButtonSizeClass,
 } from './ComposerButtons'
 
 const adapter: ChatModelAdapter = {
@@ -88,7 +91,7 @@ describe('UnifiedButton — routesToScratchlist visual state', () => {
         )
         const btn = getButton('Send')
         expect(btn.className).not.toContain('bg-amber-500')
-        expect(btn.className).toContain('bg-black')
+        expect(btn.className).toContain('bg-[var(--app-button)]')
     })
 
     it('defaults routesToScratchlist to false when omitted', () => {
@@ -161,6 +164,104 @@ describe('UnifiedButton — default send intent', () => {
     })
 })
 
+describe('UnifiedButton — fill-height primary (voice ↔ send)', () => {
+    afterEach(cleanup)
+
+    it('fills height when empty with voice/dictate afforded', () => {
+        expect(isLargeEmptyVoicePrimary({
+            canSend: false,
+            voiceEnabled: true,
+            voiceStatus: 'disconnected',
+        })).toBe(true)
+        expect(isComposerPrimaryFillHeight({
+            canSend: false,
+            voiceEnabled: true,
+            voiceStatus: 'disconnected',
+        })).toBe(true)
+        expect(unifiedButtonSizeClass(true)).toContain('h-full')
+        expect(unifiedButtonSizeClass(true)).toContain('w-16')
+        expect(unifiedButtonSizeClass(true)).toContain('rounded-r-[20px]')
+
+        renderInProviders(
+            <UnifiedButton
+                canSend={false}
+                voiceStatus="disconnected"
+                voiceEnabled
+                controlsDisabled={false}
+                onSend={() => {}}
+                onVoiceToggle={() => {}}
+                voiceLabel="Dictate"
+                fillHeight
+            />,
+        )
+        const btn = getButton(/^Dictate/)
+        expect(btn.getAttribute('data-size')).toBe('fill')
+        expect(btn.className).toContain('h-full')
+        expect(btn.className).toContain('w-16')
+    })
+
+    it('keeps the same fill-height layout when a draft swaps the icon to Send', () => {
+        // Draft → Send morph; still fill-height. Empty-voice FUE helper stays false.
+        expect(isLargeEmptyVoicePrimary({
+            canSend: true,
+            voiceEnabled: true,
+            voiceStatus: 'disconnected',
+        })).toBe(false)
+        expect(isComposerPrimaryFillHeight({
+            canSend: true,
+            voiceEnabled: true,
+            voiceStatus: 'disconnected',
+        })).toBe(true)
+
+        renderInProviders(
+            <UnifiedButton
+                canSend
+                voiceStatus="disconnected"
+                voiceEnabled
+                controlsDisabled={false}
+                onSend={() => {}}
+                onVoiceToggle={() => {}}
+                fillHeight
+            />,
+        )
+        const btn = getButton('Send')
+        expect(btn.getAttribute('data-size')).toBe('fill')
+        expect(btn.className).toContain('h-full')
+        expect(btn.className).toContain('w-16')
+    })
+
+    it('fills height while voice is connected (stop)', () => {
+        renderInProviders(
+            <UnifiedButton
+                canSend={false}
+                voiceStatus="connected"
+                voiceEnabled
+                controlsDisabled={false}
+                onSend={() => {}}
+                onVoiceToggle={() => {}}
+                fillHeight
+            />,
+        )
+        const btn = getButton('Stop')
+        expect(btn.getAttribute('data-size')).toBe('fill')
+    })
+
+    it('stays compact when the composer editor is expanded', () => {
+        expect(isComposerPrimaryFillHeight({
+            canSend: true,
+            voiceEnabled: true,
+            voiceStatus: 'disconnected',
+            expanded: true,
+        })).toBe(false)
+        expect(isComposerPrimaryFillHeight({
+            canSend: false,
+            voiceEnabled: true,
+            voiceStatus: 'connected',
+            expanded: true,
+        })).toBe(false)
+    })
+})
+
 describe('DictationButton', () => {
     afterEach(cleanup)
 
@@ -168,16 +269,69 @@ describe('DictationButton', () => {
         const onVoiceToggle = vi.fn()
         renderInProviders(
             <DictationButton
-                enabled
                 canSend
                 voiceEnabled
                 voiceStatus="disconnected"
                 controlsDisabled={false}
                 onVoiceToggle={onVoiceToggle}
+                voiceLabel="Dictate (Ctrl/Cmd+Shift+D)"
             />,
         )
 
         fireEvent.click(getButton(/^Dictate/))
+        expect(onVoiceToggle).toHaveBeenCalledOnce()
+    })
+
+    it('hides draft voice when the draft routes to the scratchlist', () => {
+        expect(shouldShowDraftVoiceButton({
+            canSend: true,
+            voiceEnabled: true,
+            voiceStatus: 'disconnected',
+            routesToScratchlist: true,
+        })).toBe(false)
+
+        const { container } = renderInProviders(
+            <DictationButton
+                canSend
+                voiceEnabled
+                voiceStatus="disconnected"
+                controlsDisabled={false}
+                onVoiceToggle={vi.fn()}
+                routesToScratchlist
+            />,
+        )
+        expect(container.querySelector('[data-testid="composer-draft-voice-button"]')).toBeNull()
+    })
+
+    it('keeps assistant voice as a compact toolbar circle when a draft is present', () => {
+        expect(shouldShowDraftVoiceButton({
+            canSend: true,
+            voiceEnabled: true,
+            voiceStatus: 'disconnected',
+        })).toBe(true)
+        expect(shouldShowDraftVoiceButton({
+            canSend: false,
+            voiceEnabled: true,
+            voiceStatus: 'disconnected',
+        })).toBe(false)
+
+        const onVoiceToggle = vi.fn()
+        renderInProviders(
+            <DictationButton
+                canSend
+                voiceEnabled
+                voiceStatus="disconnected"
+                controlsDisabled={false}
+                onVoiceToggle={onVoiceToggle}
+                voiceLabel="Voice assistant"
+            />,
+        )
+        const btn = getButton('Voice assistant')
+        expect(btn.getAttribute('data-variant')).toBe('toolbar')
+        expect(btn.className).toContain('h-8')
+        expect(btn.className).toContain('w-8')
+        expect(btn.className).toContain('rounded-full')
+        fireEvent.click(btn)
         expect(onVoiceToggle).toHaveBeenCalledOnce()
     })
 })
@@ -209,7 +363,7 @@ describe('ComposerExpandButton', () => {
 describe('ComposerButtons responsive toolbar', () => {
     afterEach(cleanup)
 
-    it('keeps toolbar actions non-shrinking inside a horizontal scroll area', () => {
+    it('shows only attachment, model, and stop in the toolbar', () => {
         const noop = () => {}
         render(
             <RuntimeProviders>
@@ -217,29 +371,18 @@ describe('ComposerButtons responsive toolbar', () => {
                     <ComposerButtons
                         canSend
                         controlsDisabled={false}
-                        showSettingsButton
-                        onSettingsToggle={noop}
-                        expanded={false}
-                        onExpandedToggle={noop}
-                        showTerminalButton
-                        terminalDisabled={false}
-                        terminalLabel="Terminal"
-                        onTerminal={noop}
                         showAbortButton
                         abortDisabled={false}
                         isAborting={false}
                         onAbort={noop}
-                        showSwitchButton
-                        switchDisabled={false}
-                        isSwitching={false}
-                        onSwitch={noop}
                         voiceEnabled
                         dictationEnabled
                         voiceStatus="disconnected"
                         onVoiceToggle={noop}
                         onSend={noop}
-                        onSchedule={noop}
-                        onScratchlistToggle={noop}
+                        modelValueLabel="Opus"
+                        onModelValueToggle={noop}
+                        omitPrimaryButton
                     />
                 </div>
             </RuntimeProviders>,
@@ -248,16 +391,11 @@ describe('ComposerButtons responsive toolbar', () => {
         const toolbar = screen.getByTestId('composer-toolbar-items')
         expect(toolbar.className).toContain('overflow-x-auto')
         const toolbarButtons = within(toolbar).getAllByRole('button')
-        expect(toolbarButtons.length).toBeGreaterThanOrEqual(8)
+        expect(toolbarButtons.map((button) => button.getAttribute('aria-label'))).toEqual(['Attach file', 'Opus', 'Abort'])
         for (const button of toolbarButtons) {
             expect(button.closest('.shrink-0')).not.toBeNull()
         }
     })
 
-    it('uses overflow-safe alignment for centered and right-aligned layouts', () => {
-        expect(getComposerToolbarJustifyContent('center')).toBe('safe center')
-        expect(getComposerToolbarJustifyContent('right')).toBe('safe end')
-        expect(getComposerToolbarJustifyContent('left')).toBe('flex-start')
-        expect(getComposerToolbarJustifyContent('split')).toBe('flex-start')
-    })
+
 })

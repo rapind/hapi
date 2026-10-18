@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Session } from '@/types/api'
 import type { ApiClient } from '@/api/client'
@@ -45,6 +45,7 @@ function renderHeader(session: Session, extra?: { serviceTier?: string | null; t
         <QueryClientProvider client={new QueryClient()}>
             <ToastProvider>
                 <I18nProvider>
+                    <ToastMessages />
                     <SessionHeader
                         session={session}
                         serviceTier={extra?.serviceTier}
@@ -95,6 +96,22 @@ describe('resolveSessionHeaderMachineLabel', () => {
 })
 
 describe('SessionHeader', () => {
+    it('shows only the title even when session metadata is available', () => {
+        renderHeader(baseSession({
+            metadata: { flavor: 'codex', name: 'Personal chat', path: '/repo', host: 'machine' },
+            model: 'gpt-5',
+            modelReasoningEffort: 'xhigh',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        }), { serviceTier: 'priority' })
+        expect(screen.getByTitle('Personal chat')).toHaveClass('truncate')
+        for (const label of ['codex', 'gpt-5', 'reasoning xhigh', 'fast', 'machine']) {
+            expect(screen.queryByText(label)).not.toBeInTheDocument()
+        }
+        expect(screen.queryByTestId('session-header-age')).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /More/ })).toBeInTheDocument()
+    })
+
     it('does not offer manual Codex sync while the HAPI session is active', () => {
         const api = {
             getMachines: vi.fn().mockResolvedValue({ machines: [] }),
@@ -249,102 +266,6 @@ describe('SessionHeader', () => {
         expect(onToggleTerminal).toHaveBeenCalledOnce()
     })
 
-    it('shows an inherited catalog-default Fast tier', () => {
-        renderHeader(baseSession(), { serviceTier: 'priority' })
-        expect(screen.getByText('fast')).toBeInTheDocument()
-        expect(screen.queryByText('reasoning default')).not.toBeInTheDocument()
-    })
-
-    it('shows Pi ordinary effort as reasoning metadata', () => {
-        renderHeader(baseSession({
-            metadata: { flavor: 'pi', path: '/repo', host: 'machine' },
-            modelReasoningEffort: null,
-            effort: 'max'
-        }))
-
-        expect(screen.getByTestId('session-header-reasoning')).toHaveTextContent('reasoning max')
-    })
-
-    it('keeps model reasoning effort for Codex and hides ordinary effort for non-Pi flavors', () => {
-        const { rerender } = renderHeader(baseSession({
-            modelReasoningEffort: 'xhigh',
-            effort: 'max'
-        }))
-
-        expect(screen.getByTestId('session-header-reasoning')).toHaveTextContent('reasoning xhigh')
-
-        rerender(
-            <QueryClientProvider client={new QueryClient()}>
-                <ToastProvider>
-                    <I18nProvider>
-                        <SessionHeader
-                            session={baseSession({
-                                metadata: { flavor: 'claude', path: '/repo', host: 'machine' },
-                                modelReasoningEffort: null,
-                                effort: 'max'
-                            })}
-                            onBack={vi.fn()}
-                            api={null}
-                        />
-                    </I18nProvider>
-                </ToastProvider>
-            </QueryClientProvider>
-        )
-
-        expect(screen.queryByTestId('session-header-reasoning')).not.toBeInTheDocument()
-    })
-
-    it('hides Pi reasoning metadata when the header reasoning setting is disabled', () => {
-        localStorage.setItem('hapi-session-header-metadata', JSON.stringify({ reasoning: false }))
-        renderHeader(baseSession({
-            metadata: { flavor: 'pi', path: '/repo', host: 'machine' },
-            effort: 'max'
-        }))
-
-        expect(screen.queryByTestId('session-header-reasoning')).not.toBeInTheDocument()
-    })
-
-    it('shows machine label and relative last-active age in the meta row', () => {
-        const fiveMinutesAgo = Date.now() - 5 * 60_000
-        renderHeader(baseSession({
-            activeAt: fiveMinutesAgo,
-            updatedAt: fiveMinutesAgo,
-            metadata: {
-                flavor: 'cursor',
-                path: '/home/heavygee/coding/hapi',
-                host: 'oos-linux',
-                machineId: 'machine-deadbeef'
-            }
-        }))
-
-        expect(screen.getByTestId('session-header-machine')).toHaveTextContent(/oos-linux/)
-        expect(screen.getByTestId('session-header-age')).toHaveTextContent(/5m ago|5分钟前/)
-    })
-
-    it('advances relative age on the minute tick without a session prop change', () => {
-        vi.useFakeTimers()
-        const now = new Date('2026-07-29T16:00:00.000Z')
-        vi.setSystemTime(now)
-
-        try {
-            renderHeader(baseSession({
-                activeAt: now.getTime() - 30_000,
-                updatedAt: now.getTime() - 30_000,
-                metadata: { flavor: 'cursor', path: '/r', host: 'host.local' }
-            }))
-
-            expect(screen.getByTestId('session-header-age')).toHaveTextContent(/just now|刚刚/)
-
-            act(() => {
-                vi.advanceTimersByTime(60_000)
-            })
-
-            expect(screen.getByTestId('session-header-age')).toHaveTextContent(/1m ago|1分钟前/)
-        } finally {
-            vi.useRealTimers()
-        }
-    })
-
     it('anchors the action menu to the center of the More actions trigger', () => {
         renderHeader(baseSession())
 
@@ -435,5 +356,61 @@ describe('SessionHeader', () => {
         fireEvent.click(screen.getByRole('menuitem', { name: 'Pin in project' }))
 
         expect(await screen.findByText('Could not update pin: Network unavailable')).toBeInTheDocument()
+    })
+})
+
+describe('App fullscreen', () => {
+    afterEach(() => {
+        for (const key of ['fullscreenEnabled', 'fullscreenElement', 'exitFullscreen']) {
+            Reflect.deleteProperty(document, key)
+        }
+        Reflect.deleteProperty(document.documentElement, 'requestFullscreen')
+    })
+
+    it('hides the toggle when fullscreen is unavailable', () => {
+        renderHeader(baseSession())
+        expect(screen.queryByRole('button', { name: 'Enter fullscreen' })).not.toBeInTheDocument()
+    })
+
+    it('toggles the whole document and follows browser fullscreen changes', async () => {
+        let current: Element | null = null
+        const request = vi.fn(async () => {
+            current = document.documentElement
+            document.dispatchEvent(new Event('fullscreenchange'))
+        })
+        const exit = vi.fn(async () => {
+            current = null
+            document.dispatchEvent(new Event('fullscreenchange'))
+        })
+        Object.defineProperties(document, {
+            fullscreenEnabled: { configurable: true, value: true },
+            fullscreenElement: { configurable: true, get: () => current },
+            exitFullscreen: { configurable: true, value: exit },
+        })
+        Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: request })
+        renderHeader(baseSession())
+        fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' }))
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeEnabled())
+        expect(request).toHaveBeenCalledWith({ navigationUI: 'hide' })
+        fireEvent.click(screen.getByRole('button', { name: 'Exit fullscreen' }))
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toBeEnabled())
+        expect(exit).toHaveBeenCalledOnce()
+        fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' }))
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Exit fullscreen' })).toBeEnabled())
+        current = null
+        fireEvent(document, new Event('fullscreenchange'))
+        expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toBeInTheDocument()
+    })
+
+    it('reports a rejected request and allows another attempt', async () => {
+        Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: true })
+        Object.defineProperty(document.documentElement, 'requestFullscreen', {
+            configurable: true,
+            value: vi.fn().mockRejectedValue(new Error('Fullscreen denied')),
+        })
+        renderHeader(baseSession())
+        fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' }))
+        await waitFor(() => expect(screen.getByText('Could not change fullscreen mode: Fullscreen denied')).toBeInTheDocument())
+        expect(screen.getByRole('button', { name: 'Enter fullscreen' })).toBeEnabled()
     })
 })

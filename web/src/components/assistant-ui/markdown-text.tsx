@@ -772,7 +772,7 @@ function A(props: ComponentPropsWithoutRef<'a'>) {
 }
 
 function Paragraph(props: ComponentPropsWithoutRef<'p'>) {
-    return <p {...props} className={cn('aui-md-p my-2.5 leading-7 first:mt-0 last:mb-0', props.className)} />
+    return <p {...props} className={cn('aui-md-p my-2.5 leading-[var(--app-chat-line-height)] first:mt-0 last:mb-0', props.className)} />
 }
 
 function Blockquote(props: ComponentPropsWithoutRef<'blockquote'>) {
@@ -796,7 +796,7 @@ function OrderedList(props: ComponentPropsWithoutRef<'ol'>) {
 }
 
 function ListItem(props: ComponentPropsWithoutRef<'li'>) {
-    return <li {...props} className={cn('aui-md-li leading-7', props.className)} />
+    return <li {...props} className={cn('aui-md-li leading-[var(--app-chat-line-height)]', props.className)} />
 }
 
 function Hr(props: ComponentPropsWithoutRef<'hr'>) {

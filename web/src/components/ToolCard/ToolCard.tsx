@@ -107,20 +107,6 @@ export function ToolTimingSummary(props: {
     )
 }
 
-function ToolCardTimingSummary(props: { tool: ChatToolCall }) {
-    const active = props.tool.state === 'running'
-    const [now, setNow] = useState(() => Date.now())
-
-    useEffect(() => {
-        if (!active) return
-        setNow(Date.now())
-        const id = setInterval(() => setNow(Date.now()), ELAPSED_INTERVAL_MS)
-        return () => clearInterval(id)
-    }, [active, props.tool.startedAt, props.tool.createdAt])
-
-    return <ToolTimingSummary {...getToolTimingDetails(props.tool, now)} />
-}
-
 function ToolTimingDetails(props: { block: ToolCallBlock }) {
     const { t } = useTranslation()
     const tool = props.block.tool
@@ -436,7 +422,7 @@ function ToolCardInner(props: ToolCardProps) {
     const isCodexAgentCard = toolName === 'CodexAgent'
     const useCompactTerminalCard = shouldUseCompactTerminalToolCard(toolName, props.terminalToolDisplayMode)
     const showInline = shouldShowInlineToolCardBody(toolName, presentation.minimal, props.terminalToolDisplayMode)
-    const CompactToolView = showInline ? getToolViewComponent(toolName) : null
+    const CompactToolView = showInline ? getToolViewComponent(toolName, props.block.tool) : null
     const compactViewOwnsInteractions = toolName === 'CodexDiff'
     const ResultToolView = getToolResultViewComponent(toolName)
     const permission = props.block.tool.permission
@@ -447,6 +433,7 @@ function ToolCardInner(props: ToolCardProps) {
         permission.status === 'resolved' || permission.status === 'pending'
         || ((permission.status === 'denied' || permission.status === 'canceled') && Boolean(permission.reason))
     ))
+    const isPromptCard = isQuestionTool || permission?.status === 'pending'
     const hasBody = showInline || taskSummary !== null || showsPermissionFooter
     // Header/content padding already supplies 12-16px below timing; add only
     // the remainder needed to match the detail dialog's 16px section gap.
@@ -479,7 +466,7 @@ function ToolCardInner(props: ToolCardProps) {
                         {presentation.icon}
                     </div>
                     <CardTitle className={cn(
-                        'min-w-0 text-sm font-medium leading-tight text-[var(--app-fg)]',
+                        'min-w-0 text-[length:var(--app-chat-font-size)] font-normal leading-relaxed text-[var(--app-tool-card-title)]',
                         isCodexAgentCard ? 'truncate whitespace-nowrap' : 'break-words'
                     )}>
                         {toolTitle}
@@ -494,7 +481,6 @@ function ToolCardInner(props: ToolCardProps) {
                         {truncate(subtitle, 160)}
                     </CardDescription>
                 ) : null}
-                <ToolCardTimingSummary tool={props.block.tool} />
             </div>
 
             <div className={cn(
@@ -520,8 +506,8 @@ function ToolCardInner(props: ToolCardProps) {
     )
 
     return (
-        <Card className="overflow-hidden rounded-[20px] bg-[var(--app-tool-card-bg)] shadow-none">
-            <CardHeader className={cn('space-y-0 p-3', subtitle ? 'pb-2' : null)}>
+        <Card className={cn('overflow-hidden rounded-2xl bg-transparent shadow-none', isPromptCard && 'border border-[var(--app-border)]')}>
+            <CardHeader className={cn('space-y-0', isPromptCard ? 'p-3' : 'px-0 py-1.5')}>
                 <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
                     <DialogTrigger asChild>
                         <button

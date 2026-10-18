@@ -1,11 +1,10 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { ReactNode, TextareaHTMLAttributes } from 'react'
 import { useRef, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '@/lib/i18n-context'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import type { ComposerSendIntent } from '@/lib/messageDelivery'
-import type { ComposerToolbarLayout } from '@/hooks/useComposerToolbarLayout'
 import { HappyComposer } from './HappyComposer'
 
 /**
@@ -35,7 +34,6 @@ const runtime = vi.hoisted(() => ({
     pendingSendIntentRef: { current: 'default' },
     sentIntents: [] as ComposerSendIntent[],
     narrowViewport: false,
-    toolbarLayout: null as ComposerToolbarLayout | null,
 }))
 
 vi.mock('@assistant-ui/react', async () => {
@@ -93,13 +91,6 @@ vi.mock('@assistant-ui/react', async () => {
         },
     }
 })
-vi.mock('@/hooks/useComposerToolbarLayout', async () => {
-    const actual = await import('@/hooks/useComposerToolbarLayout')
-    return {
-        ...actual,
-        useComposerToolbarLayout: () => ({ layout: runtime.toolbarLayout ?? actual.DEFAULT_COMPOSER_TOOLBAR_LAYOUT }),
-    }
-})
 vi.mock('@/hooks/useNarrowViewport', () => ({
     useNarrowViewport: () => runtime.narrowViewport,
 }))
@@ -136,21 +127,24 @@ function renderComposer(agentFlavor: string, overrides: Partial<Parameters<typeo
     )
 }
 
+function toolbarButton(name: string) {
+    return within(screen.getByTestId('composer-toolbar-items')).getByRole('button', { name })
+}
+
 describe('HappyComposer generic model/effort value buttons', () => {
     afterEach(() => {
         cleanup()
         runtime.setSnapshot = null
         runtime.narrowViewport = false
-        runtime.toolbarLayout = null
         runtime.snapshot.thread.isDisabled = false
         runtime.sentIntents = []
     })
 
-    it('shows model and effort value buttons for Claude on wide viewports', () => {
+    it('shows only the model button for Claude on wide viewports', () => {
         renderComposer('claude')
         expect(screen.getByRole('button', { name: 'Sonnet 4' })).toBeTruthy()
-        expect(screen.getByRole('button', { name: 'High' })).toBeTruthy()
-        expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: 'High' })).toBeNull()
+        expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
     })
 
     it('shows only the model button for flavors without effort support', () => {
@@ -159,57 +153,46 @@ describe('HappyComposer generic model/effort value buttons', () => {
         expect(screen.queryByRole('button', { name: 'High' })).toBeNull()
     })
 
-    it('hides value buttons on narrow viewports, keeping settings', () => {
+    it('keeps reasoning and follow-up controls reachable from the model menu on phones', () => {
+        runtime.narrowViewport = true
+        const change = vi.fn().mockResolvedValue(undefined)
+        renderComposer('codex', {
+            codexPromptMode: 'steer',
+            onCodexPromptModeChange: change,
+            modelReasoningEffort: 'medium',
+            onModelReasoningEffortChange: vi.fn(),
+        })
+        fireEvent.click(toolbarButton('Sonnet 4'))
+        expect(screen.getByText('Reasoning Effort')).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Steer' })).toHaveAttribute('aria-pressed', 'true')
+        fireEvent.click(screen.getByRole('button', { name: 'Queue' }))
+        expect(change).toHaveBeenCalledWith('queue')
+    })
+
+    it('keeps the model settings trigger on narrow viewports', () => {
         runtime.narrowViewport = true
         renderComposer('claude')
-        expect(screen.queryByRole('button', { name: 'Sonnet 4' })).toBeNull()
+        expect(screen.getByRole('button', { name: 'Sonnet 4' })).toBeTruthy()
         expect(screen.queryByRole('button', { name: 'High' })).toBeNull()
-        expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
     })
 
-    it('opens only the Model section from the model button (anchored open)', () => {
+    it('opens the full settings menu from the model button', () => {
         renderComposer('claude')
-        fireEvent.click(screen.getByRole('button', { name: 'Sonnet 4' }))
+        fireEvent.click(toolbarButton('Sonnet 4'))
         expect(screen.getByText('Model')).toBeTruthy()
-        // Anchored open: the other sections stay collapsed.
-        expect(screen.queryByText('Permission Mode')).toBeNull()
-        expect(screen.queryByText('Effort')).toBeNull()
-    })
-
-    it('opens only the Effort section from the effort button (anchored open)', () => {
-        renderComposer('claude')
-        fireEvent.click(screen.getByRole('button', { name: 'High' }))
+        // The model trigger opens all supported settings.
+        expect(screen.getByText('Permission Mode')).toBeTruthy()
         expect(screen.getByText('Effort')).toBeTruthy()
-        expect(screen.queryByText('Model')).toBeNull()
-        expect(screen.queryByText('Permission Mode')).toBeNull()
     })
 
-    it('switches from the Model to the Effort section without closing the sheet', () => {
+    it('keeps Model before Permission in the full menu', () => {
         renderComposer('claude')
-        fireEvent.click(screen.getByRole('button', { name: 'Sonnet 4' }))
-        expect(screen.getByText('Model')).toBeTruthy()
-        fireEvent.click(screen.getByRole('button', { name: 'High' }))
-        expect(screen.getByText('Effort')).toBeTruthy()
-        expect(screen.queryByText('Model')).toBeNull()
-    })
-
-    it('opens the full sheet from the gear with Model before Permission', () => {
-        renderComposer('claude')
-        fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+        fireEvent.click(toolbarButton('Sonnet 4'))
         const model = screen.getByText('Model')
         const permission = screen.getByText('Permission Mode')
         expect(model.compareDocumentPosition(permission) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(screen.getByText('Effort')).toBeTruthy()
-    })
-
-    it('expands an anchored sheet to the full sheet when the gear is clicked', () => {
-        renderComposer('claude')
-        fireEvent.click(screen.getByRole('button', { name: 'Sonnet 4' }))
-        expect(screen.queryByText('Effort')).toBeNull()
-        fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
-        expect(screen.getByText('Model')).toBeTruthy()
-        expect(screen.getByText('Effort')).toBeTruthy()
-        expect(screen.getByText('Permission Mode')).toBeTruthy()
     })
 
     it('shows generic value buttons for Pi with the provider-qualified model label', () => {
@@ -220,10 +203,10 @@ describe('HappyComposer generic model/effort value buttons', () => {
             ],
             piSelectedModel: { provider: 'gemini', modelId: 'gemini-2.5-pro' },
         })
-        // Pi uses the same value buttons as every other flavor.
+        // Pi uses the same model button as every other flavor.
         expect(screen.getByRole('button', { name: 'Gemini 2.5 Pro' })).toBeTruthy()
-        expect(screen.getByRole('button', { name: 'High' })).toBeTruthy()
-        expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: 'High' })).toBeNull()
+        expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
     })
 
     it('opens the settings sheet with provider-grouped model rows for Pi', () => {
@@ -234,31 +217,15 @@ describe('HappyComposer generic model/effort value buttons', () => {
             ],
             piSelectedModel: { provider: 'gemini', modelId: 'gemini-2.5-pro' },
         })
-        fireEvent.click(screen.getByRole('button', { name: 'Gemini 2.5 Pro' }))
+        fireEvent.click(toolbarButton('Gemini 2.5 Pro'))
         expect(screen.getByText('Model')).toBeTruthy()
         // The value button label and the matching sheet row share the model name.
         expect(screen.getAllByText('Gemini 2.5 Pro').length).toBeGreaterThan(1)
         expect(screen.getByText('Vertex Gemini 2.5 Pro')).toBeTruthy()
-        // Anchored open from the model button: the Effort section stays collapsed.
-        expect(screen.queryByText('Effort')).toBeNull()
+        expect(screen.getByText('Effort')).toBeTruthy()
     })
 
-    it('keeps the gear reachable on narrow viewports even when the toolbar layout hides it', () => {
-        runtime.narrowViewport = true
-        runtime.toolbarLayout = {
-            mode: 'left',
-            left: ['attachment', 'expand', 'terminal'],
-            right: [],
-            hidden: ['settings', 'abort'],
-        }
-        renderComposer('claude')
-        // Narrow mode collapses the value buttons into the settings sheet, so the
-        // gear must stay visible regardless of the persisted layout.
-        expect(screen.queryByRole('button', { name: 'Sonnet 4' })).toBeNull()
-        expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy()
-    })
-
-    it('keeps the Pi settings gear live mid-turn on narrow viewports', () => {
+    it('keeps the Pi model settings trigger live mid-turn on narrow viewports', () => {
         runtime.narrowViewport = true
         runtime.snapshot.thread.isDisabled = true
         renderComposer('pi', {
@@ -267,13 +234,12 @@ describe('HappyComposer generic model/effort value buttons', () => {
             ],
             piSelectedModel: { provider: 'gemini', modelId: 'gemini-2.5-pro' },
         })
-        // Value buttons are collapsed on narrow; the gear is the only trigger and
-        // must stay clickable while a Pi turn is running (#1442).
-        const gear = screen.getByRole('button', { name: 'Settings' })
+        // The model trigger stays clickable during a Pi turn (#1442).
+        const gear = screen.getByRole('button', { name: 'Gemini 2.5 Pro' })
         expect(gear).not.toBeDisabled()
         fireEvent.click(gear)
         expect(screen.getByText('Model')).toBeTruthy()
-        expect(screen.getByText('Gemini 2.5 Pro')).toBeTruthy()
+        expect(screen.getAllByText('Gemini 2.5 Pro').length).toBeGreaterThan(1)
     })
 
     it('highlights only the matching provider row when model IDs collide across providers', () => {
@@ -371,12 +337,9 @@ describe('HappyComposer generic model/effort value buttons', () => {
             piSelectedModel: { provider: 'gemini', modelId: 'gemini-2.5-pro' },
             onEffortChange: (level) => effortChanges.push(level),
         })
-        // Open the sheet from the 'High' value button, then re-click the 'High' row.
+        // Open the sheet from the model button, then re-click the selected 'High' row.
+        fireEvent.click(toolbarButton('Gemini 2.5 Pro'))
         fireEvent.click(screen.getByRole('button', { name: 'High' }))
-        const effortRows = screen.getAllByRole('button', { name: 'High' })
-        expect(effortRows.length).toBeGreaterThan(1)
-        // The sheet renders before the toolbar in the DOM, so the first match is the row.
-        fireEvent.click(effortRows[0])
         expect(effortChanges).toEqual([null])
     })
 
@@ -401,7 +364,7 @@ describe('HappyComposer generic model/effort value buttons', () => {
             </I18nProvider>
         )
         // Open the sheet while controls are live.
-        fireEvent.click(screen.getByRole('button', { name: 'Gemini 2.5 Pro' }))
+        fireEvent.click(toolbarButton('Gemini 2.5 Pro'))
         const sheetRow = () => screen.getAllByRole('button', { name: 'Gemini 2.5 Pro' })
             .find((btn) => btn.className.includes('w-full'))!
         expect(sheetRow()).not.toBeDisabled()
@@ -434,12 +397,5 @@ describe('HappyComposer generic model/effort value buttons', () => {
         expect(screen.queryByText('Model')).toBeNull()
     })
 
-    it('toggles the settings sheet closed when the effort value button is clicked again', () => {
-        renderComposer('claude')
-        const effortButton = screen.getAllByRole('button', { name: 'High' })[0]
-        fireEvent.click(effortButton)
-        expect(screen.getByText('Effort')).toBeTruthy()
-        fireEvent.click(effortButton)
-        expect(screen.queryByText('Effort')).toBeNull()
-    })
+
 })

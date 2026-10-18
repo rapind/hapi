@@ -21,7 +21,6 @@ import { AppContextProvider } from '@/lib/app-context'
 import { clearMessageWindow, rewindMessageWindow, syncTailMessages } from '@/lib/message-window-store'
 import { useAppGoBack } from '@/hooks/useAppGoBack'
 import { useTranslation } from '@/lib/use-translation'
-import { translateInputRequestTitle } from '@/lib/input-request-toast'
 import { VoiceProvider } from '@/lib/voice-context'
 import { requireHubUrlForLogin } from '@/lib/runtime-config'
 import { getAppGlobalSseSubscription, getAppSessionSseSubscription } from '@/lib/appSseSubscriptions'
@@ -39,10 +38,8 @@ import { RunnerVersionSkewBanner } from '@/components/RunnerVersionSkewBanner'
 import { LoadingState } from '@/components/LoadingState'
 import { ToastContainer } from '@/components/ToastContainer'
 import { PwaUpdateProvider } from '@/lib/pwa-update-context'
-import { ToastProvider, useToast } from '@/lib/toast-context'
+import { ToastProvider } from '@/lib/toast-context'
 import type { SyncEvent } from '@/types/api'
-
-type ToastEvent = Extract<SyncEvent, { type: 'toast' }>
 
 const REQUIRE_SERVER_URL = requireHubUrlForLogin()
 
@@ -75,7 +72,6 @@ function AppInner() {
     const pathname = useLocation({ select: (location) => location.pathname })
     const matchRoute = useMatchRoute()
     const router = useRouter()
-    const { addToast } = useToast()
 
     useEffect(() => {
         let cancelled = false
@@ -333,64 +329,6 @@ function AppInner() {
         })
     }, [api, selectedSessionId])
 
-    const translateIncomingToast = useCallback((title: string, body: string): { title: string; body: string } => {
-        const normalizedTitle = title.trim()
-        const normalizedBody = body.trim()
-        const inputTitle = translateInputRequestTitle(normalizedTitle, t)
-        if (inputTitle) {
-            return { title: inputTitle, body: normalizedBody }
-        }
-
-        if (normalizedTitle === 'Ready for input') {
-            const waitingMatch = normalizedBody.match(/^(.+)\s+is waiting in\s+(.+)$/i)
-            if (waitingMatch) {
-                const agent = waitingMatch[1]?.trim() ?? ''
-                const sessionName = waitingMatch[2]?.trim() ?? ''
-                return {
-                    title: t('toast.ready.title'),
-                    body: t('toast.ready.body', { agent, session: sessionName })
-                }
-            }
-            return {
-                title: t('toast.ready.title'),
-                body: normalizedBody
-            }
-        }
-
-        if (normalizedTitle === 'Permission Request') {
-            return {
-                title: t('toast.permission.title'),
-                body: normalizedBody
-            }
-        }
-
-        if (normalizedTitle === 'Task completed') {
-            return {
-                title: t('toast.task.completed'),
-                body: normalizedBody
-            }
-        }
-
-        if (normalizedTitle === 'Task failed') {
-            return {
-                title: t('toast.task.failed'),
-                body: normalizedBody
-            }
-        }
-
-        return { title, body }
-    }, [t])
-
-    const handleToast = useCallback((event: ToastEvent) => {
-        const localized = translateIncomingToast(event.data.title, event.data.body)
-        addToast({
-            title: localized.title,
-            body: localized.body,
-            sessionId: event.data.sessionId,
-            url: event.data.url
-        })
-    }, [addToast, translateIncomingToast])
-
     const globalEventSubscription = useMemo(() => getAppGlobalSseSubscription(), [])
     const sessionEventSubscription = useMemo(
         () => getAppSessionSseSubscription(selectedSessionId),
@@ -407,8 +345,8 @@ function AppInner() {
         scope: 'global',
         onConnect: handleSseConnect,
         onDisconnect: handleSseDisconnect,
-        onEvent: () => {},
-        onToast: handleToast
+        // Personal build: suppress chat activity toasts; local action feedback still uses ToastProvider.
+        onEvent: () => {}
     })
 
     const { subscriptionId: sessionSubscriptionId } = useSSE({

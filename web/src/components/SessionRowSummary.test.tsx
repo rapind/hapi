@@ -12,6 +12,7 @@ function makeSummary(overrides: Partial<SessionSummary> = {}): SessionSummary {
         active: true,
         thinking: false,
         activeAt: 0,
+        createdAt: 0,
         updatedAt: 0,
         metadata: { path: '/demo/status', name: 'Background demo', flavor: 'claude' },
         metadataVersion: 0,

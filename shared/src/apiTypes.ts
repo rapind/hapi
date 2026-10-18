@@ -142,10 +142,11 @@ export type MessagesResponse = {
 export type MachinesResponse = { machines: Machine[] }
 
 export type SpawnResponse =
-    | { type: 'success'; sessionId: string }
+    | { type: 'success'; sessionId: string; preferencesWarning?: string }
     | {
         type: 'error'
         message: string
+        sessionId?: string
         code?: 'agent_unavailable' | 'runner_upgrade_required' | 'outside_workspace_roots'
         agent?: z.infer<typeof AgentFlavorSchema>
     }
@@ -539,6 +540,8 @@ export type MessagesQuery = z.infer<typeof MessagesQuerySchema>
 export const MessageDeliveryModeSchema = z.enum(['queue', 'steer'])
 export type MessageDeliveryMode = z.infer<typeof MessageDeliveryModeSchema>
 
+export const SessionCodexPromptModeRequestSchema = z.object({ mode: MessageDeliveryModeSchema })
+
 export const SendMessageRequestSchema = z.object({
     text: z.string(),
     localId: z.string().min(1).optional(),
@@ -652,7 +655,8 @@ export const SpawnSessionRequestSchema = z.object({
     serviceTier: z.enum(['fast', 'standard']).optional(),
     collaborationMode: CodexCollaborationModeSchema.optional(),
     copilotAgentMode: CopilotAgentModeSchema.optional(),
-    startingMode: z.enum(['remote', 'pty']).optional()
+    startingMode: z.enum(['remote', 'pty']).optional(),
+    codexPromptMode: MessageDeliveryModeSchema.optional()
 })
 
 export type SpawnSessionRequest = z.infer<typeof SpawnSessionRequestSchema>

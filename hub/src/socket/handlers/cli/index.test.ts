@@ -1,5 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test'
 import { Store } from '../../../store'
+import { SessionCache } from '../../../sync/sessionCache'
+import type { EventPublisher } from '../../../sync/eventPublisher'
 import type { CliSocketWithData } from '../../socketTypes'
 import { registerCliHandlers } from './index'
 
@@ -342,4 +344,30 @@ describe('cli handler session-access memo', () => {
         expect(received).toBeDefined()
         store.close()
     })
+})
+
+
+it('acknowledges and persists a CLI rename after a web rename', async () => {
+    const store = new Store(':memory:')
+    try {
+        const cache = new SessionCache(store, { emit: () => { } } as unknown as EventPublisher)
+        const session = cache.getOrCreateSession('cli-human-title', { path: '/sports', host: 'localhost', flavor: 'codex' }, null, 'default')
+        await cache.renameSession(session.id, 'ABC')
+        const socket = new FakeCliSocket()
+        socket.data = { namespace: 'default' }
+        registerCliHandlers(socket as unknown as CliSocketWithData, {
+            io: fakeIo, store, rpcRegistry: anyRegistry, terminalRegistry: anyRegistry
+        })
+        const current = store.sessions.getSession(session.id)!
+        let ack: unknown
+        socket.trigger('update-metadata', {
+            sid: session.id, expectedVersion: current.metadataVersion,
+            metadata: { path: '/sports', host: 'localhost', flavor: 'codex', name: 'Agent title' }
+        }, (response) => { ack = response })
+        expect(ack).toMatchObject({ result: 'success', metadata: { name: 'Agent title' } })
+        cache.refreshSession(session.id)
+        expect(cache.getSession(session.id)?.metadata?.name).toBe('Agent title')
+    } finally {
+        store.close()
+    }
 })
