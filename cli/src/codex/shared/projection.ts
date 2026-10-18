@@ -109,8 +109,10 @@ export class SharedCodexProjection {
             if (id && !this.emitted.has(`user:${id}`)) {
                 const firstInTurn = turnId ? [...this.turns].find(([, value]) => value === turnId)?.[0] : undefined;
                 if (turnId) this.turns.set(id, turnId);
-                await this.committed(id);
+                // Reserve before yielding: live notifications can overlap history.
                 this.emitted.add(`user:${id}`);
+                try { await this.committed(id); }
+                catch (error) { this.emitted.delete(`user:${id}`); throw error; }
                 const text = inputText(item.content);
                 if (text) this.session.sendUserMessage(text, undefined, id);
                 this.session.updateMetadata(metadata => ({ ...metadata, conversationHistoryTurns: Object.fromEntries(this.turns),

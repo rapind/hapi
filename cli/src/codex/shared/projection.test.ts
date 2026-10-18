@@ -25,6 +25,38 @@ describe('shared history projection', () => {
         expect(user.mock.calls[1]).toEqual(user.mock.calls[0]);
     });
 
+    it('reserves a user item while durable confirmation overlaps live history', async () => {
+        let confirm!: () => void;
+        const committed = vi.fn(() => new Promise<void>(resolve => { confirm = resolve; }));
+        const user = vi.fn();
+        const session = { getMetadata: () => ({}), sendAgentMessage: vi.fn(),
+            sendUserMessage: user, updateMetadata: vi.fn() } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const item = { id: 'prompt', clientId: 'local-prompt', type: 'userMessage',
+            content: [{ type: 'text', text: 'hello' }] };
+        const live = projection.notification('item/started', { threadId: 'thread', turnId: 'turn', item });
+        const history = projection.history({ turns: [{ id: 'turn', status: 'completed', items: [item] }] });
+        expect(committed).toHaveBeenCalledTimes(1);
+        confirm();
+        await Promise.all([live, history]);
+        expect(user).toHaveBeenCalledTimes(1);
+    });
+
+    it('allows retry after durable user confirmation fails', async () => {
+        const committed = vi.fn().mockRejectedValueOnce(new Error('disk unavailable')).mockResolvedValue(undefined);
+        const user = vi.fn();
+        const session = { getMetadata: () => ({}), sendAgentMessage: vi.fn(),
+            sendUserMessage: user, updateMetadata: vi.fn() } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const params = { threadId: 'thread', turnId: 'turn', item: { id: 'prompt',
+            type: 'userMessage', content: [{ type: 'text', text: 'hello' }] } };
+        await expect(projection.notification('item/started', params)).rejects.toThrow('disk unavailable');
+        expect(user).not.toHaveBeenCalled();
+        await projection.notification('item/completed', params);
+        expect(committed).toHaveBeenCalledTimes(2);
+        expect(user).toHaveBeenCalledTimes(1);
+    });
+
     it.each([undefined, 'root'])('persists proposals without approval and replays the same IDs (parent: %s)', async parentThreadId => {
         const send = vi.fn();
         const session = { getMetadata: () => ({}), sendAgentMessage: send } as unknown as ApiSessionClient;
