@@ -106,10 +106,11 @@ export class SharedCodexProjection {
         const itemId = string(item.id) ?? string(p.itemId);
         if (!this.parentThreadId && (method === 'item/started' || method === 'item/completed') && item.type === 'userMessage') {
             const id = string(item.clientId ?? item.clientUserMessageId) ?? (itemId ? `codex:${this.threadId}:user:${itemId}` : undefined);
-            if (id) {
+            if (id && !this.emitted.has(`user:${id}`)) {
                 const firstInTurn = turnId ? [...this.turns].find(([, value]) => value === turnId)?.[0] : undefined;
                 if (turnId) this.turns.set(id, turnId);
                 await this.committed(id);
+                this.emitted.add(`user:${id}`);
                 const text = inputText(item.content);
                 if (text) this.session.sendUserMessage(text, undefined, id);
                 this.session.updateMetadata(metadata => ({ ...metadata, conversationHistoryTurns: Object.fromEntries(this.turns),

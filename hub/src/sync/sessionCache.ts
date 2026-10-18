@@ -587,7 +587,7 @@ export class SessionCache {
             return
         }
 
-        const stored = this.store.sessions.getSession(sessionId)
+        const stored = this.store.sessions.getSessionActivity(sessionId)
         if (!stored) {
             return
         }

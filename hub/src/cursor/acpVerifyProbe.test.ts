@@ -247,7 +247,7 @@ describe('AcpVerifyProbe — agent-acp-active lock acquisition (Codex #34 P2 v2)
         mkdirSync(stubBin, { recursive: true })
         writeFileSync(
             join(stubBin, 'agent'),
-            '#!/bin/sh\nprintenv PATH > "$0.path"\nexit 33\n',
+            "#!/bin/sh\nprintf '%s\\n' \"$PATH\" > \"$0.path\"\nexit 33\n",
             { mode: 0o755 }
         )
 

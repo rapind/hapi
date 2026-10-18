@@ -880,6 +880,13 @@ export function touchSessionUpdatedAt(
     }
 }
 
+export function getSessionActivity(db: Database, id: string): { updatedAt: number; namespace: string } | null {
+    const row = prepareCached(db,
+        'SELECT updated_at AS updatedAt, namespace FROM sessions WHERE id = ?'
+    ).get(id) as { updatedAt: number; namespace: string } | undefined
+    return row ?? null
+}
+
 export function getSession(db: Database, id: string): StoredSession | null {
     const row = prepareCached(db, 'SELECT * FROM sessions WHERE id = ?').get(id) as DbSessionRow | undefined
     return row ? toStoredSession(row) : null

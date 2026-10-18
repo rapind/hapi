@@ -4,6 +4,27 @@ import { SharedCodexProjection, inputText } from './projection';
 import { codexPlanProposalId } from './plan';
 
 describe('shared history projection', () => {
+    it('projects each user item once until a reconnect requests durable replay', async () => {
+        const user = vi.fn();
+        const committed = vi.fn(async () => {});
+        const session = { getMetadata: () => ({}), sendAgentMessage: vi.fn(),
+            sendUserMessage: user, updateMetadata: vi.fn() } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const snapshot = { turns: [{ id: 'turn', status: 'completed', items: [
+            { id: 'prompt', clientId: 'local-prompt', type: 'userMessage', content: [{ type: 'text', text: 'hello' }] }
+        ] }] };
+
+        await projection.history(snapshot);
+        await projection.history(snapshot);
+        expect(user).toHaveBeenCalledTimes(1);
+        expect(committed).toHaveBeenCalledTimes(1);
+
+        projection.reset();
+        await projection.history(snapshot);
+        expect(user).toHaveBeenCalledTimes(2);
+        expect(user.mock.calls[1]).toEqual(user.mock.calls[0]);
+    });
+
     it.each([undefined, 'root'])('persists proposals without approval and replays the same IDs (parent: %s)', async parentThreadId => {
         const send = vi.fn();
         const session = { getMetadata: () => ({}), sendAgentMessage: send } as unknown as ApiSessionClient;
