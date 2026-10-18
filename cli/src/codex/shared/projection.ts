@@ -121,9 +121,14 @@ export class SharedCodexProjection {
                 if (turnId) this.turns.set(id, turnId);
                 const text = inputText(item.content);
                 if (text) this.session.sendUserMessage(text, undefined, id);
-                this.session.updateMetadata(metadata => ({ ...metadata, conversationHistoryTurns: Object.fromEntries(this.turns),
-                    ...(turnId && (!firstInTurn || firstInTurn === id) ? { conversationHistoryPoints: { ...metadata.conversationHistoryPoints, [id]: true } } : {})
-                }));
+                const historyPoint = turnId && (!firstInTurn || firstInTurn === id);
+                const metadata = this.session.getMetadata();
+                if (turnId && (metadata?.conversationHistoryTurns?.[id] !== turnId
+                    || (historyPoint && metadata?.conversationHistoryPoints?.[id] !== true))) {
+                    this.session.updateMetadata(current => ({ ...current, conversationHistoryTurns: Object.fromEntries(this.turns),
+                        ...(historyPoint ? { conversationHistoryPoints: { ...current.conversationHistoryPoints, [id]: true } } : {})
+                    }));
+                }
             }
         }
         if (this.parentThreadId && (method === 'turn/started' || method === 'turn/completed')) {

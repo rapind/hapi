@@ -95,6 +95,23 @@ describe('shared history projection', () => {
         expect(metadata.conversationHistoryPoints).toEqual({ first: true });
     });
 
+    it('replays durable messages without republishing unchanged history metadata', async () => {
+        const updateMetadata = vi.fn(); const user = vi.fn(); const committed = vi.fn(async () => {});
+        const metadata = { conversationHistoryTurns: { prompt: 'turn' }, conversationHistoryPoints: { prompt: true } };
+        const session = { getMetadata: () => metadata, sendAgentMessage: vi.fn(),
+            sendUserMessage: user, updateMetadata } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const snapshot = { turns: [{ id: 'turn', status: 'completed', items: [
+            { id: 'native', clientId: 'prompt', type: 'userMessage', content: [{ type: 'text', text: 'hello' }] }
+        ] }] };
+        await projection.history(snapshot);
+        projection.reset();
+        await projection.history(snapshot);
+        expect(committed).toHaveBeenCalledTimes(2);
+        expect(user).toHaveBeenCalledTimes(2);
+        expect(updateMetadata).not.toHaveBeenCalled();
+    });
+
     it.each([undefined, 'root'])('persists proposals without approval and replays the same IDs (parent: %s)', async parentThreadId => {
         const send = vi.fn();
         const session = { getMetadata: () => ({}), sendAgentMessage: send } as unknown as ApiSessionClient;
