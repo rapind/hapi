@@ -616,6 +616,8 @@ export function HappyThread(props: {
     })
     const showSessionSummaryInChat = hubSettingsQuery.data?.sessionSummaryInChat === true
     const hasVisibleMessages = unstable_useThreadMessageIds().length > 0
+    const hasVisibleMessagesRef = useRef(hasVisibleMessages)
+    hasVisibleMessagesRef.current = hasVisibleMessages
     const runtimeExtras = useAuiState((s) => s.thread.extras) as HappyRuntimeExtras | undefined
     const appliedMessagesVersion = runtimeExtras?.messagesVersion ?? props.messagesVersion
     const appliedHistoryVersion = runtimeExtras?.historyVersion ?? props.historyVersion
@@ -709,6 +711,12 @@ export function HappyThread(props: {
     const isInitialScrollSettling = useCallback(() => {
         return initialScrollSessionRef.current === sessionIdRef.current && Date.now() < initialScrollDeadlineRef.current
     }, [])
+
+    // An empty transcript has nothing to settle, so history coverage need not
+    // wait for the initial scroll (subagent-only latest pages render nothing).
+    const shouldDeferCoverage = useCallback(() => {
+        return hasVisibleMessagesRef.current && isInitialScrollSettling()
+    }, [isInitialScrollSettling])
 
     const clearInitialScrollTimers = useCallback(() => {
         for (const timer of initialScrollTimersRef.current) {
@@ -1295,7 +1303,8 @@ export function HappyThread(props: {
         if (historyLoaderRef.current.autoPaused) {
             return
         }
-        const delay = getHistoryCoverageRetryDelay(initialScrollDeadlineRef.current, Date.now())
+        const deadline = hasVisibleMessagesRef.current ? initialScrollDeadlineRef.current : 0
+        const delay = getHistoryCoverageRetryDelay(deadline, Date.now())
         coverageCheckTimerRef.current = window.setTimeout(() => {
             coverageCheckTimerRef.current = null
             if (needsViewportCoverage()) {
@@ -1461,7 +1470,7 @@ export function HappyThread(props: {
             if (state.autoPaused) {
                 return Promise.resolve('terminal-stop')
             }
-            if (isInitialScrollSettling() || !needsViewportCoverage()) {
+            if (shouldDeferCoverage() || !needsViewportCoverage()) {
                 return Promise.resolve('transient-stop')
             }
         } else {
@@ -1507,7 +1516,7 @@ export function HappyThread(props: {
         clearCoverageCheckTimer,
         clearFailureRetryTimer,
         clearInitialScrollTimers,
-        isInitialScrollSettling,
+        shouldDeferCoverage,
         needsViewportCoverage
     ])
     requestOlderRef.current = requestOlder
@@ -1547,7 +1556,7 @@ export function HappyThread(props: {
         if (!needsViewportCoverage()) {
             return
         }
-        if (isInitialScrollSettling()) {
+        if (shouldDeferCoverage()) {
             scheduleCoverageAfterSettling()
             return
         }
@@ -1557,7 +1566,7 @@ export function HappyThread(props: {
         props.isSyncingTail,
         props.isLoadingMoreMessages,
         props.messagesVersion,
-        isInitialScrollSettling,
+        shouldDeferCoverage,
         needsViewportCoverage,
         scheduleCoverageAfterSettling,
         clearCoverageCheckTimer
@@ -1588,7 +1597,7 @@ export function HappyThread(props: {
             // a scroll event. Submit demand through the same controller; an
             // in-flight load, backoff, or paused run remains exclusive.
             if (!pendingScrollRef.current && needsViewportCoverage()) {
-                if (isInitialScrollSettling()) {
+                if (shouldDeferCoverage()) {
                     scheduleCoverageAfterSettling()
                 } else {
                     void requestOlderRef.current('coverage')
@@ -1600,7 +1609,7 @@ export function HappyThread(props: {
     }, [
         scrollToBottomInstant,
         scrollToBottomSmooth,
-        isInitialScrollSettling,
+        shouldDeferCoverage,
         needsViewportCoverage,
         scheduleCoverageAfterSettling
     ])
