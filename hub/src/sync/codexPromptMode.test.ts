@@ -24,13 +24,13 @@ describe('Codex prompt mode', () => {
         } finally { engine.stop(); store.close() }
     })
 
-    it('keeps a user-chosen title through both prompt modes and later automatic naming', async () => {
+    it('allows agent renames in both prompt modes after a web rename', async () => {
         const store = new Store(':memory:')
         const engine = new SyncEngine(store, {
             of: () => ({ to: () => ({ emit() { } }) })
         } as never, new RpcRegistry(), { broadcast() { } } as never)
         try {
-            const session = engine.getOrCreateSession('protected-toggle', {
+            const session = engine.getOrCreateSession('rename-toggle', {
                 path: '/sports', host: 'test', flavor: 'codex'
             }, null, 'default')
             await engine.renameSession(session.id, 'sports')
@@ -38,9 +38,9 @@ describe('Codex prompt mode', () => {
                 await engine.setCodexPromptMode(session.id, mode)
                 const current = store.sessions.getSession(session.id)!
                 store.sessions.updateSessionMetadata(session.id, {
-                    ...current.metadata as Record<string, unknown>, name: 'Automatic title'
+                    ...current.metadata as Record<string, unknown>, name: `Agent title - ${mode}`
                 }, current.metadataVersion, 'default')
-                expect(store.sessions.getSession(session.id)?.metadata).toMatchObject({ name: 'sports', codexPromptMode: mode })
+                expect(store.sessions.getSession(session.id)?.metadata).toMatchObject({ name: `Agent title - ${mode}`, codexPromptMode: mode })
             }
         } finally {
             engine.stop()

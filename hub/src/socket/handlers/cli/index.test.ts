@@ -347,7 +347,7 @@ describe('cli handler session-access memo', () => {
 })
 
 
-it('acknowledges the human title when a CLI attempts automatic renaming after a message', async () => {
+it('acknowledges and persists a CLI rename after a web rename', async () => {
     const store = new Store(':memory:')
     try {
         const cache = new SessionCache(store, { emit: () => { } } as unknown as EventPublisher)
@@ -362,11 +362,11 @@ it('acknowledges the human title when a CLI attempts automatic renaming after a 
         let ack: unknown
         socket.trigger('update-metadata', {
             sid: session.id, expectedVersion: current.metadataVersion,
-            metadata: { path: '/sports', host: 'localhost', flavor: 'codex', name: 'Message-derived title', userChosenName: null }
+            metadata: { path: '/sports', host: 'localhost', flavor: 'codex', name: 'Agent title' }
         }, (response) => { ack = response })
-        expect(ack).toMatchObject({ result: 'success', metadata: { name: 'ABC' } })
+        expect(ack).toMatchObject({ result: 'success', metadata: { name: 'Agent title' } })
         cache.refreshSession(session.id)
-        expect(cache.getSession(session.id)?.metadata?.name).toBe('ABC')
+        expect(cache.getSession(session.id)?.metadata?.name).toBe('Agent title')
     } finally {
         store.close()
     }
