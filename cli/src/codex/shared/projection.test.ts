@@ -78,6 +78,23 @@ describe('shared history projection', () => {
         expect(committed).toHaveBeenCalledTimes(2);
     });
 
+    it('does not retain an unconfirmed turn mapping across reset', async () => {
+        let confirm!: () => void;
+        const committed = vi.fn().mockImplementationOnce(() => new Promise<void>(resolve => { confirm = resolve; }))
+            .mockResolvedValue(undefined);
+        let metadata = {} as Record<string, unknown>;
+        const session = { getMetadata: () => metadata, sendAgentMessage: vi.fn(), sendUserMessage: vi.fn(),
+            updateMetadata: (change: (value: Record<string, unknown>) => Record<string, unknown>) => { metadata = change(metadata); }
+        } as unknown as ApiSessionClient;
+        const projection = new SharedCodexProjection(session, 'thread', committed);
+        const item = (id: string) => ({ id, clientId: id, type: 'userMessage', content: [{ type: 'text', text: id }] });
+        const old = projection.notification('item/started', { threadId: 'thread', turnId: 'turn', item: item('later') });
+        projection.reset();
+        await projection.history({ turns: [{ id: 'turn', status: 'completed', items: [item('first'), item('later')] }] });
+        confirm(); await old;
+        expect(metadata.conversationHistoryPoints).toEqual({ first: true });
+    });
+
     it.each([undefined, 'root'])('persists proposals without approval and replays the same IDs (parent: %s)', async parentThreadId => {
         const send = vi.fn();
         const session = { getMetadata: () => ({}), sendAgentMessage: send } as unknown as ApiSessionClient;
