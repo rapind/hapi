@@ -65,6 +65,9 @@ See `src/router.tsx` for route definitions.
 - Message thread with infinite scroll.
 - Read conversational text aloud with the speaker button beside Copy. Skips code, terminal output, and Git commit hashes. Uses the browser's default voice; tap Stop to end playback.
 - Composer for sending messages.
+- Agent-requested SOPS credential forms show the destination file and key, mask
+  pasted values, and encrypt delivery to the local helper. Values bypass chat
+  messages and terminal input. See [SOPS credential setup](../cli/README.md#save-credentials-to-sops).
 - Permission mode and model selection for supported agents.
   Cursor Auto uses CLI Auto for new/resumed sessions configured with Auto. When ACP does not advertise a literal Auto option, the session picker warns that switching back from a concrete model requires a restart; HAPI does not automatically restart an active session.
 - Session abort and handoff controls.

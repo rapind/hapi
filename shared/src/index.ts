@@ -1,4 +1,5 @@
 export * from './scratchlistAttachments'
+export * from './sopsSecrets'
 export * from './workGraph'
 export * from './apiTypes'
 export * from './cursorCliSku'

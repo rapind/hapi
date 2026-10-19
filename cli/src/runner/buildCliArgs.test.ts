@@ -225,7 +225,10 @@ describe('buildCliArgs', () => {
             GIT_COMMITTER_EMAIL: 'test@example.com'
         }
         const git = (cwd: string, args: string[]) => {
-            execFileSync('git', args, { cwd, stdio: ['ignore', 'ignore', 'pipe'], env: gitEnv })
+            // Disposable fixture commits must not execute the developer's global hooks.
+            execFileSync('git', ['-c', `core.hooksPath=${join(cwd, '.git', 'fixture-hooks')}`, ...args], {
+                cwd, stdio: ['ignore', 'ignore', 'pipe'], env: gitEnv
+            })
         }
         try {
             git(main, ['init'])

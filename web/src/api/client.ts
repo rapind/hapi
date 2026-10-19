@@ -61,6 +61,7 @@ import type {
     UploadFileResponse
 } from '@hapi/protocol/apiTypes'
 import type { AgentFlavor, MessageDeliveryMode } from '@hapi/protocol'
+import { SopsSecretResultSchema, type SopsSecretReply, type SopsSecretResult } from '@hapi/protocol'
 import type { CancelMessageResponse, SteerQueuedMessageResponse } from '@hapi/protocol/schemas'
 import type { TranscriptionMode, TranscriptionProvider, TranscriptionProviderInfo } from '@hapi/protocol/voice'
 
@@ -265,6 +266,14 @@ export class ApiClient {
 
     async getSessions(): Promise<SessionsResponse> {
         return await this.request<SessionsResponse>('/api/sessions')
+    }
+
+    async submitSopsSecret(sessionId: string, requestId: string, reply: SopsSecretReply): Promise<SopsSecretResult> {
+        return SopsSecretResultSchema.parse(await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/sops-secrets/${encodeURIComponent(requestId)}`, {
+            method: 'POST',
+            cache: 'no-store',
+            body: JSON.stringify(reply),
+        }))
     }
 
     async getHealth(): Promise<HubHealthResponse> {

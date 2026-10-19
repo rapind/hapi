@@ -85,6 +85,7 @@ import type { SendMessageAcceptance, SendMessageSettlement } from '@/hooks/mutat
 import { handoffComposerDraft, transferComposerDraftThenNavigate } from '@/lib/composer-draft-transfer'
 import { SessionHeader } from '@/components/SessionHeader'
 import { CursorMigrationBanner } from '@/components/CursorMigrationBanner'
+import { SopsSecretRequests } from '@/components/SopsSecretRequests'
 import { TeamPanel } from '@/components/TeamPanel'
 import { SessionStatusPanel } from '@/components/SessionStatusPanel'
 import { buildSessionStatusData } from '@/chat/sessionStatus'
@@ -1791,6 +1792,8 @@ function SessionChatInner(props: SessionChatProps) {
             <CursorMigrationBanner metadata={props.session.metadata} />
 
             {sessionStatus ? <SessionStatusPanel data={sessionStatus} /> : null}
+
+            {props.session.active && <SopsSecretRequests api={props.api} sessionId={props.session.id} requests={props.session.agentState?.sopsSecretRequests} />}
 
             <div className="flex flex-col min-h-0 flex-1">
             {props.session.teamState && (

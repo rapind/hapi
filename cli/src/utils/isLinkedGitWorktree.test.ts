@@ -25,7 +25,8 @@ describe('isLinkedGitWorktree', () => {
     }
 
     function git(cwd: string, args: string[]): void {
-        execFileSync('git', args, {
+        // Disposable fixture commits must not execute the developer's global hooks.
+        execFileSync('git', ['-c', `core.hooksPath=${join(cwd, '.git', 'fixture-hooks')}`, ...args], {
             cwd,
             stdio: ['ignore', 'ignore', 'pipe'],
             env: {

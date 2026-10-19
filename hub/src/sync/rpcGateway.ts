@@ -40,6 +40,7 @@ import type {
     UploadFileResponse
 } from '@hapi/protocol/apiTypes'
 import type { Server } from 'socket.io'
+import { SopsSecretResultSchema, type SopsSecretReply, type SopsSecretResult } from '@hapi/protocol'
 import type { RpcRegistry } from '../socket/rpcRegistry'
 
 const DEFAULT_RPC_TIMEOUT_MS = 30_000
@@ -415,6 +416,10 @@ export class RpcGateway {
 
     async deleteUploadFile(sessionId: string, path: string): Promise<RpcDeleteUploadResponse> {
         return await this.sessionRpc(sessionId, RPC_METHODS.DeleteUpload, { sessionId, path }) as RpcDeleteUploadResponse
+    }
+
+    async submitSopsSecret(sessionId: string, requestId: string, reply: SopsSecretReply): Promise<SopsSecretResult> {
+        return SopsSecretResultSchema.parse(await this.sessionRpc(sessionId, RPC_METHODS.SubmitSopsSecret, { requestId, reply }))
     }
 
     async runRipgrep(sessionId: string, args: string[], cwd?: string, fileSearch?: FileSearchOptions): Promise<RpcCommandResponse> {

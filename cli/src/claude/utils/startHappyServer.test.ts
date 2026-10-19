@@ -41,10 +41,13 @@ describe('startHappyServer skill_lookup', () => {
         await rm(sandboxDir, { recursive: true, force: true })
     })
 
-    async function connect(enableSkillLookup = true): Promise<Client> {
+    async function connect(enableSkillLookup = true, enableSecrets = false): Promise<Client> {
         sendAgentMessage = vi.fn()
         const sessionClient = {
             updateMetadata: vi.fn(),
+            getMetadata: () => enableSecrets ? { path: workingDirectory } : null,
+            updateAgentState: vi.fn(),
+            rpcHandlerManager: { registerHandler: vi.fn() },
             sendAgentMessage,
             sendClaudeSessionMessage: vi.fn()
         } as unknown as ApiSessionClient
@@ -90,6 +93,21 @@ describe('startHappyServer skill_lookup', () => {
         expect(result.content?.[0]?.text).toContain('Skill: review')
         expect(result.content?.[0]?.text).toContain('Description: Review changes safely')
         expect(result.content?.[0]?.text).toContain('# Review instructions')
+    })
+
+    it('exposes a credential request tool with a destination and no plaintext input', async () => {
+        const file = join(workingDirectory, 'secrets.json')
+        await writeFile(file, JSON.stringify({ token: 'encrypted-placeholder', sops: {} }))
+        const mcp = await connect(false, true)
+        const tools = await mcp.listTools()
+        const tool = tools.tools.find(tool => tool.name === 'request_sops_secret')
+        expect(tool?.description).toContain('end your turn')
+        expect(Object.keys(tool?.inputSchema.properties ?? {})).toEqual(['file', 'key'])
+        const result = await mcp.callTool({ name: 'request_sops_secret', arguments: { file: 'secrets.json', key: ['token'] } }) as ToolResult
+        expect(result.isError).not.toBe(true)
+        expect(JSON.parse(result.content![0].text!)).toMatchObject({ file, key: ['token'], status: 'waiting_for_user' })
+        const rejected = await mcp.callTool({ name: 'request_sops_secret', arguments: { file, key: ['sops'] } }) as ToolResult
+        expect(rejected.isError).toBe(true)
     })
 
     it('returns a tool error for an unknown skill', async () => {

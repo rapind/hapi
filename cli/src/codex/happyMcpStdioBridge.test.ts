@@ -51,6 +51,16 @@ describe('runHappyMcpStdioBridge tool forwarding', () => {
         harness.callTool.mockClear()
     })
 
+    it('forwards credential destinations and suppresses bridge diagnostics', async () => {
+        await runHappyMcpStdioBridge(['--url', 'http://127.0.0.1:43006', '--tools', 'request_sops_secret'])
+        const handler = harness.tools.get('request_sops_secret')!
+        const args = { file: 'secrets.yaml', key: ['service', 'token'] }
+        await handler(args)
+        expect(harness.callTool).toHaveBeenCalledWith({ name: 'request_sops_secret', arguments: args })
+        harness.callTool.mockRejectedValueOnce(new Error('private transport diagnostic'))
+        expect(await handler(args)).toEqual({ content: [{ type: 'text', text: 'Credential request unavailable.' }], isError: true })
+    })
+
     it('describes display_image as user output rather than image input', async () => {
         await runHappyMcpStdioBridge([
             '--url',

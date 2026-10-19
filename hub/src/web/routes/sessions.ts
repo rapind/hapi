@@ -36,6 +36,7 @@ import { loadScratchlistAttachmentLimitsFromEnv } from '../../config/scratchlist
 import { validateScratchlistAttachmentsForWrite, scratchlistSessionBytesBeforeForPut } from '../../scratchlistAttachments/validate'
 import { TitleSuggestionError } from '../../sync/titleSuggestion'
 import { requireSessionFromParam, requireSyncEngine } from './guards'
+import { createSopsSecretsRoutes } from './sopsSecrets'
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
@@ -72,6 +73,7 @@ function estimateBase64Bytes(base64: string): number {
 
 export function createSessionsRoutes(getSyncEngine: () => SyncEngine | null): Hono<WebAppEnv> {
     const app = new Hono<WebAppEnv>()
+    app.route('/', createSopsSecretsRoutes(getSyncEngine))
 
     app.get('/sessions', (c) => {
         const engine = requireSyncEngine(c, getSyncEngine)

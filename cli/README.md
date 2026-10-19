@@ -140,6 +140,30 @@ See `src/ui/doctor.ts`.
 - `hapi hub` - Start the bundled hub (single binary workflow).
 - `hapi server` - Alias for `hapi hub`.
 
+### Save credentials to SOPS
+
+Ask the agent to use `request_sops_secret` with an existing encrypted YAML or
+JSON file and an object key path, for example `secrets.enc.yaml` and
+`["services", "STRIPE_API_KEY"]`. In the web chat, check the displayed file and
+key, then paste the credential into the masked field and select **Save to SOPS**.
+Saving replaces the value at that key. The agent receives a status message
+after submission so it can continue.
+
+The dev box needs SOPS with `sops set --value-stdin` support
+and access to the file's encryption keys. Open the web app over HTTPS or
+localhost. Clipboard access may require browser permission; manual paste works
+in the same field. Requests expire after ten minutes and are canceled when the
+local bridge stops. Native clients don't yet display the credential form.
+
+HAPI encrypts the value in the browser for the local helper. The hub relays
+ciphertext, and the helper passes the value to SOPS through stdin. HAPI keeps
+the plaintext out of chat, terminal replay, and request metadata. It checks that
+the destination key is covered by SOPS encryption rules and refuses to overwrite
+a file that changed while the form was open. Use a trusted hub over a trusted
+connection: the hub supplies the helper's public key to the browser. An agent
+with access to the dev box can still decrypt the saved file or run a command
+that prints the value.
+
 ### Codex MCP servers
 
 Codex sessions keep the MCP servers configured in the user's Codex

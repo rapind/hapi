@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { COPILOT_AGENT_MODES, type CopilotAgentMode } from './copilotModes'
 import { CODEX_COLLABORATION_MODES, PERMISSION_MODES } from './modes'
 import { AgentConfigDescriptorSchema } from './agentConfig'
+import { SopsSecretRequestSchema } from './sopsSecrets'
 
 export const PermissionModeSchema = z.enum(PERMISSION_MODES)
 export const CodexCollaborationModeSchema = z.enum(CODEX_COLLABORATION_MODES)
@@ -228,6 +229,7 @@ export const AgentStateSchema = z.object({
     // re-spawn in the same mode — notably 'pty', which has no agent terminal
     // otherwise (a reopened PTY session would silently fall back to 'remote').
     startingMode: z.enum(['local', 'remote', 'pty']).nullish(),
+    sopsSecretRequests: z.record(z.string(), SopsSecretRequestSchema).optional(),
     requests: z.record(z.string(), AgentStateRequestSchema).nullish(),
     completedRequests: z.record(z.string(), AgentStateCompletedRequestSchema).nullish()
 })

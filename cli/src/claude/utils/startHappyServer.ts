@@ -32,6 +32,8 @@ import { PingPeerError, archivePeer, formatInspectPeerReport, formatPeerSessions
 import { applySessionDisplayRename, normalizeSessionDisplayTitle } from "@/agent/sessionDisplayRename";
 
 import { ARCHIVE_PEER_TOOL_DESCRIPTION, archivePeerInputSchema } from '@/modules/common/archivePeerTool';
+import { SopsSecretInputSchema, type SopsSecretInput } from '@hapi/protocol';
+import { SopsSecretRequests, SOPS_SECRET_TOOL_DESCRIPTION } from '@/modules/common/sopsSecretRequests';
 
 type StartHappyServerOptions = {
     /**
@@ -72,7 +74,8 @@ function createHapiMcpServer(
     client: ApiSessionClient,
     emitTitleSummary: boolean,
     enableChangeTitle: boolean,
-    skillLookup: StartHappyServerOptions['skillLookup']
+    skillLookup: StartHappyServerOptions['skillLookup'],
+    secrets: SopsSecretRequests | null
 ): McpServer {
     const handler = async (title: string) => {
         logger.debug('[hapiMCP] Changing title to:', title);
@@ -95,6 +98,21 @@ function createHapiMcpServer(
         name: "HAPI MCP",
         version: "1.0.0",
     });
+
+    if (secrets) {
+        mcp.registerTool<any, any>('request_sops_secret', {
+            description: SOPS_SECRET_TOOL_DESCRIPTION,
+            title: 'Request SOPS Credential',
+            inputSchema: SopsSecretInputSchema,
+        }, async (args: SopsSecretInput) => {
+            try {
+                const request = await secrets.request(args);
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ requestId: request.id, file: request.file, key: request.key, status: 'waiting_for_user', expiresAt: request.expiresAt }) }] };
+            } catch {
+                return { content: [{ type: 'text' as const, text: 'Could not request credential. Use an existing SOPS YAML or JSON file and a valid object key path; at most five requests may be pending.' }], isError: true };
+            }
+        });
+    }
 
     const changeTitleInputSchema: z.ZodTypeAny = z.object({
         title: z.string().describe('The new title for the chat session'),
@@ -524,9 +542,11 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
     const enableChangeTitle = options.enableChangeTitle ?? true;
     const transports = new Map<string, StreamableHTTPServerTransport>();
     const mcps = new Map<string, McpServer>();
+    const workingDirectory = client.getMetadata?.()?.path;
+    const secrets = workingDirectory ? new SopsSecretRequests(client, workingDirectory) : null;
 
     const createMcpTransport = () => {
-        const mcp = createHapiMcpServer(client, emitTitleSummary, enableChangeTitle, options.skillLookup);
+        const mcp = createHapiMcpServer(client, emitTitleSummary, enableChangeTitle, options.skillLookup, secrets);
         const transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (sessionId) => {
@@ -586,11 +606,13 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
     if (options.skillLookup) {
         toolNames.push('skill_lookup');
     }
+    if (secrets) toolNames.push('request_sops_secret');
 
     return {
         url: mcpUrl,
         toolNames,
         stop: () => {
+            secrets?.close();
             logger.debug('[hapiMCP] Stopping server');
             for (const mcp of mcps.values()) {
                 mcp.close();

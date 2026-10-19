@@ -25,8 +25,10 @@ import {
 } from '@hapi/protocol/sessionCitation';
 
 import { ARCHIVE_PEER_TOOL_DESCRIPTION, archivePeerInputSchema } from '@/modules/common/archivePeerTool';
+import { SopsSecretInputSchema } from '@hapi/protocol';
+import { SOPS_SECRET_TOOL_DESCRIPTION } from '@/modules/common/sopsSecretRequests';
 
-const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'ping_peer', 'inspect_peer', 'archive_peer', 'spawn_peer'];
+const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'ping_peer', 'inspect_peer', 'archive_peer', 'spawn_peer', 'request_sops_secret'];
 
 function parseArgs(argv: string[]): { url: string | null; toolNames: Set<string> } {
   let url: string | null = null;
@@ -85,6 +87,20 @@ export async function runHappyMcpStdioBridge(argv: string[]): Promise<void> {
     });
 
     // Register tools and forward to HTTP MCP
+    if (toolNames.has('request_sops_secret')) {
+      server.registerTool<any, any>('request_sops_secret', {
+        description: SOPS_SECRET_TOOL_DESCRIPTION,
+        title: 'Request SOPS Credential',
+        inputSchema: SopsSecretInputSchema,
+      }, async (args: Record<string, unknown>) => {
+        try {
+          const client = await ensureHttpClient();
+          return await client.callTool({ name: 'request_sops_secret', arguments: args }) as any;
+        } catch {
+          return { content: [{ type: 'text' as const, text: 'Credential request unavailable.' }], isError: true };
+        }
+      });
+    }
     const changeTitleInputSchema: z.ZodTypeAny = z.object({
       title: z.string().describe('The new title for the chat session'),
     });

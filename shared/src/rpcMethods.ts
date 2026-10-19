@@ -23,6 +23,7 @@ export const RPC_METHODS = {
     GetDirectoryTree: 'getDirectoryTree',
     UploadFile: 'uploadFile',
     DeleteUpload: 'deleteUpload',
+    SubmitSopsSecret: 'submitSopsSecret',
     Ripgrep: 'ripgrep',
     Difftastic: 'difftastic',
     Bash: 'bash',

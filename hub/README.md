@@ -107,6 +107,7 @@ for request/response shapes and error semantics, and `src/web/routes/` for all e
 - `POST /api/sessions/:id/clear` - Start a fresh conversation when supported.
 - `POST /api/sessions/:id/upload` - Upload file (base64, max 50MB).
 - `POST /api/sessions/:id/upload/delete` - Delete uploaded file.
+- `POST /api/sessions/:id/sops-secrets/:requestId` - Submit an encrypted credential envelope or cancel a pending SOPS request. Relays ciphertext to the session CLI and sends only the result and destination to chat.
 - `POST /api/sessions/:id/archive` - Archive active session.
 - `PATCH /api/sessions/:id` - Rename session.
 - `DELETE /api/sessions/:id` - Delete inactive session.
