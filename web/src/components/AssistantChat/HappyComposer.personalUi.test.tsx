@@ -9,6 +9,7 @@ function Preview(props: {
     onVoiceToggle: () => void
     attachmentAdapter?: AttachmentAdapter
     autocompleteSuggestions?: (query: string) => Promise<[]>
+    disabled?: boolean
 }) {
     const runtime = useLocalRuntime({ async *run() {} }, { adapters: { attachments: props.attachmentAdapter } })
     return (
@@ -18,6 +19,7 @@ function Preview(props: {
                     onVoiceToggle={props.onVoiceToggle}
                     onSchedule={vi.fn()}
                     autocompleteSuggestions={props.autocompleteSuggestions}
+                    disabled={props.disabled}
                 />
             </I18nProvider>
         </AssistantRuntimeProvider>
@@ -37,6 +39,7 @@ describe('Personal composer', () => {
         render(<Preview onVoiceToggle={onVoiceToggle} />)
         const input = screen.getByRole('textbox')
         expect(input.tagName).toBe('TEXTAREA')
+        expect(input).toHaveAttribute('rows', '1')
         expect(document.querySelector('[contenteditable]')).toBeNull()
         expect(input.getAttribute('placeholder') ?? '').toBe('')
         expect(input.textContent).toBe('')
@@ -64,6 +67,24 @@ describe('Personal composer', () => {
         render(<Preview onVoiceToggle={vi.fn()} />)
         fireEvent.change(screen.getByRole('textbox'), { target: { value: 'A typed message' } })
         expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
+    })
+
+    it('does not refocus the field or move an earlier selection when controls become available', () => {
+        const onVoiceToggle = vi.fn()
+        const { rerender } = render(<Preview onVoiceToggle={onVoiceToggle} />)
+        const input = screen.getByRole('textbox') as HTMLTextAreaElement
+        fireEvent.change(input, { target: { value: 'we can apply it' } })
+        input.focus()
+        input.setSelectionRange(3, 6)
+        rerender(<Preview onVoiceToggle={onVoiceToggle} disabled />)
+        const outside = document.createElement('button')
+        document.body.appendChild(outside)
+        outside.focus()
+        rerender(<Preview onVoiceToggle={onVoiceToggle} disabled={false} />)
+        expect(document.activeElement).toBe(outside)
+        outside.remove()
+        expect(input.selectionStart).toBe(3)
+        expect(input.selectionEnd).toBe(6)
     })
 
     it('keeps @ text literal without requesting mention suggestions', async () => {

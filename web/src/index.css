@@ -499,6 +499,15 @@ html:has(.chat-scroll-y) #root {
     }
 }
 
+.composer-textarea {
+    caret-color: var(--app-composer-fg);
+    scrollbar-width: none;
+}
+
+.composer-textarea::-webkit-scrollbar {
+    display: none;
+}
+
 [data-color-theme="personal"] .app-chat-composer {
     --app-bg: var(--app-chat-header-bg);
     --app-secondary-bg: var(--app-composer-bg);

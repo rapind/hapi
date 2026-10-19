@@ -17,6 +17,10 @@ type FakeAttachment = { id: string; status: { type: 'complete' } }
 type MockComposerInputProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
     asChild?: boolean
     maxRows?: number
+    minRows?: number
+    unstable_focusOnRunStart?: boolean
+    unstable_focusOnScrollToBottom?: boolean
+    unstable_focusOnThreadSwitched?: boolean
     submitOnEnter?: boolean
     cancelOnEscape?: boolean
 }
@@ -71,6 +75,10 @@ vi.mock('@assistant-ui/react', async () => {
                     asChild: _asChild,
                     onChange,
                     maxRows: _maxRows,
+                    minRows: _minRows,
+                    unstable_focusOnRunStart: _focusOnRunStart,
+                    unstable_focusOnScrollToBottom: _focusOnScrollToBottom,
+                    unstable_focusOnThreadSwitched: _focusOnThreadSwitched,
                     submitOnEnter: _submitOnEnter,
                     cancelOnEscape: _cancelOnEscape,
                     ...props

@@ -1,6 +1,6 @@
 /* Exercises conversation and draft selection with the real plain text composer. */
 
-import React from 'react'
+import React, { useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import '../src/index.css'
 import { AssistantRuntimeProvider, useLocalRuntime } from '@assistant-ui/react'
@@ -13,6 +13,7 @@ declare global {
         __composerCopyE2E?: {
             setValue: (value: string) => void
             getValue: () => string
+            setDisabled: (disabled: boolean) => void
         }
     }
 }
@@ -23,9 +24,11 @@ window.addEventListener('keydown', applyGlobalSelectAll)
 
 function Harness() {
     const runtime = useLocalRuntime({ async *run() {} })
+    const [disabled, setDisabled] = useState(false)
     window.__composerCopyE2E = {
-        setValue: (value) => runtime.composer.setText(value),
-        getValue: () => runtime.composer.getState().text
+        setValue: (value) => runtime.thread.composer.setText(value),
+        getValue: () => runtime.thread.composer.getState().text,
+        setDisabled
     }
     return (
         <div style={{ padding: 40, width: 640 }}>
@@ -56,7 +59,7 @@ function Harness() {
             </div>
             <AssistantRuntimeProvider runtime={runtime}>
                 <I18nProvider>
-                    <HappyComposer />
+                    <HappyComposer disabled={disabled} />
                 </I18nProvider>
             </AssistantRuntimeProvider>
         </div>

@@ -702,7 +702,7 @@ export function HappyComposer(props: {
         })
     }, [composerText])
 
-    const { haptic: platformHaptic, isTouch } = usePlatform()
+    const { haptic: platformHaptic } = usePlatform()
     const { isStandalone, isIOS } = usePWAInstall()
     const isIOSPWA = isIOS && isStandalone
     const bottomPaddingClass = isIOSPWA ? 'pb-0' : 'pb-1'
@@ -1144,14 +1144,20 @@ export function HappyComposer(props: {
         return () => window.removeEventListener('keydown', handleGlobalKeyDown)
     }, [model, onModelChange, haptic, agentFlavor, availableModelOptions])
 
-    const handleChange = useCallback((e: ReactChangeEvent<HTMLTextAreaElement>) => {
-        const selection = {
-            start: e.target.selectionStart,
-            end: e.target.selectionEnd
-        }
-        setInputState({ text: e.target.value, selection })
-        handleUserEdit()
-    }, [handleUserEdit])
+    const handleChange = useCallback(
+        (e: ReactChangeEvent<HTMLTextAreaElement>) => {
+            const selection = {
+                start: e.target.selectionStart,
+                end: e.target.selectionEnd
+            }
+            const text = e.target.value
+            // Keep the displayed value in React state within this input event. The
+            // runtime subscription can lag behind and otherwise resets the caret.
+            setInputState({ text, selection })
+            handleUserEdit()
+        },
+        [handleUserEdit]
+    )
 
     const handleSelect = useCallback((e: ReactSyntheticEvent<HTMLTextAreaElement>) => {
         const target = e.target as HTMLTextAreaElement
@@ -1931,7 +1937,11 @@ export function HappyComposer(props: {
                                         <ComposerPrimitive.Input
                                             asChild
                                             ref={textareaRef}
-                                            autoFocus={!controlsDisabled && !isTouch}
+                                            value={inputState.text}
+                                            autoFocus={false}
+                                            unstable_focusOnRunStart={false}
+                                            unstable_focusOnScrollToBottom={false}
+                                            unstable_focusOnThreadSwitched={false}
                                             submitOnEnter={false}
                                             cancelOnEscape={false}
                                             onChange={handleChange}
@@ -1940,17 +1950,24 @@ export function HappyComposer(props: {
                                             onPaste={handlePaste}
                                         >
                                             <textarea
+                                                rows={1}
                                                 placeholder=""
                                                 disabled={controlsDisabled}
-                                                className="h-full min-h-0 flex-1 resize-none overflow-y-auto bg-transparent text-base leading-snug text-[var(--app-composer-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                                className="composer-textarea h-full min-h-0 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-base leading-snug text-[var(--app-composer-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                             />
                                         </ComposerPrimitive.Input>
                                     ) : (
                                         <ComposerPrimitive.Input
                                             ref={textareaRef}
-                                            autoFocus={!controlsDisabled && !isTouch}
+                                            value={inputState.text}
+                                            autoFocus={false}
+                                            unstable_focusOnRunStart={false}
+                                            unstable_focusOnScrollToBottom={false}
+                                            unstable_focusOnThreadSwitched={false}
                                             placeholder=""
                                             disabled={controlsDisabled}
+                                            rows={1}
+                                            minRows={1}
                                             maxRows={5}
                                             submitOnEnter={false}
                                             cancelOnEscape={false}
@@ -1958,7 +1975,7 @@ export function HappyComposer(props: {
                                             onSelect={handleSelect}
                                             onKeyDown={handleKeyDown}
                                             onPaste={handlePaste}
-                                            className="flex-1 resize-none bg-transparent text-base leading-snug text-[var(--app-composer-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                            className="composer-textarea min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-base leading-snug text-[var(--app-composer-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                         />
                                     )}
                                 </div>
