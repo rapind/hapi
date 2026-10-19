@@ -1,16 +1,11 @@
-/*
- * Standalone Vite-served fixture for the composer copy Playwright spec.
- * Mounts the real RichComposerInput inside a realistic chat page layout
- * (message thread above the composer) and wires the real
- * `applyGlobalSelectAll` takeover from SessionChat, so a real Chromium
- * can drive Ctrl+A / Ctrl+C against the actual code paths.
- */
+/* Exercises conversation and draft selection with the real plain text composer. */
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import '../src/index.css'
-import { useState } from 'react'
-import { RichComposerInput } from '../src/components/AssistantChat/RichComposerInput'
+import { AssistantRuntimeProvider, useLocalRuntime } from '@assistant-ui/react'
+import { HappyComposer } from '../src/components/AssistantChat/HappyComposer'
+import { I18nProvider } from '../src/lib/i18n-context'
 import { applyGlobalSelectAll } from '../src/components/SessionChat'
 
 declare global {
@@ -27,32 +22,43 @@ declare global {
 window.addEventListener('keydown', applyGlobalSelectAll)
 
 function Harness() {
-    const [value, setValue] = useState('')
+    const runtime = useLocalRuntime({ async *run() {} })
     window.__composerCopyE2E = {
-        setValue,
-        getValue: () => value,
+        setValue: (value) => runtime.composer.setText(value),
+        getValue: () => runtime.composer.getState().text
     }
     return (
         <div style={{ padding: 40, width: 640 }}>
             <div data-testid="message-thread" style={{ marginBottom: 24 }}>
                 <div className="happy-thread-messages flex flex-col gap-3">
-                    <div data-testid="assistant-message-1" className="happy-chat-text" style={{ whiteSpace: 'pre-wrap' }}>
+                    <div
+                        data-testid="assistant-message-1"
+                        className="happy-chat-text"
+                        style={{ whiteSpace: 'pre-wrap' }}
+                    >
                         {'The quick brown fox jumps over the lazy dog.\nSecond line of the first reply.'}
                     </div>
-                    <div data-testid="assistant-message-2" className="happy-chat-text" style={{ whiteSpace: 'pre-wrap' }}>
+                    <div
+                        data-testid="assistant-message-2"
+                        className="happy-chat-text"
+                        style={{ whiteSpace: 'pre-wrap' }}
+                    >
                         {'Another assistant message with a code block:\nconst x = 1;'}
                     </div>
-                    <div data-testid="user-message-1" className="happy-user-bubble happy-chat-text" style={{ whiteSpace: 'pre-wrap' }}>
+                    <div
+                        data-testid="user-message-1"
+                        className="happy-user-bubble happy-chat-text"
+                        style={{ whiteSpace: 'pre-wrap' }}
+                    >
                         {'my earlier user message'}
                     </div>
                 </div>
             </div>
-            <RichComposerInput
-                value={value}
-                placeholder="Type a message"
-                onValueChange={setValue}
-                onMirrorChange={() => {}}
-            />
+            <AssistantRuntimeProvider runtime={runtime}>
+                <I18nProvider>
+                    <HappyComposer />
+                </I18nProvider>
+            </AssistantRuntimeProvider>
         </div>
     )
 }

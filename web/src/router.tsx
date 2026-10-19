@@ -35,9 +35,6 @@ import { useCursorChatStoreStatus } from '@/hooks/queries/useCursorChatStoreStat
 import { useSessions } from '@/hooks/queries/useSessions'
 import { useSlashCommands } from '@/hooks/queries/useSlashCommands'
 import { useSkills } from '@/hooks/queries/useSkills'
-import { getSessionTitle } from '@/lib/sessionTitle'
-import { buildSessionReferenceText, matchSessionsForMention } from '@/lib/sessionReference'
-import type { Suggestion } from '@/hooks/useActiveSuggestions'
 import { useSendMessage, type SendErrorInfo } from '@/hooks/mutations/useSendMessage'
 import type { ComposerSendError } from '@/components/AssistantChat/HappyComposer'
 import { ApiError } from '@/api/client'
@@ -623,81 +620,12 @@ function SessionPage() {
     const {
         getSuggestions: getSkillSuggestions,
     } = useSkills(api, sessionId)
-    // Mention pool is stricter than sidebar (#1506): titled sessions only; match via sessionMatchesQuery.
-    const { sessions: allSessions } = useSessions(api)
-    const { machines: mentionMachines } = useMachines(api, true)
-    const mentionMachineLabelsById = useMachineLabels(mentionMachines)
-    // Same fallbacks as share picker / SessionList search.
-    const resolveMentionMachineLabel = useCallback((machineId: string | null) => {
-        if (machineId && mentionMachineLabelsById[machineId]) {
-            return mentionMachineLabelsById[machineId]
-        }
-        if (machineId) {
-            return machineId.slice(0, 8)
-        }
-        return t('machine.unknown')
-    }, [mentionMachineLabelsById, t])
-
     const getAutocompleteSuggestions = useCallback(async (query: string) => {
-        if (query.startsWith('@')) {
-            const search = query.slice(1)
-            // v1: plain-text expansion (same grammar as Copy reference) — #1213.
-            // v2: segmented rich composer with inline session tokens — #1215.
-            // Match via sessionMatchesQuery (share/sidebar); label/insert via getSessionTitle.
-            const sessionHits = matchSessionsForMention(allSessions, search, {
-                excludeId: sessionId,
-                limit: 20,
-                resolveMachineLabel: resolveMentionMachineLabel,
-            }).map((s) => {
-                const title = getSessionTitle(s)
-                const mentionText = buildSessionReferenceText(title, s.id)
-                const idPrefix = s.id.slice(0, 8)
-                return {
-                    key: `session:${s.id}`,
-                    text: mentionText,
-                    label: `@${title || idPrefix}`,
-                    description: s.active
-                        ? `Session · ${idPrefix} · active`
-                        : `Session · ${idPrefix}`,
-                    // Rich composer atom; textarea path still inserts `text` prose.
-                    sessionMention: { id: s.id, title: title || idPrefix },
-                }
-            })
-
-            const fileHits: Suggestion[] = []
-            if ((agentType === 'codex' || agentType === 'copilot') && api && sessionId) {
-                const response = await api.searchSessionFiles(sessionId, search, 50)
-                if (response.success && response.files) {
-                    for (const file of response.files) {
-                        // Codex App Server expects @"path"; Copilot CLI uses @path (relative preferred).
-                        const mentionText = agentType === 'copilot'
-                            ? `@${file.fullPath}`
-                            : `@"${file.fullPath.replace(/(["\\])/g, '\\$1')}"`
-                        fileHits.push({
-                            key: mentionText,
-                            text: mentionText,
-                            label: `@${file.fileName}`,
-                            description: file.filePath || file.fullPath,
-                        })
-                    }
-                }
-            }
-
-            return [...sessionHits, ...fileHits]
-        }
         if (query.startsWith('$')) {
             return await getSkillSuggestions(query)
         }
         return await getSlashSuggestions(query)
-    }, [
-        agentType,
-        api,
-        sessionId,
-        allSessions,
-        resolveMentionMachineLabel,
-        getSkillSuggestions,
-        getSlashSuggestions,
-    ])
+    }, [getSkillSuggestions, getSlashSuggestions])
 
     const refreshSelectedSession = useCallback(async () => {
         await Promise.all([

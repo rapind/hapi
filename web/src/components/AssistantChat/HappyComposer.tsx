@@ -6,7 +6,6 @@ import {
     type CopilotAgentMode
 } from '@hapi/protocol'
 import { ComposerPrimitive, useAui, useAuiState } from '@assistant-ui/react'
-import { flushTapSync } from '@assistant-ui/tap'
 import {
     type ChangeEvent as ReactChangeEvent,
     type ClipboardEvent as ReactClipboardEvent,
@@ -21,12 +20,6 @@ import {
     useRef,
     useState
 } from 'react'
-import { isRichComposerMentionsEnabled } from '@/lib/composerSegments'
-import type { SessionMentionResolveResult } from '@/components/AssistantChat/RichComposerInput'
-import {
-    RichComposerInput,
-    type RichComposerInputHandle,
-} from '@/components/AssistantChat/RichComposerInput'
 import type { AgentState, CodexCollaborationMode, PermissionMode, PiModelSummary } from '@/types/api'
 import type { Suggestion } from '@/hooks/useActiveSuggestions'
 import type { ConversationStatus } from '@/realtime/types'
@@ -118,42 +111,6 @@ export type ComposerSendError = {
         onClick: () => void
         pending?: boolean
     } | null
-}
-
-type RichComposerBridgeApi = {
-    composer: () => {
-        setText: (text: string) => void
-    }
-}
-
-/**
- * The custom rich contenteditable must follow ComposerPrimitive.Input's
- * synchronous composer-write contract. Kept separate so its callback identity
- * is stable across unrelated HappyComposer renders and directly testable.
- */
-export function useRichComposerBridge(
-    api: RichComposerBridgeApi,
-    setInputState: (state: TextInputState) => void,
-    sendError: ComposerSendError | null,
-    onClearSendError?: () => void,
-    onUserEdit?: () => void,
-) {
-    const onValueChange = useCallback((text: string) => {
-        flushTapSync(() => {
-            api.composer().setText(text)
-        })
-    }, [api])
-
-    const onMirrorChange = useCallback((state: TextInputState) => {
-        setInputState(state)
-    }, [setInputState])
-
-    const onEdit = useCallback(() => {
-        onUserEdit?.()
-        if (sendError && onClearSendError) onClearSendError()
-    }, [sendError, onClearSendError, onUserEdit])
-
-    return { onValueChange, onMirrorChange, onEdit }
 }
 
 const defaultSuggestionHandler = async (): Promise<Suggestion[]> => []
@@ -382,8 +339,6 @@ export function HappyComposer(props: {
     pendingSendIntentRef?: MutableRefObject<ComposerSendIntent>
     /** Shared order ref consumed by useHappyRuntime when the message is sent. */
     attachmentOrderRef?: MutableRefObject<string[]>
-    /** Chip hover / aria-label resolver (SessionChat → useSessions). */
-    resolveSessionMentionTooltip?: (id: string, title: string) => SessionMentionResolveResult
 }) {
     const { t } = useTranslation()
     const {
@@ -424,7 +379,7 @@ export function HappyComposer(props: {
         onEffortChange,
         serviceTier: rawServiceTier,
         onServiceTierChange,
-        autocompletePrefixes = ['@', '/', '$'],
+        autocompletePrefixes = ['/', '$'],
         autocompleteSuggestions = defaultSuggestionHandler,
         pendingSchedule: pendingScheduleProp,
         onSchedule: onScheduleProp,
@@ -433,7 +388,6 @@ export function HappyComposer(props: {
         onSuppressSendErrorRestore,
         pendingSendIntentRef,
         attachmentOrderRef: externalAttachmentOrderRef,
-        resolveSessionMentionTooltip,
     } = props
 
     // Use ?? so missing values fall back to default (destructuring defaults only handle undefined)
@@ -532,7 +486,6 @@ export function HappyComposer(props: {
     }, [props.sendSettlement])
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
-    const richInputRef = useRef<RichComposerInputHandle>(null)
     const modelValueButtonRef = useRef<HTMLButtonElement>(null)
     const settingsOverlayRef = useRef<HTMLDivElement>(null)
     // `composer.text === ''` alone is not enough to identify the empty state
@@ -548,9 +501,6 @@ export function HappyComposer(props: {
         userScheduleGeneration: number
         userAttachmentGeneration: number
     } | null>(null)
-    // Kill-switch only (?richMentions=0 / localStorage=0 / VITE=false). Mount-time
-    // read — hard reload required, so no per-keystroke localStorage/URL parse.
-    const [richMentionsEnabled] = useState(() => isRichComposerMentionsEnabled())
     const recordUserEdit = useCallback(() => {
         userEditGenerationRef.current += 1
     }, [])
@@ -564,12 +514,6 @@ export function HappyComposer(props: {
             onClearSendError()
         }
     }, [recordUserEdit, sendError, onClearSendError])
-
-    const {
-        onValueChange: handleRichValueChange,
-        onMirrorChange: handleRichMirrorChange,
-        onEdit: handleRichEdit,
-    } = useRichComposerBridge(api, setInputState, sendError, onClearSendError, recordUserEdit)
 
     const attachmentDrafts = orderedAttachments.flatMap((attachment) => {
         if (!attachment.file) return []
@@ -718,8 +662,8 @@ export function HappyComposer(props: {
 
     // A successful automatic restore keeps its inline error visible so the
     // operator understands why the draft returned. If another path replaces
-    // the restored text or inserts an attachment without firing a textarea or
-    // rich-input event (scratchlist/queued/draft programmatic writes), consume
+    // the restored text or inserts an attachment without firing a textarea
+    // change event (scratchlist/queued/draft programmatic writes), consume
     // the route-level error before a keyed remount can replay it over that new
     // state. The exact restored text is intentionally exempt from this check.
     useEffect(() => {
@@ -749,10 +693,6 @@ export function HappyComposer(props: {
     }, [attachments])
 
     useEffect(() => {
-        if (richMentionsEnabled) {
-            // Rich input owns mirror text + selection via onMirrorChange.
-            return
-        }
         setInputState((prev) => {
             if (prev.text === composerText) return prev
             // When syncing from composerText, update selection to end of text
@@ -760,7 +700,7 @@ export function HappyComposer(props: {
             const newPos = composerText.length
             return { text: composerText, selection: { start: newPos, end: newPos } }
         })
-    }, [composerText, richMentionsEnabled])
+    }, [composerText])
 
     const { haptic: platformHaptic, isTouch } = usePlatform()
     const { isStandalone, isIOS } = usePWAInstall()
@@ -794,10 +734,6 @@ export function HappyComposer(props: {
         setIsExpanded((expanded) => !expanded)
         haptic('light')
         setTimeout(() => {
-            if (richMentionsEnabled) {
-                richInputRef.current?.focus()
-                return
-            }
             const input = textareaRef.current
             if (!input) return
             try {
@@ -814,13 +750,12 @@ export function HappyComposer(props: {
                 )
             }
         }, 0)
-    }, [haptic, richMentionsEnabled])
+    }, [haptic])
 
     // Keep focus within the user's click gesture so mobile keyboards can open.
     useImperativeHandle(props.focusInputRef, () => () => {
-        if (richMentionsEnabled) richInputRef.current?.focus()
-        else textareaRef.current?.focus()
-    }, [richMentionsEnabled])
+        textareaRef.current?.focus()
+    }, [])
 
     const handleSuggestionSelect = useCallback((index: number) => {
         const suggestion = suggestions[index]
@@ -829,29 +764,8 @@ export function HappyComposer(props: {
             markSkillUsed(suggestion.text.slice(1))
         }
 
-        // Suggestions edit composer content programmatically, so neither the
-        // textarea onChange nor RichComposerInput.onEdit sees this path.
+        // Suggestions edit composer content without firing textarea onChange.
         handleUserEdit()
-
-        if (richMentionsEnabled && richInputRef.current) {
-            // insert*/apply* emit mirror state via onMirrorChange (keep inputState in mirror space).
-            if (suggestion.sessionMention) {
-                richInputRef.current.insertSessionMention(
-                    suggestion.sessionMention,
-                    autocompletePrefixes
-                )
-            } else {
-                richInputRef.current.applyPlainSuggestion(
-                    suggestion.text,
-                    autocompletePrefixes
-                )
-            }
-            setTimeout(() => {
-                richInputRef.current?.focus()
-            }, 0)
-            haptic('light')
-            return
-        }
 
         if (!textareaRef.current) return
 
@@ -881,7 +795,7 @@ export function HappyComposer(props: {
         }, 0)
 
         haptic('light')
-    }, [api, suggestions, inputState, autocompletePrefixes, haptic, richMentionsEnabled, handleUserEdit])
+    }, [api, suggestions, inputState, autocompletePrefixes, haptic, handleUserEdit])
 
     const abortDisabled = controlsDisabled || isAborting || !threadIsRunning
 
@@ -1014,12 +928,6 @@ export function HappyComposer(props: {
         // into the next normal submission.
         resetPendingSendIntent()
 
-        // Rich chips must be serialized into composer.text before any send or
-        // scratchlist park snapshot (RichComposerInput contract).
-        if (richMentionsEnabled && richInputRef.current) {
-            richInputRef.current.flushSerializedText()
-        }
-
         // Scratchlist parks must not go through assistant-ui's send(): it
         // empties text/chips before onNew, so a rejected add cannot restore
         // retryable composer state (#1226 Major).
@@ -1107,7 +1015,6 @@ export function HappyComposer(props: {
         props.onParkScratchlist,
         props.onResumeStoredDraft,
         props.scratchlistMode,
-        richMentionsEnabled,
         sendError,
         attachmentOrderRef,
         pendingSendIntentRef,
@@ -1118,7 +1025,7 @@ export function HappyComposer(props: {
         void handleSend(intent)
     }, [handleSend])
 
-    const handleKeyDown = useCallback((e: ReactKeyboardEvent<HTMLTextAreaElement | HTMLDivElement>) => {
+    const handleKeyDown = useCallback((e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
         const key = e.key
 
         // Avoid intercepting IME composition keystrokes (Enter, arrows, etc.)
@@ -1126,7 +1033,7 @@ export function HappyComposer(props: {
             return
         }
 
-        // Shift+Enter inserts a newline (textarea default; rich path inserts <br>).
+        // Shift+Enter inserts a newline through the textarea default.
         if (key === 'Enter' && e.shiftKey) {
             return
         }
@@ -1213,7 +1120,6 @@ export function HappyComposer(props: {
         handleSend,
         haptic,
         composerEnterBehavior,
-        richMentionsEnabled,
         flushAndSend,
         isExpanded,
         handleExpandedToggle,
@@ -1255,7 +1161,7 @@ export function HappyComposer(props: {
         }))
     }, [])
 
-    const handlePaste = useCallback(async (e: ReactClipboardEvent<HTMLTextAreaElement | HTMLDivElement>) => {
+    const handlePaste = useCallback(async (e: ReactClipboardEvent<HTMLTextAreaElement>) => {
         const files = Array.from(e.clipboardData?.files || [])
         const imageFiles = files.filter(file => file.type.startsWith('image/'))
 
@@ -1966,9 +1872,6 @@ export function HappyComposer(props: {
     const rootClassName = isExpanded
         ? 'relative flex min-h-0 flex-1 flex-col'
         : 'relative'
-    const editorClassName = isExpanded
-        ? 'h-full min-h-[1.5rem] flex-1 overflow-y-auto whitespace-pre-wrap break-words bg-transparent text-base leading-snug text-[var(--app-composer-fg)] focus:outline-none'
-        : 'max-h-[7.5rem] min-h-[1.5rem] flex-1 overflow-y-auto whitespace-pre-wrap break-words bg-transparent text-base leading-snug text-[var(--app-composer-fg)] focus:outline-none'
 
     return (
         <ComposerParkingContext.Provider value={isParkingScratchlist}>
@@ -2024,27 +1927,7 @@ export function HappyComposer(props: {
 
                                 <div className={`flex px-3 py-1.5 ${isExpanded ? 'min-h-0 flex-1 items-stretch' : 'items-center'
                                     }`}>
-                                    {richMentionsEnabled ? (
-                                        <div
-                                            className="relative flex min-w-0 flex-1"
-                                            data-testid="rich-composer-fue-anchor"
-                                        >
-                                            <RichComposerInput
-                                                ref={richInputRef}
-                                                value={composerText}
-                                                autoFocus={!controlsDisabled && !isTouch}
-                                                placeholder=""
-                                                disabled={controlsDisabled}
-                                                onValueChange={handleRichValueChange}
-                                                onMirrorChange={handleRichMirrorChange}
-                                                onKeyDown={handleKeyDown}
-                                                onPaste={handlePaste}
-                                                resolveSessionMentionTooltip={resolveSessionMentionTooltip}
-                                                onEdit={handleRichEdit}
-                                                className={editorClassName}
-                                            />
-                                        </div>
-                                    ) : isExpanded ? (
+                                    {isExpanded ? (
                                         <ComposerPrimitive.Input
                                             asChild
                                             ref={textareaRef}

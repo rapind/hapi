@@ -44,12 +44,6 @@ import { HappyThread } from '@/components/AssistantChat/HappyThread'
 import { QueuedMessagesBar } from '@/components/AssistantChat/QueuedMessagesBar'
 import { ScratchlistDrawer } from '@/components/AssistantChat/ScratchlistPanel'
 import { useHubScratchlist } from '@/lib/use-hub-scratchlist'
-import { useSessions } from '@/hooks/queries/useSessions'
-import { getSessionTitle } from '@/lib/sessionTitle'
-import { formatSessionMentionTooltip } from '@/lib/sessionReference'
-import { classifySessionAttention, getSessionAttentionLabelKey } from '@/lib/sessionAttention'
-import { getSessionLastSeenAt } from '@/lib/sessionLastSeen'
-import { formatRelativeTime } from '@/lib/relativeTime'
 import { ScratchlistMigrationBanner } from '@/components/AssistantChat/ScratchlistMigrationBanner'
 import { findLatestCompletedBoundaryId, useHappyRuntime } from '@/lib/assistant-runtime'
 import {
@@ -668,41 +662,6 @@ function SessionChatInner(props: SessionChatProps) {
     const lastSyncedCursorModelRef = useRef<string | null | undefined>(undefined)
     const scratchlist = useHubScratchlist(props.session.id, props.api)
     const queryClient = useQueryClient()
-    const { sessions: allSessions } = useSessions(props.api)
-    const resolveSessionMentionTooltip = useCallback((id: string, title: string) => {
-        const hit = allSessions.find((s) => s.id === id) ?? null
-        if (!hit) {
-            return {
-                model: formatSessionMentionTooltip(null, title, id),
-                session: null,
-            }
-        }
-        const attention = classifySessionAttention(hit, {
-            selected: false,
-            lastSeenAt: getSessionLastSeenAt(hit.id),
-        })
-        const attentionLabel = attention
-            ? t(getSessionAttentionLabelKey(attention))
-            : null
-        return {
-            model: formatSessionMentionTooltip(
-                {
-                    id: hit.id,
-                    title: getSessionTitle(hit),
-                    active: hit.active,
-                    lifecycleState: hit.metadata?.lifecycleState ?? null,
-                    path: hit.metadata?.path ?? null,
-                    worktreePath: hit.metadata?.worktree?.worktreePath ?? null,
-                    relativeTime: formatRelativeTime(hit.updatedAt, t),
-                    thinking: hit.thinking,
-                    attentionLabel,
-                },
-                title,
-                id
-            ),
-            session: hit,
-        }
-    }, [allSessions, t])
     const [scratchlistMode, setScratchlistMode] = useState(false)
     const [isScratchlistParking, setIsScratchlistParking] = useState(false)
     // Mode resets across sessions implicitly: SessionChat is keyed by
@@ -1929,7 +1888,6 @@ function SessionChatInner(props: SessionChatProps) {
                             uploadDraftSnapshotRef.current = { text, attachments }
                         }}
                         attachmentOrderRef={attachmentOrderRef}
-                        resolveSessionMentionTooltip={resolveSessionMentionTooltip}
                         disabled={props.isSending}
                         pendingSchedule={pendingSchedule}
                         sendAcceptance={sendAcceptance}

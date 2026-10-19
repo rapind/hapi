@@ -23,7 +23,6 @@ React Mini App / PWA for monitoring and controlling hapi sessions.
 - When opened in a normal browser, you can log in with `CLI_API_TOKEN:<namespace>` (or `CLI_API_TOKEN` for the default namespace).
 - The login screen includes a top-right hub picker; if unset, the app uses the same origin it was loaded from.
 - Live updates come from the hub via SSE.
-- Session `@` suggestions require conversation content, including untitled conversations. Names and directory labels affect display/search, not eligibility; empty stubs stay excluded.
 
 ## Routes
 
@@ -64,7 +63,7 @@ See `src/router.tsx` for route definitions.
 
 - Message thread with infinite scroll.
 - Read conversational text aloud with the speaker button beside Copy. Skips code, terminal output, and Git commit hashes. Uses the browser's default voice; tap Stop to end playback.
-- Composer for sending messages.
+- Plain textarea composer with file attachments, image paste, slash commands, and skill suggestions.
 - Agent-requested SOPS credential forms show the destination file and key, mask
   pasted values, and encrypt delivery to the local helper. Values bypass chat
   messages and terminal input. See [SOPS credential setup](../cli/README.md#save-credentials-to-sops).
