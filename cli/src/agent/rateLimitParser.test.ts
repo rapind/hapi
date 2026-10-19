@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRateLimitText } from './rateLimitParser';
+import { parseRateLimitText, RateLimitEventFilter } from './rateLimitParser';
 
 describe('parseRateLimitText', () => {
     it('returns null for non-JSON text', () => {
@@ -39,7 +39,7 @@ describe('parseRateLimitText', () => {
                 status: 'allowed_warning',
                 resetsAt: 1774850400,
                 rateLimitType: 'seven_day',
-                utilization: 0.85,
+                utilization: 0.95,
                 surpassedThreshold: 0.75,
             },
         }));
@@ -48,7 +48,7 @@ describe('parseRateLimitText', () => {
             suppress: false,
             message: {
                 type: 'text',
-                text: 'Claude AI usage limit warning|1774850400|85|seven_day',
+                text: 'Claude AI usage limit warning|1774850400|95|seven_day',
             },
         });
     });
@@ -149,5 +149,30 @@ describe('parseRateLimitText', () => {
         }));
 
         expect(result).toEqual({ suppress: true });
+    });
+});
+
+describe('RateLimitEventFilter', () => {
+    it('tracks warnings separately by limit type and reset window', () => {
+        const filter = new RateLimitEventFilter();
+        const info = { status: 'allowed_warning', resetsAt: 1774278000, utilization: 0.9, rateLimitType: 'seven_day' };
+        expect(filter.convert(info)).not.toBeNull();
+        expect(filter.convert({ ...info, rateLimitType: 'five_hour' })).not.toBeNull();
+        expect(filter.convert(info)).toBeNull();
+        expect(filter.convert({ ...info, resetsAt: 1774882800 })).not.toBeNull();
+    });
+
+    it('keeps actual limit rejections visible after warnings', () => {
+        const filter = new RateLimitEventFilter();
+        const info = { status: 'allowed_warning', resetsAt: 1774278000, utilization: 1 };
+        filter.convert(info);
+        expect(filter.convert({ ...info, status: 'rejected' })).toBe('Claude AI usage limit reached|1774278000|');
+    });
+
+    it('suppresses early and malformed warnings', () => {
+        for (const utilization of [undefined, NaN, Infinity, 0.75, 0.76, 0.899]) {
+            const filter = new RateLimitEventFilter();
+            expect(filter.convert({ status: 'allowed_warning', resetsAt: 1774278000, utilization })).toBeNull();
+        }
     });
 });

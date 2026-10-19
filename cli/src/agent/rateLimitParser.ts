@@ -18,7 +18,7 @@ export type RateLimitResult =
     | { suppress: true }
     | { suppress: false; message: AgentMessage };
 
-export function parseRateLimitText(text: string): RateLimitResult {
+export function parseRateLimitText(text: string, filter = new RateLimitEventFilter()): RateLimitResult {
     if (text[0] !== '{') return null;
 
     let parsed: unknown;
@@ -38,50 +38,33 @@ export function parseRateLimitText(text: string): RateLimitResult {
 
     if (inner.type !== 'rate_limit_event') return null;
 
-    const info = inner.rate_limit_info;
-    if (typeof info !== 'object' || info === null) return null;
+    const message = filter.convert(inner.rate_limit_info);
+    return message === null
+        ? { suppress: true }
+        : { suppress: false, message: { type: 'text', text: message } };
+}
 
-    const { status, resetsAt, utilization, rateLimitType } = info as Record<string, unknown>;
+/** Warning memory belongs to the session, so prompt boundaries do not repeat alerts. */
+export class RateLimitEventFilter {
+    private readonly warnings = new Map<string, { resetsAt: number; percent: number }>();
 
-    // Suppress early for statuses that never need display,
-    // before checking resetsAt — malformed payloads should not leak.
-    if (status === 'allowed') {
-        return { suppress: true };
-    }
+    convert(info: unknown): string | null {
+        if (typeof info !== 'object' || info === null) return null;
+        const { status, resetsAt, utilization, rateLimitType } = info as Record<string, unknown>;
+        if (typeof resetsAt !== 'number' || !Number.isFinite(resetsAt) || resetsAt < 0) return null;
 
-    if (typeof resetsAt !== 'number') {
-        // Malformed rate_limit_event (missing resetsAt) — suppress to prevent
-        // raw JSON from leaking into chat.
-        return { suppress: true };
-    }
-
-    // Ensure integer for the pipe-delimited format (web regex uses \d+)
-    const resetsAtInt = Math.round(resetsAt);
-
-    if (status === 'allowed_warning') {
-        const pct = typeof utilization === 'number' ? Math.round(utilization * 100) : 0;
+        const reset = Math.round(resetsAt);
         const limitType = typeof rateLimitType === 'string' ? rateLimitType : '';
-        return {
-            suppress: false,
-            message: {
-                type: 'text',
-                text: `Claude AI usage limit warning|${resetsAtInt}|${pct}|${limitType}`,
-            },
-        };
-    }
+        if (status === 'rejected') {
+            return `Claude AI usage limit reached|${reset}|${limitType}`;
+        }
+        if (status !== 'allowed_warning' || typeof utilization !== 'number'
+            || !Number.isFinite(utilization) || utilization < 0.9) return null;
 
-    if (status === 'rejected') {
-        const limitType = typeof rateLimitType === 'string' ? rateLimitType : '';
-        return {
-            suppress: false,
-            message: {
-                type: 'text',
-                text: `Claude AI usage limit reached|${resetsAtInt}|${limitType}`,
-            },
-        };
+        const percent = Math.round(utilization * 100);
+        const previous = this.warnings.get(limitType);
+        if (previous?.resetsAt === reset && previous.percent === percent) return null;
+        this.warnings.set(limitType, { resetsAt: reset, percent });
+        return `Claude AI usage limit warning|${reset}|${percent}|${limitType}`;
     }
-
-    // Unknown status — suppress to prevent raw JSON from leaking into chat.
-    // If a new status needs to be displayed, add an explicit branch above.
-    return { suppress: true };
 }

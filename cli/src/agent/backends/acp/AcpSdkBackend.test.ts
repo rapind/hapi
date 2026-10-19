@@ -52,6 +52,45 @@ afterEach(() => {
 });
 
 describe('AcpSdkBackend', () => {
+    it('remembers displayed usage warnings across real prompt boundaries', async () => {
+        backendStatics.UPDATE_QUIET_PERIOD_MS = 1;
+        backendStatics.PRE_PROMPT_UPDATE_QUIET_PERIOD_MS = 1;
+        backendStatics.LATE_FLUSH_WINDOW_MS = 1;
+        const backend = new AcpSdkBackend({ command: 'agent' });
+        const internal = backend as unknown as {
+            transport: { sendRequest: () => Promise<unknown>; close: () => Promise<void> };
+            handleSessionUpdate: (params: unknown) => void;
+        };
+        let utilization = 0.9;
+        internal.transport = {
+            sendRequest: async () => {
+                internal.handleSessionUpdate({
+                    sessionId: 'session-1',
+                    update: {
+                        sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentMessageChunk,
+                        content: {
+                            type: 'text', text: JSON.stringify({
+                                type: 'rate_limit_event',
+                                rate_limit_info: { status: 'allowed_warning', resetsAt: 1774278000, utilization, rateLimitType: 'seven_day' }
+                            })
+                        }
+                    }
+                });
+                return { stopReason: 'end_turn' };
+            },
+            close: async () => { }
+        };
+        const messages: AgentMessage[] = [];
+        for (const percent of [0.9, 0.901, 0.91]) {
+            utilization = percent;
+            await backend.prompt('session-1', [{ type: 'text', text: 'hi' }], message => messages.push(message));
+        }
+        expect(messages.filter(message => message.type === 'text')).toEqual([
+            { type: 'text', text: 'Claude AI usage limit warning|1774278000|90|seven_day' },
+            { type: 'text', text: 'Claude AI usage limit warning|1774278000|91|seven_day' }
+        ]);
+    });
+
     it('forwards ACP session_info_update titles without requiring an active prompt', () => {
         const backend = new AcpSdkBackend({ command: 'agent' });
         const updates: Array<{ sessionId: string | null; title: string | null }> = [];

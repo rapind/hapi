@@ -1,3 +1,4 @@
+import { RateLimitEventFilter } from '@/agent/rateLimitParser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -2544,4 +2545,26 @@ describe('AcpMessageHandler', () => {
         }
         clearGeneratedImages();
     });
+});
+
+it('suppresses early and repeated usage warnings across ACP prompt handlers', async () => {
+    const messages: AgentMessage[] = [];
+    const rateLimitFilter = new RateLimitEventFilter();
+    for (const utilization of [0.75, 0.76, 0.9, 0.901, 0.91]) {
+        const handler = new AcpMessageHandler(message => messages.push(message), { rateLimitFilter });
+        await handler.handleUpdate({
+            sessionUpdate: ACP_SESSION_UPDATE_TYPES.agentMessageChunk,
+            content: {
+                type: 'text', text: JSON.stringify({
+                    type: 'rate_limit_event',
+                    rate_limit_info: { status: 'allowed_warning', resetsAt: 1774278000, utilization, rateLimitType: 'seven_day' }
+                })
+            }
+        });
+        handler.drainBuffers();
+    }
+    expect(messages).toEqual([
+        { type: 'text', text: 'Claude AI usage limit warning|1774278000|90|seven_day' },
+        { type: 'text', text: 'Claude AI usage limit warning|1774278000|91|seven_day' }
+    ]);
 });

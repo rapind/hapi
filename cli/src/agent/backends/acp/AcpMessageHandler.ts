@@ -5,7 +5,7 @@ import { registerGeneratedImageFromAcpBlock } from '@/modules/common/generatedIm
 import type { InlineMediaSource } from '@/modules/common/inlineMediaSource';
 import { asString, isObject } from '@hapi/protocol';
 import { deriveToolNameWithSource, isPlaceholderToolName } from '@/agent/utils';
-import { parseRateLimitText } from '@/agent/rateLimitParser';
+import { parseRateLimitText, RateLimitEventFilter } from '@/agent/rateLimitParser';
 import { isInternalEventJson } from '@/agent/internalEventFilter';
 import { ACP_SESSION_UPDATE_TYPES } from './constants';
 
@@ -397,6 +397,7 @@ function getSuffixPrefixOverlap(base: string, next: string): number {
 }
 
 export class AcpMessageHandler {
+    private readonly rateLimitFilter: RateLimitEventFilter;
     private readonly toolCalls = new Map<string, { name: string; input: unknown }>();
     private acceptingUpdates = true;
     private bufferedText = '';
@@ -415,12 +416,13 @@ export class AcpMessageHandler {
 
     constructor(
         onMessage: (message: AgentMessage) => void,
-        private readonly options: { textChunkMode?: AcpTextChunkMode; flavor?: string } = {}
+        private readonly options: { textChunkMode?: AcpTextChunkMode; flavor?: string; rateLimitFilter?: RateLimitEventFilter } = {}
     ) {
         this.onMessage = (message) => {
             if (this.acceptingUpdates) onMessage(message);
         };
         this.textChunkMode = this.options.textChunkMode ?? 'dedupe';
+        this.rateLimitFilter = this.options.rateLimitFilter ?? new RateLimitEventFilter();
     }
 
     /** Drop late updates from a cancelled prompt before the next handler exists. */
@@ -634,7 +636,7 @@ export class AcpMessageHandler {
                 // prefixes that would otherwise leak on flushText().
                 const hadBufferedPrefix = this.bufferedText !== '' && text.startsWith(this.bufferedText);
 
-                const rateLimit = parseRateLimitText(text);
+                const rateLimit = parseRateLimitText(text, this.rateLimitFilter);
                 if (rateLimit) {
                     if (hadBufferedPrefix) {
                         this.bufferedText = '';

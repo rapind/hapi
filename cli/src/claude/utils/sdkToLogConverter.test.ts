@@ -943,6 +943,26 @@ describe('SDKToLogConverter', () => {
     })
 
     describe('Internal event filtering', () => {
+        it('suppresses usage warnings below 90 percent', () => {
+            for (const utilization of [0.75, 0.76, 0.899]) {
+                expect(converter.convert({
+                    type: 'rate_limit_event',
+                    rate_limit_info: { status: 'allowed_warning', resetsAt: 1775559600, utilization, rateLimitType: 'seven_day' }
+                } as unknown as SDKMessage)).toBeNull()
+            }
+        })
+
+        it('only emits usage warnings when the displayed percentage changes across turns', () => {
+            const warning = (utilization: number) => converter.convert({
+                type: 'rate_limit_event',
+                rate_limit_info: { status: 'allowed_warning', resetsAt: 1775559600, utilization, rateLimitType: 'seven_day' }
+            } as unknown as SDKMessage)
+            expect(warning(0.9)).not.toBeNull()
+            converter.resetParentChain()
+            expect(warning(0.901)).toBeNull()
+            expect(warning(0.91)).not.toBeNull()
+        })
+
         it('should suppress rate_limit_event with allowed status', () => {
             const sdkMessage = {
                 type: 'rate_limit_event',
@@ -962,7 +982,7 @@ describe('SDKToLogConverter', () => {
                 rate_limit_info: {
                     status: 'allowed_warning',
                     resetsAt: 1775559600,
-                    utilization: 0.85,
+                    utilization: 0.95,
                     rateLimitType: 'five_hour'
                 }
             } as unknown as SDKMessage
@@ -972,7 +992,7 @@ describe('SDKToLogConverter', () => {
             expect(logMessage).not.toBeNull()
             expect(logMessage!.type).toBe('assistant')
             expect((logMessage as any).message.content[0].text).toBe(
-                'Claude AI usage limit warning|1775559600|85|five_hour'
+                'Claude AI usage limit warning|1775559600|95|five_hour'
             )
         })
 
@@ -1025,7 +1045,7 @@ describe('SDKToLogConverter', () => {
                 rate_limit_info: {
                     status: 'allowed_warning',
                     resetsAt: 1775559600,
-                    utilization: 0.8,
+                    utilization: 0.9,
                     rateLimitType: 'five_hour'
                 }
             } as unknown as SDKMessage)

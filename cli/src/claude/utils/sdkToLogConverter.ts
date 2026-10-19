@@ -4,6 +4,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
+import { RateLimitEventFilter } from '@/agent/rateLimitParser'
 import { execSync } from 'node:child_process'
 import type {
     SDKMessage,
@@ -83,6 +84,7 @@ function getGitBranch(cwd: string): string | undefined {
  * Maintains state for parent-child relationships between messages
  */
 export class SDKToLogConverter {
+    private readonly rateLimitFilter = new RateLimitEventFilter()
     private lastUuid: string | null = null
     private context: ConversionContext
     private responses?: Map<string, PermissionResponse>
@@ -168,30 +170,11 @@ export class SDKToLogConverter {
     /**
      * Convert rate_limit_event to pipe-delimited text matching the ACP path format,
      * or suppress if the status does not need display (e.g. 'allowed').
-     * Must not mutate converter state (UUID chain) so dropped events are invisible.
+     * Dropped events must not advance the UUID chain.
      */
     private convertRateLimitEvent(sdkMessage: SDKMessage): RawJSONLines | null {
-        const info = (sdkMessage as any).rate_limit_info
-        if (typeof info !== 'object' || info === null) return null
-
-        const { status, resetsAt, utilization, rateLimitType } = info
-
-        if (status === 'allowed') return null
-        if (typeof resetsAt !== 'number') return null
-
-        const resetsAtInt = Math.round(resetsAt)
-        let text: string
-
-        if (status === 'allowed_warning') {
-            const pct = typeof utilization === 'number' ? Math.round(utilization * 100) : 0
-            const limitType = typeof rateLimitType === 'string' ? rateLimitType : ''
-            text = `Claude AI usage limit warning|${resetsAtInt}|${pct}|${limitType}`
-        } else if (status === 'rejected') {
-            const limitType = typeof rateLimitType === 'string' ? rateLimitType : ''
-            text = `Claude AI usage limit reached|${resetsAtInt}|${limitType}`
-        } else {
-            return null
-        }
+        const text = this.rateLimitFilter.convert((sdkMessage as { rate_limit_info?: unknown }).rate_limit_info)
+        if (text === null) return null
 
         const parentUuid = this.lastUuid
         const uuid = randomUUID()

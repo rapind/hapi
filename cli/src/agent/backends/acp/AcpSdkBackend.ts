@@ -1,3 +1,4 @@
+import { RateLimitEventFilter } from '@/agent/rateLimitParser';
 import type { AgentFlavor } from '@hapi/protocol';
 import type { AgentBackend, AgentMessage, AgentSessionConfig, PermissionRequest, PermissionResponse, PromptContent } from '@/agent/types';
 import { asString, isObject } from '@hapi/protocol';
@@ -71,6 +72,7 @@ export class AcpSdkBackend implements AgentBackend {
     private readonly initialAvailableCommands = new Set<string>();
     private readonly sessionAvailableCommands = new Map<string, Set<string>>();
     private autoPermissionModeEnabled: boolean | null = null;
+    private readonly rateLimitFilter = new RateLimitEventFilter();
     private messageHandler: AcpMessageHandler | null = null;
     private activeSessionId: string | null = null;
     private initializeResult: AcpInitializeResult | null = null;
@@ -604,6 +606,7 @@ export class AcpSdkBackend implements AgentBackend {
         this.messageHandler = new AcpMessageHandler(onUpdate, {
             textChunkMode: this.options.textChunkMode,
             flavor: this.options.flavor,
+            rateLimitFilter: this.rateLimitFilter,
         });
         this.promptGeneration++;
         this.foregroundPromptRequests++;
