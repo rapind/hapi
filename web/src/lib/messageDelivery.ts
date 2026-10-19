@@ -1,10 +1,10 @@
-import type { MessageDeliveryMode } from '@hapi/protocol'
+import { isSteeringSupportedForSession, type Metadata, type MessageDeliveryMode } from '@hapi/protocol'
 
 /**
  * The one-shot UI intent associated with a composer submission.  It is not
  * the wire delivery mode: `default` is resolved against the current session
- * state at the SessionChat boundary, while `queue` is an explicit operator
- * request not to steer an in-flight Pi turn.
+ * state at the SessionChat boundary. Retry state may carry `queue`, but a
+ * fresh immediate submission follows the fixed steering policy.
  */
 export type ComposerSendIntent = 'default' | 'queue'
 
@@ -40,19 +40,16 @@ export function getRestoredComposerSendIntent(
     return getRetryDeliveryMode(deliveryMode)
 }
 
-/** Resolve ordinary sends against the session preference; explicit queue always wins. */
+/** Steer fresh immediate messages whenever the session supports it. */
 export function resolveMessageDeliveryMode(input: {
-    codexPromptMode?: MessageDeliveryMode
-    agentFlavor: string | null | undefined
+    metadata?: Pick<Metadata, 'flavor' | 'cursorSessionProtocol' | 'cursorSessionId'> | null
     isSessionThinking: boolean
     intent: ComposerSendIntent
     scheduledAt?: number | null
     routesToScratchlist?: boolean
 }): MessageDeliveryMode {
-    return input.agentFlavor === 'codex'
-        && input.codexPromptMode === 'steer'
+    return isSteeringSupportedForSession(input.metadata)
         && input.isSessionThinking
-        && input.intent === 'default'
         && input.scheduledAt == null
         && !input.routesToScratchlist
         ? 'steer'

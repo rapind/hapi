@@ -109,6 +109,13 @@ export async function runCursor(opts: {
         };
         const formattedText = formatMessageWithAttachments(message.content.text, message.content.attachments);
         enqueueCursorUserMessage(messageQueue, formattedText, enhancedMode, localId);
+        // Capture the active turn synchronously, before another prompt can start.
+        const steer = sessionWrapperRef.current?.steerQueuedMessage;
+        if (message.meta?.deliveryMode === 'steer' && localId && steer) {
+            void steer(localId).catch((error) => {
+                logger.debug('[cursor] Automatic steering failed', error);
+            });
+        }
     });
 
     session.onCancelQueuedMessage((localId) => {

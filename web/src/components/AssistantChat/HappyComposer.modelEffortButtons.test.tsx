@@ -159,20 +159,16 @@ describe('HappyComposer generic model/effort value buttons', () => {
         expect(screen.queryByRole('button', { name: 'High' })).toBeNull()
     })
 
-    it('keeps reasoning and follow-up controls reachable from the model menu on phones', () => {
+    it('keeps reasoning reachable without follow-up controls on phones', () => {
         runtime.narrowViewport = true
-        const change = vi.fn().mockResolvedValue(undefined)
         renderComposer('codex', {
-            codexPromptMode: 'steer',
-            onCodexPromptModeChange: change,
             modelReasoningEffort: 'medium',
             onModelReasoningEffortChange: vi.fn(),
         })
         fireEvent.click(toolbarButton('Sonnet 4'))
         expect(screen.getByText('Reasoning Effort')).toBeTruthy()
-        expect(screen.getByRole('button', { name: 'Steer' })).toHaveAttribute('aria-pressed', 'true')
-        fireEvent.click(screen.getByRole('button', { name: 'Queue' }))
-        expect(change).toHaveBeenCalledWith('queue')
+        expect(screen.queryByRole('button', { name: 'Steer' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Queue' })).not.toBeInTheDocument()
     })
 
     it('keeps the model settings trigger on narrow viewports', () => {

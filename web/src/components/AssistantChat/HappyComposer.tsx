@@ -1,4 +1,3 @@
-import { CodexPromptModeSettings } from './CodexPromptModeSettings'
 import { getCodexCollaborationModeOptions, getCopilotAgentModeOptions, type CopilotAgentMode } from '@hapi/protocol'
 import { ComposerPrimitive, useAui, useAuiState } from '@assistant-ui/react'
 import {
@@ -239,8 +238,6 @@ export function HappyComposer(props: {
     collaborationMode?: CodexCollaborationMode
     copilotAgentMode?: CopilotAgentMode
     model?: string | null
-    codexPromptMode?: 'queue' | 'steer'
-    onCodexPromptModeChange?: (mode: 'queue' | 'steer') => Promise<void>
     modelReasoningEffort?: string | null
     effort?: string | null
     active?: boolean
@@ -895,10 +892,8 @@ export function HappyComposer(props: {
     }, [pendingSendIntentRef])
 
     const handleSend = useCallback(async (intent: ComposerSendIntent = 'default') => {
-        // SessionChat preloads the ref only when restoring a rejected send:
-        // queue retries remain queue, while an ordinary fresh send always
-        // starts from the explicit/default argument. Capture it before the
-        // mandatory early-path reset below, then consume it at send time.
+        // Preserve restored retry provenance until SessionChat resolves this
+        // submission against the current session and steering policy.
         const restoredIntent = intent === 'default'
             ? (pendingSendIntentRef?.current ?? 'default')
             : intent
@@ -956,9 +951,8 @@ export function HappyComposer(props: {
             userScheduleGeneration: userScheduleGenerationRef.current,
             userAttachmentGeneration: userAttachmentGenerationRef.current,
         }
-        // Scheduled sends retain their existing route. The same is true for a
-        // scratchlist route above; only an immediate chat submit may carry the
-        // explicit queue intent to SessionChat.
+        // Scheduled and scratchlist sends use their own delivery paths.
+        // Pass restored provenance only for an immediate chat submission.
         const effectiveIntent = pendingSchedule == null ? restoredIntent : 'default'
         try {
             if (!hasText && !hasAttachments && draftHydration.hasStoredAttachments) {
@@ -1337,11 +1331,8 @@ export function HappyComposer(props: {
     const showFastModeSettings = Boolean(onServiceTierChange)
     const showModelAreaSettings =
         showModelSettings || showModelEffortSettings || showModelReasoningEffortSettings || showEffortSettings
-    const showPromptModeSettings =
-        agentFlavor === 'codex' && Boolean(props.codexPromptMode && props.onCodexPromptModeChange)
     const showOtherSettings = showFastModeSettings || showCollaborationSettings || showCopilotAgentModeSettings
     const showSettingsButton = Boolean(
-        showPromptModeSettings ||
         showCollaborationSettings ||
         showCopilotAgentModeSettings ||
         showModelSettings ||
@@ -1395,12 +1386,10 @@ export function HappyComposer(props: {
         const sheetCopilotAgentModeSettings = showCopilotAgentModeSettings
         const sheetModelAreaSettings =
             sheetModelSettings || sheetModelEffortSettings || sheetModelReasoningEffortSettings || sheetEffortSettings
-        const sheetPromptModeSettings = showPromptModeSettings
         const sheetOtherSettings = sheetFastModeSettings || sheetCollaborationSettings || sheetCopilotAgentModeSettings
         if (
             showSettings &&
-            (sheetPromptModeSettings ||
-                sheetCollaborationSettings ||
+            (sheetCollaborationSettings ||
                 sheetCopilotAgentModeSettings ||
                 sheetModelSettings ||
                 sheetModelEffortSettings ||
@@ -1411,12 +1400,6 @@ export function HappyComposer(props: {
             return (
                 <div ref={settingsOverlayRef} className={`${overlayPositionClass} w-full`}>
                     <FloatingOverlay maxHeight={320}>
-                        {sheetPromptModeSettings && props.codexPromptMode && props.onCodexPromptModeChange ? (
-                            <>
-                                <CodexPromptModeSettings mode={props.codexPromptMode} onChange={props.onCodexPromptModeChange} />
-                                <div className="mx-3 h-px bg-[var(--app-divider)]" />
-                            </>
-                        ) : null}
                         {sheetModelSettings ? (
                             <div className="py-2">
                                 <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
@@ -1757,9 +1740,6 @@ export function HappyComposer(props: {
         return null
     }, [
         showSettings,
-        showPromptModeSettings,
-        props.codexPromptMode,
-        props.onCodexPromptModeChange,
         agentFlavor,
         piModels,
         piSelectedModel,
@@ -1949,8 +1929,6 @@ export function HappyComposer(props: {
                                     contextWindow={contextWindow}
                                     contextModel={contextModel}
                                     model={model}
-                                    codexPromptMode={props.codexPromptMode}
-                                    onCodexPromptModeChange={props.onCodexPromptModeChange}
                                     modelReasoningEffort={modelReasoningEffort}
                                     effort={effort}
                                     serviceTier={serviceTier}

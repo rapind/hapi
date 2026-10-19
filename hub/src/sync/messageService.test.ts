@@ -1229,10 +1229,10 @@ describe('MessageService.sendMessage deliveryMode', () => {
         expect(gateChecks).toBe(0)
     })
 
-    it('uses the target session Steer preference for a text-only peer message', async () => {
+    it('steers a text-only peer message without a saved preference', async () => {
         const store = makeStore()
         const session = store.sessions.getOrCreateSession('peer-steer', {
-            path: '/tmp/peer-steer', host: 'localhost', flavor: 'codex', codexPromptMode: 'steer'
+            path: '/tmp/peer-steer', host: 'localhost', flavor: 'codex'
         }, null, 'default')
         const { io, cliEmitted } = makeTrackingIo()
         const service = new MessageService(store, io, makePublisher() as any)
@@ -1253,6 +1253,32 @@ describe('MessageService.sendMessage deliveryMode', () => {
         store.close()
     })
 
+    it.each(['pi', 'cursor'] as const)('automatically steers peer input for %s', async flavor => {
+        const store = makeStore()
+        const session = store.sessions.getOrCreateSession('auto-peer', {
+            path: '/tmp', host: 'localhost', flavor, ...(flavor === 'cursor' ? { cursorSessionProtocol: 'acp' } : {})
+        }, null, 'default')
+        const { io, cliEmitted } = makeTrackingIo()
+        const service = new MessageService(store, io, makePublisher() as any)
+        await service.sendMessage(session.id, { text: 'new instruction', deliveryMode: 'queue' })
+        expect(cliEmitted[0]).toMatchObject({
+            body: { message: { localId: expect.any(String), content: { meta: { deliveryMode: 'steer' } } } }
+        })
+        store.close()
+    })
+
+    it('keeps legacy Cursor stream-json input queued', async () => {
+        const store = makeStore()
+        const session = store.sessions.getOrCreateSession('legacy-cursor', {
+            path: '/tmp', host: 'localhost', flavor: 'cursor', cursorSessionProtocol: 'stream-json'
+        }, null, 'default')
+        const { io, cliEmitted } = makeTrackingIo()
+        const service = new MessageService(store, io, makePublisher() as any)
+        await service.sendMessage(session.id, { text: 'new instruction', deliveryMode: 'steer' })
+        expect(cliEmitted[0]).toMatchObject({ body: { message: { content: { meta: { deliveryMode: 'queue' } } } } })
+        store.close()
+    })
+
     it('queues scheduled sends even when delivery mode is omitted in a Steer session', async () => {
         const store = makeStore()
         const session = store.sessions.getOrCreateSession('scheduled-preference', {
@@ -1266,7 +1292,7 @@ describe('MessageService.sendMessage deliveryMode', () => {
         store.close()
     })
 
-    it.each(['pi', 'claude'])('keeps omitted delivery mode queued for %s', async flavor => {
+    it.each(['claude', 'opencode'])('keeps omitted delivery mode queued for unsupported %s', async flavor => {
         const store = makeStore()
         const session = store.sessions.getOrCreateSession('other-agent', {
             path: '/tmp', host: 'localhost', flavor, codexPromptMode: 'steer'
@@ -1281,11 +1307,11 @@ describe('MessageService.sendMessage deliveryMode', () => {
     it.each([
         ['steer', 'steer', 'steer'],
         ['steer', undefined, 'steer'],
-        ['steer', 'queue', 'queue'],
-        ['queue', 'steer', 'queue'],
-        [undefined, 'steer', 'queue'],
-        ['queue', undefined, 'queue'],
-        [undefined, undefined, 'queue']
+        ['steer', 'queue', 'steer'],
+        ['queue', 'steer', 'steer'],
+        [undefined, 'steer', 'steer'],
+        ['queue', undefined, 'steer'],
+        [undefined, undefined, 'steer']
     ] as const)('normalizes Codex preference %s and delivery %s to %s', async (codexPromptMode, deliveryMode, expected) => {
         const store = makeStore()
         const session = store.sessions.getOrCreateSession('codex-delivery', {

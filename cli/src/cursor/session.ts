@@ -14,6 +14,7 @@ type CursorModelApplyHandler = (model: string | null | undefined) => Promise<str
 type CursorPermissionModeChangedHandler = (mode: PermissionMode) => void;
 
 export class CursorSession extends AgentSessionBase<EnhancedMode> {
+    steerQueuedMessage: ((localId: string) => Promise<{ steered: boolean; error?: string }>) | null = null;
     readonly cursorArgs?: string[];
     /** Cursor-native `--worktree` name (`true` = flag without name). */
     readonly cursorWorktree?: boolean | string;

@@ -3,7 +3,7 @@ import {
     getCopilotAgentModeLabel,
 } from '@hapi/protocol'
 import * as Popover from '@radix-ui/react-popover'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { AgentState, CodexCollaborationMode } from '@/types/api'
 import type { ConversationStatus } from '@/realtime/types'
 import { getContextBudgetTokens } from '@/chat/modelConfig'
@@ -195,8 +195,6 @@ export function StatusBar(props: {
      */
     contextModel?: string | null
     model?: string | null
-    codexPromptMode?: 'queue' | 'steer'
-    onCodexPromptModeChange?: (mode: 'queue' | 'steer') => Promise<void>
     modelReasoningEffort?: string | null
     effort?: string | null
     serviceTier?: string | null
@@ -207,8 +205,6 @@ export function StatusBar(props: {
     inline?: boolean
 }) {
     const { t } = useTranslation()
-    const [savingPromptMode, setSavingPromptMode] = useState(false)
-    const [promptModeError, setPromptModeError] = useState(false)
     const { preferences: headerMetadata } = useSessionHeaderMetadata()
     const connectionStatus = useMemo(
         () => getConnectionStatus(props.active, props.thinking, props.agentState, props.voiceStatus, props.backgroundTaskCount ?? 0, t),
@@ -258,23 +254,6 @@ export function StatusBar(props: {
         ? formatCompactReasoningLabel(reasoningEffort)
         : null
     const codexFastMode = shouldShowCodexFastBadge(props.agentFlavor, props.serviceTier)
-
-    const nextPromptMode = props.codexPromptMode === 'steer' ? 'queue' : 'steer'
-    const promptModeToggleLabel = t('chat.codexPromptMode.toggle', {
-        mode: t(nextPromptMode === 'steer' ? 'chat.codexPromptMode.steer' : 'chat.codexPromptMode.queue')
-    })
-    const togglePromptMode = async () => {
-        if (savingPromptMode || !props.onCodexPromptModeChange) return
-        setSavingPromptMode(true)
-        setPromptModeError(false)
-        try {
-            await props.onCodexPromptModeChange(nextPromptMode)
-        } catch {
-            setPromptModeError(true)
-        } finally {
-            setSavingPromptMode(false)
-        }
-    }
 
     const statusBar = (
         <div data-testid="composer-status" className={props.inline ? "flex shrink-0 items-center gap-3" : "flex min-w-0 items-baseline justify-between gap-2 px-2 pb-1"}>
@@ -355,19 +334,6 @@ export function StatusBar(props: {
                         {reasoningLabel}
                     </span>
                 ) : null}
-                {props.agentFlavor === 'codex' && props.codexPromptMode ? (
-                    <button
-                        type="button"
-                        onClick={() => void togglePromptMode()}
-                        disabled={savingPromptMode || !props.onCodexPromptModeChange}
-                        aria-label={promptModeToggleLabel}
-                        title={promptModeToggleLabel}
-                        aria-busy={savingPromptMode}
-                        className="hidden sm:inline-flex cursor-pointer whitespace-nowrap rounded-sm text-xs text-[var(--app-hint)] hover:text-[var(--app-link)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--app-link)] disabled:cursor-default disabled:opacity-50"
-                    >
-                        {t(props.codexPromptMode === 'steer' ? 'chat.codexPromptMode.steer' : 'chat.codexPromptMode.queue')}
-                    </button>
-                ) : null}
                 {codexFastMode ? (
                     <span className="whitespace-nowrap text-xs text-[#34C759]">
                         fast
@@ -383,10 +349,5 @@ export function StatusBar(props: {
         </div>
     )
 
-    return (
-        <>
-            {statusBar}
-            {promptModeError ? <div role="alert" className="px-2 pb-1 text-xs text-red-500">{t('chat.codexPromptMode.error')}</div> : null}
-        </>
-    )
+    return statusBar
 }

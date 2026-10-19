@@ -608,16 +608,17 @@ describe('NewSession launch preferences', () => {
         await waitFor(() => expect(screen.getByTestId('create')).toBeDisabled())
     })
 
-    it('restores the saved Codex follow-up preference in the form', async () => {
+    it('always steers Codex without offering a follow-up preference', async () => {
         savePreferredLaunchSettings('machine-1', 'codex', {
             model: 'auto', cursorSelectedBase: 'auto', effort: 'auto',
-            modelReasoningEffort: 'default', codexPromptMode: 'steer'
+            modelReasoningEffort: 'default', codexPromptMode: 'queue'
         })
         render(<NewSession api={api} machines={[machine]} initialMachineId="machine-1"
             initialDirectory="C:\\repo" onSuccess={mocks.onSuccess} onCancel={() => { }} />)
-        await waitFor(() => expect(screen.getByRole('combobox', { name: 'newSession.codexPromptMode' })).toHaveValue('steer'))
-        fireEvent.click(screen.getByDisplayValue('claude'))
+        await waitFor(() => expect(screen.getByTestId('create')).toBeEnabled())
         expect(screen.queryByRole('combobox', { name: 'newSession.codexPromptMode' })).not.toBeInTheDocument()
+        fireEvent.click(screen.getByTestId('create'))
+        await waitFor(() => expect(mocks.spawnSession).toHaveBeenCalledWith(expect.objectContaining({ codexPromptMode: 'steer' })))
     })
 
     it('saves changed launch settings only after creation succeeds', async () => {
@@ -638,9 +639,6 @@ describe('NewSession launch preferences', () => {
         fireEvent.click(screen.getByTestId('model'))
         fireEvent.click(screen.getByTestId('reasoning'))
         expect(loadPreferredLaunchSettings('machine-1', 'codex')).toBeNull()
-        fireEvent.change(screen.getByRole('combobox', { name: 'newSession.codexPromptMode' }), {
-            target: { value: 'steer' }
-        })
         fireEvent.click(screen.getByTestId('create'))
 
         await waitFor(() => expect(mocks.onSuccess).toHaveBeenCalledWith('session-1'))

@@ -33,52 +33,26 @@ describe('retry delivery safety', () => {
 
 describe('resolveMessageDeliveryMode', () => {
     const base = {
-        agentFlavor: 'pi',
+        metadata: { flavor: 'codex' as const },
         isSessionThinking: true,
         intent: 'default' as const,
     }
 
-    // Every composer submission queues — mid-turn delivery happens only via
-    // the explicit per-queued-message Steer action (issue #1466). The old Pi
-    // automatic steer while thinking was removed.
-    it.each([
-        { name: 'thinking Pi (previously auto-steered)', input: base },
-        { name: 'thinking Pi with explicit queue intent', input: { ...base, intent: 'queue' as const } },
-        { name: 'idle Pi', input: { ...base, isSessionThinking: false } },
-        { name: 'non-Pi flavor', input: { ...base, agentFlavor: 'codex' } },
-        { name: 'scheduled message', input: { ...base, scheduledAt: Date.now() + 60_000 } },
-        { name: 'scratchlist route', input: { ...base, routesToScratchlist: true } },
-    ])('queues $name', ({ input }) => {
-        expect(resolveMessageDeliveryMode(input)).toBe('queue')
+    it.each(['codex', 'pi', 'cursor'] as const)('always steers fresh active %s sends', flavor => {
+        expect(resolveMessageDeliveryMode({ ...base, metadata: { flavor } })).toBe('steer')
     })
 
-    it('steers ordinary active Codex sends when the session opts in', () => {
-        expect(resolveMessageDeliveryMode({
-            agentFlavor: 'codex', isSessionThinking: true, intent: 'default',
-            codexPromptMode: 'steer',
-        })).toBe('steer')
+    it('does not let an old queue intent disable steering for a fresh send', () => {
+        expect(resolveMessageDeliveryMode({ ...base, intent: 'queue' })).toBe('steer')
     })
 
     it.each([
-        { intent: 'queue' as const },
         { isSessionThinking: false },
         { scheduledAt: 1 },
         { routesToScratchlist: true },
-        { agentFlavor: 'claude' },
-        { codexPromptMode: 'queue' as const },
-    ])('keeps queue overrides and non-Codex sends queued: %j', (override) => {
-        expect(resolveMessageDeliveryMode({
-            agentFlavor: 'codex', isSessionThinking: true, intent: 'default',
-            codexPromptMode: 'steer', ...override,
-        })).toBe('queue')
-    })
-
-    it('keeps the retry-restore contract: a failed steer retry restores as queue', () => {
-        const ref = { current: getRestoredComposerSendIntent('steer') }
-        const retryIntent = consumeComposerSendIntent(ref)
-
-        expect(retryIntent).toBe('queue')
-        expect(ref.current).toBe('default')
-        expect(resolveMessageDeliveryMode({ ...base, intent: retryIntent })).toBe('queue')
+        { metadata: { flavor: 'claude' as const } },
+        { metadata: { flavor: 'cursor' as const, cursorSessionProtocol: 'stream-json' as const } },
+    ])('defers idle, scheduled, scratchlist and unsupported sends: %j', override => {
+        expect(resolveMessageDeliveryMode({ ...base, ...override })).toBe('queue')
     })
 })

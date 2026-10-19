@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCursorSession = vi.hoisted(() => ({
+    steerQueuedMessage: vi.fn(async (_localId: string) => ({ steered: true })),
     setPermissionMode: vi.fn(),
     setModel: vi.fn(),
     getModel: vi.fn(() => undefined as string | undefined),
@@ -97,6 +98,7 @@ import { enqueueCursorUserMessage } from './cursorUserMessageQueue';
 
 describe('runCursor', () => {
     beforeEach(() => {
+        mockCursorSession.steerQueuedMessage.mockClear();
         harness.bootstrapArgs.length = 0;
         harness.loopArgs.length = 0;
         harness.loopError = null;
@@ -127,6 +129,17 @@ describe('runCursor', () => {
         expect(lifecycleMock.markCrash).toHaveBeenCalledWith(harness.loopError);
         expect(lifecycleMock.setSessionEndReason).not.toHaveBeenCalledWith('completed');
         expect(lifecycleMock.cleanupAndExit).toHaveBeenCalled();
+    });
+
+    it('immediately offers fresh steer intent to the active launcher after enqueueing', async () => {
+        await runCursor({ startedBy: 'runner' });
+        const handler = harness.session.onUserMessage.mock.calls[0][0];
+        handler({ content: { text: 'change direction' }, meta: { deliveryMode: 'steer' } }, 'steer-1');
+        expect(mockCursorSession.steerQueuedMessage).toHaveBeenCalledWith('steer-1');
+        expect(vi.mocked(enqueueCursorUserMessage).mock.invocationCallOrder.at(-1))
+            .toBeLessThan(mockCursorSession.steerQueuedMessage.mock.invocationCallOrder[0]);
+        handler({ content: { text: 'replayed message' }, meta: { deliveryMode: 'queue' } }, 'replay-1');
+        expect(mockCursorSession.steerQueuedMessage).toHaveBeenCalledTimes(1);
     });
 
     it('queues user turns with the live session model after startup remap', async () => {

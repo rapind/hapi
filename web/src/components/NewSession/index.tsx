@@ -53,7 +53,6 @@ import { isOpencodeReasoningEffortValid } from './types'
 import type { AgentType, LaunchEffort, CodexReasoningEffort, NewSessionServiceTier, SessionType } from './types'
 import { ActionButtons } from './ActionButtons'
 import { AgentSelector } from './AgentSelector'
-import { CodexPromptModeSelector } from './CodexPromptModeSelector'
 import { CollaborationModeSelector } from './CollaborationModeSelector'
 import { CodexImportActions } from './CodexImportActions'
 import { PiImportActions } from './PiImportActions'
@@ -120,7 +119,7 @@ export function NewSession(props: {
     const [modelReasoningEffort, setModelReasoningEffort] = useState<CodexReasoningEffort>('default')
     const [opencodeSelectedModel, setOpencodeSelectedModel] = useState<string | null | undefined>(undefined)
     const [serviceTier, setServiceTier] = useState<NewSessionServiceTier>('standard')
-    const [codexPromptMode, setCodexPromptMode] = useState<'queue' | 'steer'>('queue')
+    const codexPromptMode = 'steer' as const
     const [collaborationMode, setCollaborationMode] = useState<CodexCollaborationMode>('default')
     const [copilotAgentMode, setCopilotAgentMode] = useState<CopilotAgentMode>('interactive')
     const [sessionType, setSessionType] = useState<SessionType>('simple')
@@ -192,7 +191,6 @@ export function NewSession(props: {
         setEffort('auto')
         setModelReasoningEffort('default')
         setServiceTier('standard')
-        setCodexPromptMode('queue')
         setCollaborationMode('default')
         setCopilotAgentMode('interactive')
         if (agent !== 'cursor') {
@@ -257,7 +255,6 @@ export function NewSession(props: {
         agyModelPickedByUserRef.current = false
         setAgySelectedModel(draft.agent === 'agy' && draft.model !== 'auto' ? draft.model : null)
         setServiceTier(draft.serviceTier)
-        setCodexPromptMode(draft.codexPromptMode ?? 'queue')
         setCollaborationMode(draft.collaborationMode)
         setCopilotAgentMode(draft.copilotAgentMode)
         setSessionType(draft.sessionType)
@@ -884,7 +881,6 @@ export function NewSession(props: {
         setModel(agent === 'opencode' ? 'auto' : preferred.model)
         setCursorSelectedBase(preferred.cursorSelectedBase)
         setEffort(preferred.effort)
-        setCodexPromptMode(preferred.codexPromptMode ?? 'queue')
         setModelReasoningEffort(preferred.modelReasoningEffort)
         setOpencodeSelectedModel(agent === 'opencode' && preferred.model !== 'auto' ? preferred.model : null)
         agyModelPickedByUserRef.current = false
@@ -1957,12 +1953,6 @@ export function NewSession(props: {
                     piSelectedModel={agent === 'pi' ? piSelectedModel : null}
                 />
             ) : null}
-            {!selectedCodexImportSession ? <CodexPromptModeSelector
-                agent={agent}
-                value={codexPromptMode}
-                isDisabled={isFormDisabled}
-                onChange={setCodexPromptMode}
-            /> : null}
             <CollaborationModeSelector
                 agent={agent}
                 value={collaborationMode}

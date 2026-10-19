@@ -1120,7 +1120,6 @@ function SessionChatInner(props: SessionChatProps) {
         setModelReasoningEffort,
         setEffort,
         setServiceTier,
-        setCodexPromptMode
     } = useSessionActions(
         props.api,
         props.session.id,
@@ -1613,8 +1612,7 @@ function SessionChatInner(props: SessionChatProps) {
         // chat sends after scratchlist fallback".)
         const routedToScratchlist = shouldRouteToScratchlist(scratchlistMode, attachments, scheduledAt)
         const deliveryMode = resolveMessageDeliveryMode({
-            codexPromptMode: props.session.metadata?.codexPromptMode,
-            agentFlavor,
+            metadata: props.session.metadata,
             // Do not use assistant-ui's broader `isRunning` here: a
             // child-agent run is not the main session's steer target.
             isSessionThinking: props.session.thinking,
@@ -1636,7 +1634,7 @@ function SessionChatInner(props: SessionChatProps) {
             updatePendingSchedule(null)
             setForceScrollToken((token) => token + 1)
         }
-    }, [agentFlavor, onSendForComposer, props.session.metadata?.codexPromptMode, props.session.thinking, scratchlistMode, updatePendingSchedule])
+    }, [props.session.metadata, onSendForComposer, props.session.thinking, scratchlistMode, updatePendingSchedule])
 
     const attachmentAdapter = useMemo(() => {
         if (props.session.active && scratchlistMode) {
@@ -1886,8 +1884,6 @@ function SessionChatInner(props: SessionChatProps) {
                         collaborationMode={codexCollaborationModeSupported ? props.session.collaborationMode : undefined}
                         copilotAgentMode={agentFlavor === 'copilot' ? props.session.copilotAgentMode : undefined}
                         model={props.session.model}
-                        onCodexPromptModeChange={setCodexPromptMode}
-                        codexPromptMode={agentFlavor === 'codex' && !scratchlistMode ? (props.session.metadata?.codexPromptMode ?? 'queue') : undefined}
                         modelReasoningEffort={agentFlavor === 'codex' || agentFlavor === 'opencode' ? props.session.modelReasoningEffort : undefined}
                         effort={props.session.effort}
                         agentFlavor={agentFlavor}

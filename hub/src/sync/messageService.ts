@@ -11,7 +11,7 @@ import {
     isRedundantGoalStatusEventContent,
     unwrapRoleWrappedRecordEnvelope
 } from '@hapi/protocol/messages'
-import { isObject } from '@hapi/protocol'
+import { isObject, isSteeringSupportedForSession } from '@hapi/protocol'
 import type { MessageDeliveryMode, MessagesResponse, QueuedStateResponse } from '@hapi/protocol/apiTypes'
 import type { Server } from 'socket.io'
 import { randomUUID } from 'node:crypto'
@@ -117,17 +117,15 @@ function isExportVisibleStoredMessage(message: StoredMessageForDelivery): boolea
 
 function getNormalizedDeliveryMode(
     metadata: unknown,
-    requestedDeliveryMode: MessageDeliveryMode | undefined,
     scheduledAt: number | null | undefined
 ): MessageDeliveryMode {
-    if (scheduledAt != null || requestedDeliveryMode === 'queue') {
-        return 'queue'
-    }
-    if (isObject(metadata) && metadata.flavor === 'codex' && metadata.codexPromptMode === 'steer') {
-        return 'steer'
-    }
-    return requestedDeliveryMode === 'steer' && isObject(metadata) && metadata.flavor === 'pi'
-        ? 'steer' : 'queue'
+    if (scheduledAt != null || !isObject(metadata)) return 'queue'
+    return isSteeringSupportedForSession({
+        flavor: typeof metadata.flavor === 'string' ? metadata.flavor : undefined,
+        cursorSessionId: typeof metadata.cursorSessionId === 'string' ? metadata.cursorSessionId : undefined,
+        cursorSessionProtocol: metadata.cursorSessionProtocol === 'acp' || metadata.cursorSessionProtocol === 'stream-json'
+            ? metadata.cursorSessionProtocol : undefined,
+    }) ? 'steer' : 'queue'
 }
 
 /**
@@ -867,7 +865,6 @@ export class MessageService {
         const sentFrom = payload.sentFrom ?? 'webapp'
         const deliveryMode = getNormalizedDeliveryMode(
             this.store.sessions.getSession(sessionId)?.metadata,
-            payload.deliveryMode,
             payload.scheduledAt
         )
 

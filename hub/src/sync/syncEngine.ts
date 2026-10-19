@@ -2097,7 +2097,7 @@ export class SyncEngine {
             if (session.metadata?.flavor !== 'codex') throw new Error('Follow-up mode is only supported for Codex sessions')
             const result = this.store.sessions.updateSessionMetadata(
                 sessionId,
-                { ...session.metadata, codexPromptMode: mode },
+                { ...session.metadata, codexPromptMode: 'steer' },
                 session.metadataVersion,
                 session.namespace,
                 { touchUpdatedAt: false }
@@ -2227,7 +2227,7 @@ export class SyncEngine {
                     path: directory,
                     host: machine?.metadata?.host ?? 'unknown',
                     flavor: agent,
-                    ...(agent === 'codex' ? { codexPromptMode: codexPromptMode ?? 'queue' } : {}),
+                    ...(agent === 'codex' ? { codexPromptMode: 'steer' } : {}),
                     machineId,
                     startedBy: 'runner',
                     startedFromRunner: true,

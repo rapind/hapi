@@ -372,6 +372,24 @@ describe('cursorAcpRemoteLauncher', () => {
         await runPromise;
     }, 10_000);
 
+    it('exposes the native steer handler for automatic incoming messages and clears it on exit', async () => {
+        let releasePrompt!: () => void;
+        harness.deferPrompt = new Promise((resolve) => { releasePrompt = resolve; });
+        const session = makeSession(null, false);
+        const mode = { permissionMode: 'default' } as EnhancedMode;
+        session.queue.push('first turn', mode, 'first');
+        const running = cursorAcpRemoteLauncher(session);
+        await vi.waitFor(() => expect(harness.promptCalls).toBe(1));
+        session.queue.push('automatic instruction', mode, 'auto-steer');
+        expect(session.steerQueuedMessage).toBeTypeOf('function');
+        await expect(session.steerQueuedMessage!('auto-steer')).resolves.toEqual({ steered: true });
+        session.queue.close();
+        harness.deferPrompt = null;
+        releasePrompt();
+        await running;
+        expect(session.steerQueuedMessage).toBeNull();
+    });
+
     it('restores a queued steer when ACP dispatch fails', async () => {
         let releasePrompt!: () => void;
         harness.deferPrompt = new Promise((resolve) => { releasePrompt = resolve; });
