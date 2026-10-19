@@ -148,7 +148,7 @@ describe('runCursor', () => {
             expect.anything(),
             'hello',
             {
-                permissionMode: 'default',
+                permissionMode: 'yolo',
                 model: 'cursor-grok-4.5-medium'
             },
             'local-1'

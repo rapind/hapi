@@ -8,37 +8,8 @@ const state = {
 };
 
 describe('resolveOpencodeSlashCommand', () => {
-    it('enables plan mode without sending a turn', () => {
-        expect(resolveOpencodeSlashCommand('/plan', state)).toEqual({
-            kind: 'handled',
-            message: 'OpenCode plan mode enabled',
-            updates: { permissionMode: 'plan' }
-        });
-    });
-
-    it('enables plan mode and sends prompt when /plan has text', () => {
-        expect(resolveOpencodeSlashCommand('/plan design the fix', state)).toEqual({
-            kind: 'replace',
-            text: 'design the fix',
-            message: 'OpenCode plan mode enabled',
-            updates: { permissionMode: 'plan' }
-        });
-    });
-
-    it('returns to default permission mode from /plan off', () => {
-        expect(resolveOpencodeSlashCommand('/plan off', { ...state, permissionMode: 'plan' })).toEqual({
-            kind: 'handled',
-            message: 'OpenCode plan mode disabled',
-            updates: { permissionMode: 'default' }
-        });
-    });
-
-    it('handles /default', () => {
-        expect(resolveOpencodeSlashCommand('/default', { ...state, permissionMode: 'plan' })).toEqual({
-            kind: 'handled',
-            message: 'OpenCode permission mode set to default',
-            updates: { permissionMode: 'default' }
-        });
+    it.each(["/permissions","/permissions yolo","/permission plan","/plan","/plan task","/plan off","/default"])('keeps the fixed policy for %s', command => {
+        expect(resolveOpencodeSlashCommand(command, state)).toEqual({ kind: 'handled', message: 'HAPI permissions are fixed to YOLO.' });
     });
 
     it('sets model, reasoning effort, and permission mode', () => {
@@ -54,19 +25,6 @@ describe('resolveOpencodeSlashCommand', () => {
         expect(resolveOpencodeSlashCommand('/effort default', state)).toMatchObject({
             updates: { modelReasoningEffort: null }
         });
-        expect(resolveOpencodeSlashCommand('/permissions yolo', state)).toMatchObject({
-            updates: { permissionMode: 'yolo' }
-        });
-        expect(resolveOpencodeSlashCommand('/permission plan', state)).toMatchObject({
-            updates: { permissionMode: 'plan' }
-        });
-    });
-
-    it('rejects unknown permission modes', () => {
-        expect(resolveOpencodeSlashCommand('/permissions bogus', state)).toMatchObject({
-            kind: 'handled',
-            message: expect.stringContaining('Unknown OpenCode permission mode')
-        });
     });
 
     it('shows current values when slash command has no argument', () => {
@@ -77,10 +35,6 @@ describe('resolveOpencodeSlashCommand', () => {
         expect(resolveOpencodeSlashCommand('/reasoning', state)).toEqual({
             kind: 'handled',
             message: 'OpenCode reasoning effort: high'
-        });
-        expect(resolveOpencodeSlashCommand('/permissions', state)).toEqual({
-            kind: 'handled',
-            message: 'OpenCode permission mode: default'
         });
     });
 
@@ -162,9 +116,11 @@ describe('resolveOpencodeSlashCommand', () => {
         expect(help).toMatchObject({ kind: 'handled' });
         if (help.kind === 'handled') {
             expect(help.message).toContain('Supported OpenCode slash commands');
-            expect(help.message).toContain('/plan');
-            expect(help.message).toContain('/permissions');
-            expect(help.message).toContain('/compact` — compact (summarize) the OpenCode session context (remote sessions only)');
+            expect(help.message).not.toContain('/plan');
+            expect(help.message).not.toContain('/permissions');
+            expect(help.message).toContain(
+                '/compact` — compact (summarize) the OpenCode session context (remote sessions only)'
+            );
             expect(help.message).toContain('/clear` — archive this HAPI session and open a fresh OpenCode session');
         }
     });

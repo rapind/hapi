@@ -26,18 +26,21 @@ export async function validateChatCreation(engine: SyncEngine, options: Resolved
         if (!catalog.success) throw new Error(catalog.error ?? 'Pi models unavailable')
         const selected = customModel ? catalog.availableModels?.find(m => `${m.provider || 'unknown'}/${m.modelId}` === customModel) : undefined
         if (customModel && !selected) throw new Error('Selected Pi model is unavailable')
-        if (effort && (!(PI_THINKING_LEVELS as readonly string[]).includes(effort)
-            || selected?.thinkingLevelMap?.[effort] === null
-            || (['xhigh', 'max'].includes(effort) && selected?.thinkingLevelMap?.[effort] == null))) throw new Error('Thinking level is unsupported by this Pi model')
+        if (
+            effort &&
+            (!(PI_THINKING_LEVELS as readonly string[]).includes(effort) ||
+                selected?.thinkingLevelMap?.[effort] === null ||
+                (['xhigh', 'max'].includes(effort) && selected?.thinkingLevelMap?.[effort] == null))
+        )
+            throw new Error('Thinking level is unsupported by this Pi model')
         return
     }
-    if (agent === 'grok' && (customModel || effort || options.permissionMode === 'auto')) {
+    if (agent === 'grok' && (customModel || effort)) {
         const catalog = await engine.listGrokModelsForCwd(machineId, directory)
         if (!catalog.success) throw new Error(catalog.error ?? 'Grok models unavailable')
         const selected = customModel ? catalog.availableModels?.find(m => m.modelId === customModel) : catalog.availableModels?.find(m => m.modelId === catalog.currentModelId)
         if (customModel && !selected) throw new Error('Selected Grok model is unavailable')
         if (effort && !selected?.reasoningEfforts?.some(e => e.value === effort)) throw new Error('Effort is unsupported by this Grok model')
-        if (options.permissionMode === 'auto' && !catalog.autoPermissionModeSupported) throw new Error('Grok Auto permission is unavailable')
         return
     }
     if (agent === 'opencode' && (customModel || modelReasoningEffort)) {

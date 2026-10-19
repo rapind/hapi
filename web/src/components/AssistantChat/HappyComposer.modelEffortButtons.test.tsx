@@ -123,10 +123,8 @@ function renderComposer(agentFlavor: string, overrides: Partial<Parameters<typeo
                 agentFlavor={agentFlavor}
                 model="claude-sonnet-4"
                 effort="high"
-                permissionMode="default"
                 onModelChange={vi.fn()}
                 onEffortChange={vi.fn()}
-                onPermissionModeChange={vi.fn()}
                 availableModelOptions={[{ value: 'claude-sonnet-4', label: 'Sonnet 4' }]}
                 pendingSendIntentRef={runtime.pendingSendIntentRef as { current: ComposerSendIntent }}
                 {...overrides}
@@ -190,16 +188,16 @@ describe('HappyComposer generic model/effort value buttons', () => {
         fireEvent.click(toolbarButton('Sonnet 4'))
         expect(screen.getByText('Model')).toBeTruthy()
         // The model trigger opens all supported settings.
-        expect(screen.getByText('Permission Mode')).toBeTruthy()
+        expect(screen.queryByText('Permission Mode')).not.toBeInTheDocument()
         expect(screen.getByText('Effort')).toBeTruthy()
     })
 
-    it('keeps Model before Permission in the full menu', () => {
+    it('keeps Model before Effort without offering permission controls', () => {
         renderComposer('claude')
         fireEvent.click(toolbarButton('Sonnet 4'))
         const model = screen.getByText('Model')
-        const permission = screen.getByText('Permission Mode')
-        expect(model.compareDocumentPosition(permission) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        const effort = screen.getByText('Effort')
+        expect(model.compareDocumentPosition(effort) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
         expect(screen.getByText('Effort')).toBeTruthy()
     })
 

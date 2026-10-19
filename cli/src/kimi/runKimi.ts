@@ -16,17 +16,20 @@ import { getInvokedCwd } from '@/utils/invokedCwd';
 import { resolveKimiRuntimeConfig } from './utils/config';
 import { registerKimiSessionModelHandlers } from '@/modules/common/handlers/kimiModels';
 
-export async function runKimi(opts: {
-    startedBy?: 'runner' | 'terminal';
-    startingMode?: 'local' | 'remote';
-    permissionMode?: PermissionMode;
-    model?: string;
-    resumeSessionId?: string;
-    existingSessionId?: string;
-    /** Fresh-spawn reserved hub id from `--hapi-session-id` (create/getOrCreate). */
-    reservedSessionId?: string;
-    workingDirectory?: string;
-} = {}): Promise<void> {
+export async function runKimi(
+    opts: {
+        startedBy?: 'runner' | 'terminal';
+        startingMode?: 'local' | 'remote';
+        permissionMode?: PermissionMode;
+        model?: string;
+        resumeSessionId?: string;
+        existingSessionId?: string;
+        /** Fresh-spawn reserved hub id from `--hapi-session-id` (create/getOrCreate). */
+        reservedSessionId?: string;
+        workingDirectory?: string;
+    } = {}
+): Promise<void> {
+    opts = { ...opts, permissionMode: 'yolo' };
     const workingDirectory = opts.workingDirectory ?? getInvokedCwd();
     const startedBy = opts.startedBy ?? 'terminal';
 

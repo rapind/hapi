@@ -369,13 +369,19 @@ export class SharedCodexRoot {
                     logger.debug('[Codex shared] reconnect', error); await new Promise(resolve => setTimeout(resolve, 1_000));
                 }
             }
-        } finally { this.reconnecting = false; this.publishSteering(); this.publishPlan(); }
+        } finally {
+            this.reconnecting = false;
+            this.publishSteering();
+            this.publishPlan();
+        }
     }
     async applySettings(raw: unknown): Promise<{ applied: RuntimeSettings }> {
         const config = SettingsSchema.parse(raw);
-        if (config.permissionMode === 'safe-yolo') throw new Error('safe-yolo is not a native shared permission mode; choose default, read-only, or yolo');
+        if (config.permissionMode !== undefined && config.permissionMode !== 'yolo')
+            throw new Error('HAPI permission mode is fixed to YOLO');
         if (Object.keys(config).length === 0) return { applied: this.settings };
-        if (typeof config.modelReasoningEffort === 'string') config.modelReasoningEffort = parseReasoningEffortValue(config.modelReasoningEffort);
+        if (typeof config.modelReasoningEffort === 'string')
+            config.modelReasoningEffort = parseReasoningEffortValue(config.modelReasoningEffort);
         if (config.modelReasoningEffort === null) {
             // Native public null means "leave effort alone", not reset. Resolve
             // the selected model's real default instead of publishing a false reset.
@@ -413,15 +419,31 @@ export class SharedCodexRoot {
             await this.client.request('thread/settings/update', params);
             // The RPC only acknowledges queueing the settings operation. The
             // native notification, not our submitted candidate, establishes state.
-            await accepted; this.alive(); return { applied: this.settings };
-        } finally { clearTimeout(timer); this.settingsListeners.delete(changed); }
+            await accepted;
+            this.alive();
+            return { applied: this.settings };
+        } finally {
+            clearTimeout(timer);
+            this.settingsListeners.delete(changed);
+        }
     }
     async initialSettings(options: SharedLaunchOptions): Promise<void> {
-        if (options.collaborationMode) await this.applySettings({ collaborationMode: options.collaborationMode });
+        await this.applySettings({
+            permissionMode: 'yolo',
+            ...(options.collaborationMode ? { collaborationMode: options.collaborationMode } : {})
+        });
     }
     private async implementPlan(planId: string): Promise<ImplementCodexPlanResult> {
-        const unavailable = (): ImplementCodexPlanResult => ({ ok: false, code: 'unavailable', error: 'Codex is disconnected or stopping. Reconnect before implementing the plan.' });
-        const stale = (): ImplementCodexPlanResult => ({ ok: false, code: 'stale_plan', error: 'This plan is no longer actionable. Refresh the conversation.' });
+        const unavailable = (): ImplementCodexPlanResult => ({
+            ok: false,
+            code: 'unavailable',
+            error: 'Codex is disconnected or stopping. Reconnect before implementing the plan.'
+        });
+        const stale = (): ImplementCodexPlanResult => ({
+            ok: false,
+            code: 'stale_plan',
+            error: 'This plan is no longer actionable. Refresh the conversation.'
+        });
         const localId = planImplementationMessageId(planId);
         if (this.closed || this.stopping || this.reconnecting || !this.client.isInitialized()) return unavailable();
         try {

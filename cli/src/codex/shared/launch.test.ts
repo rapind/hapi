@@ -4,7 +4,7 @@ import { parseCodexCliOverrides } from '../utils/codexCliOverrides';
 import { resolveCodexPermissionModeConfig } from '../utils/permissionModeConfig';
 
 describe('shared launch configuration', () => {
-    it.each(['default', 'read-only', 'yolo'] as const)('keeps explicit %s authoritative over native permission flags', permissionMode => {
+    it.each([undefined, 'default', 'read-only', 'safe-yolo', 'yolo'] as const)('forces YOLO over saved %s and native permission flags', permissionMode => {
         for (const flags of [
             ['--yolo'], ['--dangerously-bypass-approvals-and-sandbox'], ['--full-auto'],
             ['-sdanger-full-access', '-aon-request'], ['--sandbox=read-only', '--ask-for-approval=untrusted'],
@@ -12,7 +12,7 @@ describe('shared launch configuration', () => {
             ['-c', 'sandbox_mode="danger-full-access"', '-c', 'approval_policy="never"', '-c', 'approvals_reviewer="auto_review"']
         ]) {
             const result = sharedLaunchConfig({ permissionMode, codexArgs: [...flags, '--no-alt-screen', '--', '--yolo'] }, '/tmp');
-            const { approvalPolicy, sandbox } = resolveCodexPermissionModeConfig(permissionMode);
+            const { approvalPolicy, sandbox } = resolveCodexPermissionModeConfig('yolo');
             expect(result.threadParams).toMatchObject({ approvalPolicy, sandbox, approvalsReviewer: 'user' });
             expect(parseCodexCliOverrides(result.tuiArgs)).toEqual({});
             expect(result.tuiArgs).toEqual(['--no-alt-screen', '--', '--yolo']);
@@ -43,13 +43,27 @@ describe('shared launch configuration', () => {
         }
     });
     it('does not interpret flags after -- as configuration', () => {
-        expect(sharedLaunchConfig({ codexArgs: ['--', '--profile=explain'] }, '/tmp').tuiArgs).toEqual(['--', '--profile=explain']);
-        expect(sharedLaunchConfig({ codexArgs: ['--', '-C', 'literal'] }, '/tmp').tuiArgs).toEqual(['--', '-C', 'literal']);
-        expect(() => sharedLaunchConfig({ permissionMode: 'safe-yolo' }, '/tmp')).toThrow('not a native shared');
+        expect(sharedLaunchConfig({ codexArgs: ['--', '--profile=explain'] }, '/tmp').tuiArgs).toEqual([
+            '--',
+            '--profile=explain'
+        ]);
+        expect(sharedLaunchConfig({ codexArgs: ['--', '-C', 'literal'] }, '/tmp').tuiArgs).toEqual([
+            '--',
+            '-C',
+            'literal'
+        ]);
     });
-    it('preserves launch-time provider and automatic-review policy', () => {
-        const result = sharedLaunchConfig({ codexArgs: ['--oss', '--local-provider', 'ollama', '--approve-for-me'] }, '/tmp');
-        expect(result.threadParams).toMatchObject({ modelProvider: 'ollama', approvalsReviewer: 'auto_review', sandbox: 'workspace-write' });
+    it('preserves the launch-time provider while forcing YOLO', () => {
+        const result = sharedLaunchConfig(
+            { codexArgs: ['--oss', '--local-provider', 'ollama', '--approve-for-me'] },
+            '/tmp'
+        );
+        expect(result.threadParams).toMatchObject({
+            modelProvider: 'ollama',
+            approvalPolicy: 'never',
+            approvalsReviewer: 'user',
+            sandbox: 'danger-full-access'
+        });
     });
 });
 

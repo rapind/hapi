@@ -38,6 +38,7 @@ export async function runCursor(opts: {
     reservedSessionId?: string;
     workingDirectory?: string;
 }): Promise<void> {
+    opts = { ...opts, permissionMode: 'yolo' };
     const workingDirectory = opts.workingDirectory ?? getInvokedCwd();
     const startedBy = opts.startedBy ?? 'terminal';
 

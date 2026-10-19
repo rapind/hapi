@@ -10,18 +10,18 @@ agent's integration; their supported syntax varies by agent.
 
 ## Support matrix
 
-| Agent | Command | Integration | Local | Remote | Permission modes | Resume |
+| Agent | Command | Integration | Local | Remote | Permission policy | Resume |
 |-------|---------|-------------|:-----:|:------:|------------------|:------:|
-| Claude Code | `hapi claude` | Terminal wrapper (local) + Claude Agent SDK (remote) | ✓ | ✓ | `default` `acceptEdits` `auto` `bypassPermissions` `plan` | ✓ |
-| Codex | `hapi codex` | Native terminal + `codex app-server` (Codex 0.154.0+) | ✓ | ✓ | `default` `read-only` `yolo` (+ `plan` collaboration mode) | ✓ |
-| Cursor Agent | `hapi cursor` | ACP (`agent acp`); legacy stream-json resume | ✓ | ✓ | `default` `plan` `ask` `debug` `autoReview` `yolo` | ✓ |
-| Grok Build | `hapi grok` | ACP (`grok agent stdio`) | ✓ | ✓ | `default` `auto` `plan` `bypassPermissions` | ✓ |
-| GitHub Copilot | `hapi copilot` | ACP (`copilot --acp --stdio`) | ✓ | ✓ | `default` `read-only` `safe-yolo` `yolo` | ✓ |
-| Kimi | `hapi kimi` | ACP (`kimi acp`) | ✓ | ✓ | `default` `read-only` `safe-yolo` `yolo` | ✓ |
-| OpenCode | `hapi opencode` | ACP (`opencode acp`) | ✓ | ✓ | `default` `plan` `yolo` | ✓ |
-| DeepSeek Harness | `hapi dsh` | ACP (`dsh-acp-demo` or configured server) | — | ✓ | Managed by DSH ACP composition | — |
-| Antigravity (agy) | `hapi agy` | Headless print mode (per-turn `agy -p` + NDJSON) | — | ✓ | `request-review` `always-proceed` | ✓ |
-| Pi | `hapi pi` | `pi --mode rpc` (JSON-line RPC over stdio) | — | ✓ | none (always auto-approve) | ✓ |
+| Claude Code | `hapi claude` | Terminal wrapper (local) + Claude Agent SDK (remote) | ✓ | ✓ | YOLO | ✓ |
+| Codex | `hapi codex` | Native terminal + `codex app-server` (Codex 0.154.0+) | ✓ | ✓ | YOLO | ✓ |
+| Cursor Agent | `hapi cursor` | ACP (`agent acp`); legacy stream-json resume | ✓ | ✓ | YOLO | ✓ |
+| Grok Build | `hapi grok` | ACP (`grok agent stdio`) | ✓ | ✓ | YOLO | ✓ |
+| GitHub Copilot | `hapi copilot` | ACP (`copilot --acp --stdio`) | ✓ | ✓ | YOLO | ✓ |
+| Kimi | `hapi kimi` | ACP (`kimi acp`) | ✓ | ✓ | YOLO | ✓ |
+| OpenCode | `hapi opencode` | ACP (`opencode acp`) | ✓ | ✓ | YOLO | ✓ |
+| DeepSeek Harness | `hapi dsh` | ACP (`dsh-acp-demo` or configured server) | — | ✓ | Always auto-approve | — |
+| Antigravity (agy) | `hapi agy` | Headless print mode (per-turn `agy -p` + NDJSON) | — | ✓ | YOLO | ✓ |
+| Pi | `hapi pi` | `pi --mode rpc` (JSON-line RPC over stdio) | — | ✓ | Always auto-approve | ✓ |
 | Gemini CLI | — | **Removed** — Google sunset the consumer Gemini CLI (2026-06-18) | — | — | — | — |
 
 Gemini is no longer launchable: `hapi gemini` is kept as a tombstone command that prints a clear error, and existing Gemini sessions remain viewable in the web UI but cannot be resumed.
@@ -32,90 +32,9 @@ Gemini is no longer launchable: `hapi gemini` is kept as a tombstone command tha
 
 Most remote integrations speak the [Agent Client Protocol](https://agentclientprotocol.com) (ACP) over stdio through a shared HAPI backend. ACP gives remote sessions bidirectional permission approval, plan/todo updates, question UI, model catalogs, and session resume via `session/load`. Cursor, Grok, Copilot, Kimi, OpenCode, and DeepSeek Harness remote sessions all run over ACP. DSH's official ACP server is intentionally automation-only and currently supports fresh sessions, committed assistant output, cancellation, and one-shot permissions; it does not provide native resume, model switching, MCP injection, or live tool/reasoning telemetry.
 
-### Permission modes
+### Permissions
 
-Permission modes are per-agent — each flavor exposes its own set (see the matrix above). Set the mode at launch with `--permission-mode <mode>` or a shortcut flag (`--yolo`, `--plan`, `--auto-review`, depending on the agent), and switch it mid-session from the web UI. Semantics vary per agent; see the per-agent sections below.
-
-### Local and remote mode
-
-Work **locally** in the terminal or **remotely** from web/phone, keeping the same conversation when you hand off. The support matrix shows which interfaces each agent offers; DSH, Pi, and Antigravity accept input only through HAPI's remote interface.
-
-- **Remote → local:** continue in the terminal. If it shows the remote-control screen, press double-space to return to local input.
-- **Local → remote:** send a message from the web UI or phone; HAPI handles the handoff.
-
-See [Seamless Handoff](./how-it-works.md#seamless-handoff) for details.
-
-### Resuming sessions
-
-```bash
-hapi resume                # Interactive picker of resumable sessions on this machine
-hapi resume <session-id>   # Resume a specific HAPI session
-```
-
-`hapi resume` reopens the conversation on this machine, including active sessions you were using from your phone. Gemini and fresh-session-only DSH cannot be resumed. Pi and Antigravity resume with input still controlled from HAPI rather than the terminal.
-
-### Mathematical formulas in HAPI Markdown
-
-HAPI renders LaTeX-style mathematics through KaTeX. When generating or revising Markdown intended for display in HAPI, follow these rules exactly:
-
-- Use `\( ... \)` for inline mathematics.
-- Use `\[ ... \]` for standalone display mathematics.
-- Do not use single-dollar delimiters such as `$x^2$`. Single-dollar math is disabled to prevent currency values such as `$200` from being misinterpreted as formulas.
-- `$$ ... $$` remains supported for compatibility, but `\[ ... \]` is preferred for display mathematics.
-- Do not put formulas inside inline code, fenced code blocks, or other code content.
-- Use only LaTeX commands supported by KaTeX. TikZ is not supported.
-- Do not use bare `[ ... ]` as math delimiters.
-
-Before sending a response, check every mathematical expression for the correct delimiters. Rewrite any mathematical `$...$` expression as `\(...\)` or `\[...\]`; preserve ordinary currency text such as `$200` as plain text.
-
-## Cursor Agent
-
-HAPI supports [Cursor Agent CLI](https://cursor.com/docs/cli/using) for running Cursor's AI coding agent with remote control via web and phone.
-
-When Cursor resumes mid-idle (for example after a Shell `notify_on_output` wake) and emits ACP activity, HAPI bumps session thinking over the normal `session-alive` keepalive so the list does not stay stuck idle. See [FAQ](./faq.md#why-did-my-session-look-idle-when-the-agent-woke-itself).
-
-### Prerequisites
-
-Install Cursor Agent CLI:
-
-- **macOS/Linux:** `curl https://cursor.com/install -fsS | bash`
-- **Windows:** `irm 'https://cursor.com/install?win32=true' | iex`
-
-Verify installation:
-
-```bash
-agent --version
-```
-
-### Usage
-
-```bash
-hapi cursor                    # Start Cursor Agent session
-hapi cursor resume <chatId>    # Resume a specific chat
-hapi cursor --continue         # Resume the most recent chat
-hapi cursor --plan             # Start in Plan mode (shortcut)
-hapi cursor --mode plan        # Start in Plan mode
-hapi cursor --mode ask         # Start in Ask mode
-hapi cursor --auto-review      # Start with Auto-review (Smart Auto)
-hapi cursor --yolo             # Bypass approval prompts (--force)
-hapi cursor --model <model>    # Specify model
-hapi cursor --cursor-worktree              # Cursor-native worktree (auto-named)
-hapi cursor --cursor-worktree feature-x    # Cursor-native worktree (named)
-hapi cursor --cursor-add-dir ../shared     # Extra workspace root (repeatable)
-```
-
-### Permission modes
-
-| Mode | Description |
-|------|-------------|
-| `default` | Standard agent behavior |
-| `plan` | Plan mode - design approach before coding |
-| `ask` | Ask mode - explore code without edits |
-| `debug` | Debug mode - hypotheses + instrumentation |
-| `autoReview` | Auto-review (Smart Auto) - allowlist/sandbox/classifier instead of full YOLO |
-| `yolo` | Bypass approval prompts |
-
-Set mode via `--plan` / `--mode` / `--permission-mode` / `--auto-review`, or change from the web UI during a session.
+Cursor always launches with YOLO permission mode. HAPI does not offer a permission-mode selector.
 
 ### Cursor-native worktree & multi-root
 

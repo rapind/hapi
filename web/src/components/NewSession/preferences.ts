@@ -1,9 +1,4 @@
-import {
-    CREATABLE_AGENT_FLAVORS,
-    getLaunchPermissionModesForFlavor,
-    resolveHapiYoloPermissionMode,
-    type PermissionMode
-} from '@hapi/protocol'
+import { CREATABLE_AGENT_FLAVORS } from '@hapi/protocol'
 import {
     CLAUDE_EFFORT_OPTIONS,
     CODEX_REASONING_EFFORT_OPTIONS,
@@ -12,10 +7,8 @@ import {
     type CodexReasoningEffort,
     type LaunchEffort
 } from './types'
-import { LEGACY_YOLO_BRIDGE_AGENTS, usesSharedPermissionModeState } from '@/lib/codexFamilyPermissionAgents'
 
 const AGENT_STORAGE_KEY = 'hapi:newSession:agent'
-const YOLO_STORAGE_KEY = 'hapi:newSession:yolo'
 const LAUNCH_SETTINGS_STORAGE_PREFIX = 'hapi:newSession:launchSettings:v1'
 
 export type PreferredLaunchSettings = {
@@ -24,7 +17,6 @@ export type PreferredLaunchSettings = {
     cursorSelectedBase: string
     effort: LaunchEffort
     modelReasoningEffort: CodexReasoningEffort
-    permissionMode?: PermissionMode
 }
 
 // Only launchable flavors are valid defaults; a stale 'gemini' preference
@@ -51,22 +43,6 @@ export function savePreferredAgent(agent: AgentType): void {
     }
 }
 
-export function loadPreferredYoloMode(): boolean {
-    try {
-        return localStorage.getItem(YOLO_STORAGE_KEY) === 'true'
-    } catch {
-        return false
-    }
-}
-
-export function savePreferredYoloMode(enabled: boolean): void {
-    try {
-        localStorage.setItem(YOLO_STORAGE_KEY, enabled ? 'true' : 'false')
-    } catch {
-        // Ignore storage errors
-    }
-}
-
 function launchSettingsStorageKey(machineId: string, agent: AgentType): string {
     return `${LAUNCH_SETTINGS_STORAGE_PREFIX}:${encodeURIComponent(machineId)}:${agent}`
 }
@@ -84,23 +60,16 @@ export function loadPreferredLaunchSettings(
         if (!parsed || typeof parsed !== 'object' || typeof parsed.model !== 'string') {
             return null
         }
-        const permissionMode = typeof parsed.permissionMode === 'string'
-            ? getLaunchPermissionModesForFlavor(agent).includes(parsed.permissionMode as PermissionMode)
-                ? parsed.permissionMode as PermissionMode
-                : 'default'
-            : undefined
         return {
             ...(agent === 'codex' && (parsed.codexPromptMode === 'queue' || parsed.codexPromptMode === 'steer')
-                ? { codexPromptMode: parsed.codexPromptMode } : {}),
+                ? { codexPromptMode: parsed.codexPromptMode }
+                : {}),
             model: parsed.model,
-            cursorSelectedBase: typeof parsed.cursorSelectedBase === 'string'
-                ? parsed.cursorSelectedBase
-                : 'auto',
+            cursorSelectedBase: typeof parsed.cursorSelectedBase === 'string' ? parsed.cursorSelectedBase : 'auto',
             effort: typeof parsed.effort === 'string' ? parsed.effort : 'auto',
             modelReasoningEffort: typeof parsed.modelReasoningEffort === 'string'
                 ? parsed.modelReasoningEffort
                 : 'default',
-            ...(permissionMode ? { permissionMode } : {})
         }
     } catch {
         return null
@@ -132,54 +101,40 @@ function resolvePreferredOptionValue(
 
 export function resolvePreferredLaunchSettings(
     agent: AgentType,
-    preferred: PreferredLaunchSettings | null,
-    legacyYolo = false
+    preferred: PreferredLaunchSettings | null
 ): PreferredLaunchSettings {
     const preferredModel = preferred?.model ?? 'auto'
     const staticModelValues = MODEL_OPTIONS[agent].map((option) => option.value)
     // Kimi's catalog is dynamic (machine discovery); validating a saved alias
     // against the static list would reset it to 'auto'. The settled-catalog
     // effect in NewSession validates it once the real catalog has arrived.
-    const model = staticModelValues.length > 0 && agent !== 'codex' && agent !== 'copilot' && agent !== 'kimi'
-        ? resolvePreferredOptionValue(preferredModel, staticModelValues, 'auto')
-        : preferredModel
-    const effort = agent === 'claude'
-        ? resolvePreferredOptionValue(
-            preferred?.effort ?? 'auto',
-            CLAUDE_EFFORT_OPTIONS.map((option) => option.value),
-            'auto'
-        )
-        : (preferred?.effort ?? 'auto')
-    const modelReasoningEffort = agent === 'opencode'
-        ? resolvePreferredOptionValue(
-            preferred?.modelReasoningEffort ?? 'default',
-            CODEX_REASONING_EFFORT_OPTIONS
-                .filter((option) => option.value !== 'xhigh')
-                .map((option) => option.value),
-            'default'
-        )
-        : (preferred?.modelReasoningEffort ?? 'default')
-    const usesSharedPermissionMode = usesSharedPermissionModeState(agent)
-    const availablePermissionModes = getLaunchPermissionModesForFlavor(agent)
-    const preferredPermissionMode = preferred?.permissionMode
-    // A removed explicit mode falls back to Default, never to a stale YOLO toggle.
-    const legacyYoloBridgeMode = preferredPermissionMode === undefined && legacyYolo && LEGACY_YOLO_BRIDGE_AGENTS.includes(agent)
-        ? resolveHapiYoloPermissionMode(agent)
-        : null
-    const permissionMode = usesSharedPermissionMode
-        ? preferredPermissionMode && availablePermissionModes.includes(preferredPermissionMode)
-            ? preferredPermissionMode
-            : legacyYoloBridgeMode && availablePermissionModes.includes(legacyYoloBridgeMode)
-                ? legacyYoloBridgeMode
-                : 'default'
-        : undefined
-
+    const model =
+        staticModelValues.length > 0 && agent !== 'codex' && agent !== 'copilot' && agent !== 'kimi'
+            ? resolvePreferredOptionValue(preferredModel, staticModelValues, 'auto')
+            : preferredModel
+    const effort =
+        agent === 'claude'
+            ? resolvePreferredOptionValue(
+                  preferred?.effort ?? 'auto',
+                  CLAUDE_EFFORT_OPTIONS.map((option) => option.value),
+                  'auto'
+              )
+            : (preferred?.effort ?? 'auto')
+    const modelReasoningEffort =
+        agent === 'opencode'
+            ? resolvePreferredOptionValue(
+                  preferred?.modelReasoningEffort ?? 'default',
+                  CODEX_REASONING_EFFORT_OPTIONS.filter((option) => option.value !== 'xhigh').map(
+                      (option) => option.value
+                  ),
+                  'default'
+              )
+            : (preferred?.modelReasoningEffort ?? 'default')
     return {
         ...(agent === 'codex' && preferred?.codexPromptMode ? { codexPromptMode: preferred.codexPromptMode } : {}),
         model,
         cursorSelectedBase: preferred?.cursorSelectedBase ?? 'auto',
         effort,
         modelReasoningEffort,
-        ...(permissionMode ? { permissionMode } : {})
     }
 }

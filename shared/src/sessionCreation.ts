@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { SpawnSessionRequestSchema } from './apiTypes'
-import { CREATABLE_AGENT_FLAVORS, getLaunchPermissionModesForFlavor } from './modes'
-import { resolveHapiYoloPermissionMode } from './agentConfig'
+import { CREATABLE_AGENT_FLAVORS } from './modes'
 
 // Null explicitly requests the product/native default; absence inherits.
 export const ChatLaunchSettingsSchema = SpawnSessionRequestSchema.omit({ directory: true, agent: true })
@@ -9,14 +8,13 @@ export const ChatLaunchSettingsSchema = SpawnSessionRequestSchema.omit({ directo
         model: z.string().trim().min(1).nullable().optional(),
         effort: z.string().trim().min(1).nullable().optional(),
         modelReasoningEffort: z.string().trim().min(1).nullable().optional(),
-        permissionMode: SpawnSessionRequestSchema.shape.permissionMode.unwrap().nullable().optional(),
         serviceTier: SpawnSessionRequestSchema.shape.serviceTier.unwrap().nullable().optional(),
         collaborationMode: SpawnSessionRequestSchema.shape.collaborationMode.unwrap().nullable().optional(),
         copilotAgentMode: SpawnSessionRequestSchema.shape.copilotAgentMode.unwrap().nullable().optional(),
         worktreeName: z.string().trim().min(1).nullable().optional(),
-        yolo: z.boolean().nullable().optional(),
         startingMode: SpawnSessionRequestSchema.shape.startingMode.unwrap().nullable().optional()
-    }).strict()
+    })
+    .strip()
 export type ChatLaunchSettings = z.infer<typeof ChatLaunchSettingsSchema>
 export const ChatCreationOverridesSchema = ChatLaunchSettingsSchema.extend({
     machineId: z.string().trim().min(1).optional(),
@@ -54,20 +52,13 @@ export function resolveChatCreation(
     if (!directory?.trim()) throw new Error('A directory is required when no saved directory exists')
     const { machineId: _machine, directory: _directory, agent: _agent, ...explicit } = overrides
     const result: ResolvedChatCreation = {
-        sessionType: 'simple', ...machine?.agents[agent], ...explicit, machineId, directory, agent
+        sessionType: 'simple',
+        ...machine?.agents[agent],
+        ...explicit,
+        machineId,
+        directory,
+        agent
     }
-    // Permission and YOLO are two representations of one decision. An explicit
-    // value must replace the other representation rather than inherit a conflict.
-    if (Object.hasOwn(explicit, 'permissionMode') && !Object.hasOwn(explicit, 'yolo')) result.yolo = false
-    if (Object.hasOwn(explicit, 'yolo') && !Object.hasOwn(explicit, 'permissionMode')
-        && (explicit.yolo === true || result.permissionMode === resolveHapiYoloPermissionMode(agent))) result.permissionMode = null
-    if (result.permissionMode && !getLaunchPermissionModesForFlavor(agent).includes(result.permissionMode)) {
-        throw new Error(`Unsupported permission mode ${result.permissionMode} for ${agent}`)
-    }
-    if (result.yolo && result.permissionMode && result.permissionMode !== resolveHapiYoloPermissionMode(agent)) {
-        throw new Error('yolo and permissionMode conflict')
-    }
-    if (result.yolo && !resolveHapiYoloPermissionMode(agent)) throw new Error(`${agent} manages its own permissions`)
     const only = (field: keyof ChatLaunchSettings, agents: string[]) => {
         if (result[field] !== undefined && result[field] !== null && !agents.includes(agent)) {
             throw new Error(`${field} is unsupported for ${agent}; clear it or choose a supported agent`)

@@ -1,4 +1,3 @@
-import { COPILOT_PERMISSION_MODES } from '@hapi/protocol/modes';
 import type { CopilotAgentMode } from '@hapi/protocol';
 import type { CopilotPermissionMode } from '@hapi/protocol/types';
 import type { SlashCommand } from '@/modules/common/slashCommands';
@@ -6,34 +5,22 @@ import type { SlashCommand } from '@/modules/common/slashCommands';
 export type CopilotSlashResolution =
     | { kind: 'passthrough' }
     | {
-        kind: 'handled';
-        message: string;
-        updates?: {
-            permissionMode?: CopilotPermissionMode;
-            model?: string | null;
-            agentMode?: CopilotAgentMode;
-        };
-    }
+          kind: 'handled';
+          message: string;
+          updates?: {
+              model?: string | null;
+              agentMode?: CopilotAgentMode;
+          };
+      }
     | {
-        kind: 'replace';
-        text: string;
-        message?: string;
-        updates?: {
-            permissionMode?: CopilotPermissionMode;
-            model?: string | null;
-            agentMode?: CopilotAgentMode;
-        };
-    };
-
-function resolveCopilotPermissionMode(rest: string): CopilotPermissionMode | null {
-    const normalized = rest.trim().toLowerCase();
-    if (!normalized) return null;
-    if (normalized === 'default' || normalized === 'off') return 'default';
-    if ((COPILOT_PERMISSION_MODES as readonly string[]).includes(normalized)) {
-        return normalized as CopilotPermissionMode;
-    }
-    return null;
-}
+          kind: 'replace';
+          text: string;
+          message?: string;
+          updates?: {
+              model?: string | null;
+              agentMode?: CopilotAgentMode;
+          };
+      };
 
 function resolveCopilotAgentMode(rest: string): CopilotAgentMode | null {
     const normalized = rest.trim().toLowerCase();
@@ -114,21 +101,7 @@ export function resolveCopilotSlashCommand(
     }
 
     if (command === 'permissions' || command === 'permission') {
-        if (!rest) {
-            return { kind: 'handled', message: `Copilot permission mode: ${state.permissionMode}` };
-        }
-        const permissionMode = resolveCopilotPermissionMode(rest);
-        if (!permissionMode) {
-            return {
-                kind: 'handled',
-                message: `Unknown permission mode \`${rest}\`. Use one of: ${COPILOT_PERMISSION_MODES.join(', ')}`
-            };
-        }
-        return {
-            kind: 'handled',
-            message: `Copilot permission mode set to ${permissionMode}`,
-            updates: { permissionMode }
-        };
+        return { kind: 'handled', message: 'HAPI permissions are fixed to YOLO.' };
     }
 
     if (command === 'plan') {

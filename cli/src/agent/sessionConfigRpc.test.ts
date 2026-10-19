@@ -20,11 +20,14 @@ function createRpcHarness() {
 
 describe('sessionConfigRpc', () => {
     it('rejects permission modes that are not allowed for the agent flavor', () => {
-        expect(() => resolveSessionConfigPermissionMode('bypassPermissions', 'gemini')).toThrow('Invalid permission mode')
+        expect(() => resolveSessionConfigPermissionMode('bypassPermissions', 'gemini')).toThrow(
+            'Invalid permission mode'
+        )
     })
 
-    it('accepts OpenCode plan permission mode', () => {
-        expect(resolveSessionConfigPermissionMode('plan', 'opencode')).toBe('plan')
+    it('rejects mode changes away from fixed YOLO', () => {
+        expect(() => resolveSessionConfigPermissionMode('plan', 'opencode')).toThrow('Invalid permission mode')
+        expect(resolveSessionConfigPermissionMode('yolo', 'opencode')).toBe('yolo')
     })
 
     it('accepts null model for agents that support model config', () => {

@@ -8,6 +8,9 @@ const state = {
 };
 
 describe('resolveCopilotSlashCommand', () => {
+    it.each(["/permissions","/permissions read-only","/permission default","/permissions yolo"])('keeps the fixed policy for %s', command => {
+        expect(resolveCopilotSlashCommand(command, state)).toEqual({ kind: 'handled', message: 'HAPI permissions are fixed to YOLO.' });
+    });
     it('handles /status with agent mode', () => {
         const result = resolveCopilotSlashCommand('/status', {
             ...state,

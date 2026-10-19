@@ -27,15 +27,28 @@ describe('spawn_peer MCP', () => {
             if (String(url).endsWith('/queued-state')) return { status: 200, data: { queuedLocalIds: [], invokedLocalMessages: [{ localId: deliveryId, invokedAt: 1 }] } }
             throw new Error('Unexpected request')
         })
-        const server = await startHappyServer({ sessionId: `${source}-parent`, updateMetadata: vi.fn() } as unknown as ApiSessionClient)
+        const server = await startHappyServer({
+            sessionId: `${source}-parent`,
+            updateMetadata: vi.fn()
+        } as unknown as ApiSessionClient)
         stop = server.stop
         mcp = new Client({ name: source, version: '1' })
         await mcp.connect(new StreamableHTTPClientTransport(new URL(server.url)))
-        const result = await mcp.callTool({ name: 'spawn_peer', arguments: { agent: target, message: 'Review the patch', model: null, yolo: false } })
+        const result = await mcp.callTool({
+            name: 'spawn_peer',
+            arguments: { agent: target, message: 'Review the patch', model: null }
+        })
         expect(result.isError).toBe(false)
         expect(result.content).toEqual([expect.objectContaining({ text: expect.stringContaining('/sessions/child') })])
-        expect(post).toHaveBeenCalledWith(`http://hub.test/api/sessions/${source}-parent/create-peer`, { agent: target, model: null, yolo: false }, expect.anything())
-        const forged = await mcp.callTool({ name: 'spawn_peer', arguments: { message: 'work', parentSessionId: 'forged' } })
+        expect(post).toHaveBeenCalledWith(
+            `http://hub.test/api/sessions/${source}-parent/create-peer`,
+            { agent: target, model: null },
+            expect.anything()
+        )
+        const forged = await mcp.callTool({
+            name: 'spawn_peer',
+            arguments: { message: 'work', parentSessionId: 'forged' }
+        })
         expect(forged.isError).toBe(true)
     })
 })

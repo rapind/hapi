@@ -13,7 +13,6 @@ import type {
     CodexModelSummary,
     CopilotAgentMode,
     DecryptedMessage,
-    PermissionMode,
     Session,
     PiModelSummary,
     SlashCommand
@@ -1115,7 +1114,6 @@ function SessionChatInner(props: SessionChatProps) {
     ), [agentFlavor, cursorModelEffortOptions, props.session.model])
     const {
         abortSession,
-        setPermissionMode,
         setCollaborationMode,
         setCopilotAgentMode,
         setModel,
@@ -1378,44 +1376,36 @@ function SessionChatInner(props: SessionChatProps) {
     // tool_result pair is one card.
     const unseenCount = useUnseenBlockCount(props.viewMode, visibleBlocks)
 
-    const outlineItems = useMemo(
-        () => buildConversationOutline(reconciled.blocks),
-        [reconciled.blocks]
-    )
+    const outlineItems = useMemo(() => buildConversationOutline(reconciled.blocks), [reconciled.blocks])
 
     // Permission mode change handler
-    const handlePermissionModeChange = useCallback(async (mode: PermissionMode) => {
-        try {
-            await setPermissionMode(mode)
-            haptic.notification('success')
-            props.onRefresh()
-        } catch (e) {
-            haptic.notification('error')
-            console.error('Failed to set permission mode:', e)
-        }
-    }, [setPermissionMode, props.onRefresh, haptic])
+    const handleCollaborationModeChange = useCallback(
+        async (mode: CodexCollaborationMode) => {
+            try {
+                await setCollaborationMode(mode)
+                haptic.notification('success')
+                props.onRefresh()
+            } catch (e) {
+                haptic.notification('error')
+                console.error('Failed to set collaboration mode:', e)
+            }
+        },
+        [setCollaborationMode, props.onRefresh, haptic]
+    )
 
-    const handleCollaborationModeChange = useCallback(async (mode: CodexCollaborationMode) => {
-        try {
-            await setCollaborationMode(mode)
-            haptic.notification('success')
-            props.onRefresh()
-        } catch (e) {
-            haptic.notification('error')
-            console.error('Failed to set collaboration mode:', e)
-        }
-    }, [setCollaborationMode, props.onRefresh, haptic])
-
-    const handleCopilotAgentModeChange = useCallback(async (mode: CopilotAgentMode) => {
-        try {
-            await setCopilotAgentMode(mode)
-            haptic.notification('success')
-            props.onRefresh()
-        } catch (e) {
-            haptic.notification('error')
-            console.error('Failed to set Copilot agent mode:', e)
-        }
-    }, [setCopilotAgentMode, props.onRefresh, haptic])
+    const handleCopilotAgentModeChange = useCallback(
+        async (mode: CopilotAgentMode) => {
+            try {
+                await setCopilotAgentMode(mode)
+                haptic.notification('success')
+                props.onRefresh()
+            } catch (e) {
+                haptic.notification('error')
+                console.error('Failed to set Copilot agent mode:', e)
+            }
+        },
+        [setCopilotAgentMode, props.onRefresh, haptic]
+    )
 
     // Model mode change handler
     const handleModelChange = useCallback(async (model: SessionModelSelection) => {
@@ -1893,7 +1883,6 @@ function SessionChatInner(props: SessionChatProps) {
                         sendAcceptance={sendAcceptance}
                         sendSettlement={props.sendSettlement}
                         onSchedule={updatePendingSchedule}
-                        permissionMode={props.session.permissionMode}
                         collaborationMode={codexCollaborationModeSupported ? props.session.collaborationMode : undefined}
                         copilotAgentMode={agentFlavor === 'copilot' ? props.session.copilotAgentMode : undefined}
                         model={props.session.model}
@@ -1902,7 +1891,6 @@ function SessionChatInner(props: SessionChatProps) {
                         modelReasoningEffort={agentFlavor === 'codex' || agentFlavor === 'opencode' ? props.session.modelReasoningEffort : undefined}
                         effort={props.session.effort}
                         agentFlavor={agentFlavor}
-                        concurrentClients={props.session.metadata?.capabilities?.concurrentClients}
                         availableModelOptions={
                             agentFlavor === 'codex'
                                 ? codexModelOptions
@@ -1965,11 +1953,6 @@ function SessionChatInner(props: SessionChatProps) {
                             agentFlavor === 'copilot' && props.session.active && !controlledByUser
                                 ? handleCopilotAgentModeChange
                                 : undefined
-                        }
-                        onPermissionModeChange={
-                            agentFlavor === 'copilot' && controlledByUser
-                                ? undefined
-                                : handlePermissionModeChange
                         }
                         selectedModelBase={
                             agentFlavor === 'cursor' && cursorPicker

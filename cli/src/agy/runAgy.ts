@@ -14,18 +14,21 @@ import { formatMessageWithAttachments } from '@/utils/attachmentFormatter';
 import { getInvokedCwd } from '@/utils/invokedCwd';
 import type { SessionEffort, SessionModel } from '@/api/types';
 
-export async function runAgy(opts: {
-    startedBy?: 'runner' | 'terminal';
-    startingMode?: 'local' | 'remote';
-    permissionMode?: PermissionMode;
-    model?: string;
-    effort?: string;
-    resumeSessionId?: string;
-    existingSessionId?: string;
-    /** Fresh machine-spawn stub (`--hapi-session-id`); adopt via bootstrapSession. */
-    reservedSessionId?: string;
-    workingDirectory?: string;
-} = {}): Promise<void> {
+export async function runAgy(
+    opts: {
+        startedBy?: 'runner' | 'terminal';
+        startingMode?: 'local' | 'remote';
+        permissionMode?: PermissionMode;
+        model?: string;
+        effort?: string;
+        resumeSessionId?: string;
+        existingSessionId?: string;
+        /** Fresh machine-spawn stub (`--hapi-session-id`); adopt via bootstrapSession. */
+        reservedSessionId?: string;
+        workingDirectory?: string;
+    } = {}
+): Promise<void> {
+    opts = { ...opts, permissionMode: 'always-proceed' };
     const workingDirectory = opts.workingDirectory ?? getInvokedCwd();
     const startedBy = opts.startedBy ?? 'terminal';
 

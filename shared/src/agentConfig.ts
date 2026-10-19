@@ -39,52 +39,53 @@ export const AgentConfigDescriptorSchema = z.object({
 export type AgentConfigDescriptor = z.infer<typeof AgentConfigDescriptorSchema>
 
 const MODEL: AgentConfigFieldDescriptor = {
-    id: 'model', section: 'model', kind: 'select', optionSource: 'static', availability: 'both'
+    id: 'model',
+    section: 'model',
+    kind: 'select',
+    optionSource: 'static',
+    availability: 'both'
 }
-const PERMISSION: AgentConfigFieldDescriptor = {
-    id: 'permission', section: 'permission', kind: 'select', optionSource: 'static', availability: 'both'
-}
-const MANAGED_PERMISSION: AgentConfigFieldDescriptor = {
-    id: 'permission',
-    section: 'permission',
-    kind: 'status',
-    availability: 'managed',
-    unavailableReason: 'Managed by agent'
-}
-
 function fields(...fields: AgentConfigFieldDescriptor[]): AgentConfigFieldDescriptor[] {
     return fields
 }
 
 const BUILTIN_DESCRIPTORS: Record<AgentFlavor, AgentConfigFieldDescriptor[]> = {
-    agy: fields({ ...MODEL, optionSource: 'machine' }, PERMISSION),
-    claude: fields(MODEL, { id: 'effort', section: 'effort', kind: 'select', optionSource: 'static', availability: 'both' }, PERMISSION),
+    agy: fields({ ...MODEL, optionSource: 'machine' }),
+    claude: fields(MODEL, {
+        id: 'effort',
+        section: 'effort',
+        kind: 'select',
+        optionSource: 'static',
+        availability: 'both'
+    }),
     codex: fields(
         { ...MODEL, optionSource: 'machine' },
         { id: 'effort', section: 'effort', kind: 'select', optionSource: 'model', availability: 'both' },
-        PERMISSION,
         { id: 'serviceTier', section: 'settings', kind: 'select', optionSource: 'model', availability: 'both' },
         { id: 'collaborationMode', section: 'settings', kind: 'select', optionSource: 'static', availability: 'both' }
     ),
-    dsh: fields(MANAGED_PERMISSION),
-    copilot: fields({ ...MODEL, optionSource: 'directory' }, PERMISSION),
-    cursor: fields({ id: 'model', section: 'model', kind: 'dependent-select', optionSource: 'machine', availability: 'both' }, PERMISSION),
-    gemini: fields(MODEL, PERMISSION),
+    dsh: fields(),
+    copilot: fields({ ...MODEL, optionSource: 'directory' }),
+    cursor: fields({
+        id: 'model',
+        section: 'model',
+        kind: 'dependent-select',
+        optionSource: 'machine',
+        availability: 'both'
+    }),
+    gemini: fields(MODEL),
     grok: fields(
         { ...MODEL, optionSource: 'directory' },
         { id: 'effort', section: 'effort', kind: 'select', optionSource: 'model', availability: 'both' },
-        PERMISSION
     ),
-    kimi: fields({ ...MODEL, optionSource: 'directory' }, PERMISSION),
+    kimi: fields({ ...MODEL, optionSource: 'directory' }),
     opencode: fields(
         { ...MODEL, optionSource: 'directory' },
         { id: 'effort', section: 'effort', kind: 'select', optionSource: 'model', availability: 'both' },
-        PERMISSION
     ),
     pi: fields(
         { id: 'model', section: 'model', kind: 'grouped-select', optionSource: 'machine', availability: 'both' },
-        { id: 'effort', section: 'effort', kind: 'select', optionSource: 'static', availability: 'both' },
-        MANAGED_PERMISSION
+        { id: 'effort', section: 'effort', kind: 'select', optionSource: 'static', availability: 'both' }
     )
 }
 
@@ -96,7 +97,7 @@ export function getBuiltinAgentConfigDescriptors(): AgentConfigDescriptor[] {
     return AGENT_FLAVORS.map(getAgentConfigDescriptor)
 }
 
-export function resolveHapiYoloPermissionMode(flavor: AgentFlavor): PermissionMode | null {
+export function resolveHapiYoloPermissionMode(flavor: string): PermissionMode | null {
     switch (flavor) {
         case 'claude':
         case 'grok':
@@ -112,6 +113,7 @@ export function resolveHapiYoloPermissionMode(flavor: AgentFlavor): PermissionMo
             return 'yolo'
         case 'dsh':
         case 'pi':
+        default:
             return null
     }
 }

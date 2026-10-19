@@ -87,7 +87,7 @@ describe('permission mode persistence', () => {
         expect(reloadedSession?.permissionMode).toBe('bypassPermissions')
     })
 
-    it('passes persisted permission mode when resuming after hub restart', async () => {
+    it('resumes after a hub restart without a post-spawn permission mutation', async () => {
         const store = new Store(':memory:')
         const engine = createEngine(store)
 
@@ -122,7 +122,6 @@ describe('permission mode persistence', () => {
         const restartedEngine = simulateHubRestart(store)
         restartedEngine.handleMachineAlive({ machineId: machine.id, time: Date.now() })
 
-        let capturedSpawnPermissionMode: string | undefined
         let configRpcCalls = 0
         ;(restartedEngine as any).rpcGateway.spawnSession = async (
             _machineId: string,
@@ -130,18 +129,15 @@ describe('permission mode persistence', () => {
             _agent: string,
             _model?: string,
             _modelReasoningEffort?: string,
-            _yolo?: boolean,
             _sessionType?: string,
             _worktreeName?: string,
             _resumeSessionId?: string,
             _effort?: string,
-            permissionMode?: string
         ) => {
-            capturedSpawnPermissionMode = permissionMode
             restartedEngine.handleSessionAlive({
                 sid: session.id,
                 time: Date.now(),
-                permissionMode: permissionMode as never
+                permissionMode: 'yolo'
             })
             return { type: 'success', sessionId: session.id }
         }
@@ -154,8 +150,6 @@ describe('permission mode persistence', () => {
         const result = await restartedEngine.resumeSession(session.id, 'default')
 
         expect(result).toEqual({ type: 'success', sessionId: session.id })
-        expect(capturedSpawnPermissionMode).toBe('yolo')
         expect(configRpcCalls).toBe(0)
     })
-
 })

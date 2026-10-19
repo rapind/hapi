@@ -144,22 +144,14 @@ export type MachinesResponse = { machines: Machine[] }
 export type SpawnResponse =
     | { type: 'success'; sessionId: string; preferencesWarning?: string }
     | {
-        type: 'error'
-        message: string
-        sessionId?: string
-        code?: 'agent_unavailable' | 'runner_upgrade_required' | 'outside_workspace_roots'
-        agent?: z.infer<typeof AgentFlavorSchema>
-    }
+          type: 'error'
+          message: string
+          sessionId?: string
+          code?: 'agent_unavailable' | 'runner_upgrade_required' | 'outside_workspace_roots'
+          agent?: z.infer<typeof AgentFlavorSchema>
+      }
 
-export const SessionPermissionModeRequestSchema = z.object({
-    mode: PermissionModeSchema
-})
-
-export type SessionPermissionModeRequest = z.infer<typeof SessionPermissionModeRequestSchema>
-
-export const ResumeSessionRequestSchema = z.object({
-    permissionMode: PermissionModeSchema.optional()
-})
+export const ResumeSessionRequestSchema = z.object({})
 
 export type ResumeSessionRequest = z.infer<typeof ResumeSessionRequestSchema>
 
@@ -648,8 +640,6 @@ export const SpawnSessionRequestSchema = z.object({
     model: z.string().optional(),
     effort: z.string().optional(),
     modelReasoningEffort: z.string().optional(),
-    yolo: z.boolean().optional(),
-    permissionMode: PermissionModeSchema.optional(),
     sessionType: z.enum(['simple', 'worktree']).optional(),
     worktreeName: z.string().optional(),
     serviceTier: z.enum(['fast', 'standard']).optional(),

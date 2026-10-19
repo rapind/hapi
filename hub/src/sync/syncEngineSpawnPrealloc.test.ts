@@ -27,37 +27,32 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
             engine.handleMachineAlive({ machineId: 'machine-prealloc', time: Date.now() })
 
             let forwardedExistingId: string | undefined
-            ;(engine as unknown as { rpcGateway: { spawnSession: unknown } }).rpcGateway.spawnSession =
-                async (
-                    _machineId: string,
-                    _directory: string,
-                    _agent?: string,
-                    _model?: string,
-                    _modelReasoningEffort?: string,
-                    _yolo?: boolean,
-                    _sessionType?: string,
-                    _worktreeName?: string,
-                    _resumeSessionId?: string,
-                    _effort?: string,
-                    _permissionMode?: string,
-                    _serviceTier?: string,
-                    existingSessionId?: string,
-                    _collaborationMode?: string,
-                    _copilotAgentMode?: string,
-                    _startingMode?: string,
-                    _forkSession?: boolean,
-                    reservedSessionId?: string
-                ) => {
-                    forwardedExistingId = reservedSessionId ?? existingSessionId
-                    return { type: 'success' as const, sessionId: forwardedExistingId! }
-                }
+            ;(engine as unknown as { rpcGateway: { spawnSession: unknown } }).rpcGateway.spawnSession = async (
+                _machineId: string,
+                _directory: string,
+                _agent?: string,
+                _model?: string,
+                _modelReasoningEffort?: string,
+                _sessionType?: string,
+                _worktreeName?: string,
+                _resumeSessionId?: string,
+                _effort?: string,
+                _serviceTier?: string,
+                existingSessionId?: string,
+                _collaborationMode?: string,
+                _copilotAgentMode?: string,
+                _startingMode?: string,
+                _forkSession?: boolean,
+                reservedSessionId?: string
+            ) => {
+                forwardedExistingId = reservedSessionId ?? existingSessionId
+                return { type: 'success' as const, sessionId: forwardedExistingId! }
+            }
 
             const result = await engine.spawnSession(
                 'machine-prealloc',
                 '/tmp/project',
                 'claude',
-                undefined,
-                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -107,24 +102,44 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
             engine.handleMachineAlive({ machineId: 'machine-id-mismatch', time: Date.now() })
 
             let reserved: string | undefined
-            ;(engine as unknown as { rpcGateway: { spawnSession: unknown } }).rpcGateway.spawnSession =
-                async (
-                    _m: string, _d: string, _a?: string, _mo?: string, _mr?: string, _y?: boolean,
-                    _st?: string, _wn?: string, _rs?: string, _e?: string, _pm?: string, _svc?: string,
-                    _existing?: string, _cm?: string, _ca?: string, _sm?: string, _fs?: boolean,
-                    reservedSessionId?: string
-                ) => {
-                    reserved = reservedSessionId
-                    return { type: 'success' as const, sessionId: 'totally-different-id' }
-                }
+            ;(engine as unknown as { rpcGateway: { spawnSession: unknown } }).rpcGateway.spawnSession = async (
+                _m: string,
+                _d: string,
+                _a?: string,
+                _mo?: string,
+                _mr?: string,
+                _st?: string,
+                _wn?: string,
+                _rs?: string,
+                _e?: string,
+                _svc?: string,
+                _existing?: string,
+                _cm?: string,
+                _ca?: string,
+                _sm?: string,
+                _fs?: boolean,
+                reservedSessionId?: string
+            ) => {
+                reserved = reservedSessionId
+                return { type: 'success' as const, sessionId: 'totally-different-id' }
+            }
 
             const result = await engine.spawnSession(
                 'machine-id-mismatch',
                 '/tmp/project',
                 'claude',
-                undefined, undefined, undefined, undefined, undefined, undefined,
-                undefined, undefined, undefined, undefined, undefined, undefined,
-                undefined, 'default'
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'default'
             )
 
             expect(result.type).toBe('error')
@@ -156,38 +171,33 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
 
             let forwardedExisting: string | undefined
             let forwardedReserved: string | undefined
-            ;(engine as unknown as { rpcGateway: { spawnSession: unknown } }).rpcGateway.spawnSession =
-                async (
-                    _machineId: string,
-                    _directory: string,
-                    _agent?: string,
-                    _model?: string,
-                    _modelReasoningEffort?: string,
-                    _yolo?: boolean,
-                    _sessionType?: string,
-                    _worktreeName?: string,
-                    _resumeSessionId?: string,
-                    _effort?: string,
-                    _permissionMode?: string,
-                    _serviceTier?: string,
-                    existingSessionId?: string,
-                    _collaborationMode?: string,
-                    _copilotAgentMode?: string,
-                    _startingMode?: string,
-                    _forkSession?: boolean,
-                    reservedSessionId?: string
-                ) => {
-                    forwardedExisting = existingSessionId
-                    forwardedReserved = reservedSessionId
-                    return { type: 'success' as const, sessionId: (reservedSessionId ?? existingSessionId)! }
-                }
+            ;(engine as unknown as { rpcGateway: { spawnSession: unknown } }).rpcGateway.spawnSession = async (
+                _machineId: string,
+                _directory: string,
+                _agent?: string,
+                _model?: string,
+                _modelReasoningEffort?: string,
+                _sessionType?: string,
+                _worktreeName?: string,
+                _resumeSessionId?: string,
+                _effort?: string,
+                _serviceTier?: string,
+                existingSessionId?: string,
+                _collaborationMode?: string,
+                _copilotAgentMode?: string,
+                _startingMode?: string,
+                _forkSession?: boolean,
+                reservedSessionId?: string
+            ) => {
+                forwardedExisting = existingSessionId
+                forwardedReserved = reservedSessionId
+                return { type: 'success' as const, sessionId: (reservedSessionId ?? existingSessionId)! }
+            }
 
             const result = await engine.spawnSession(
                 'machine-codex-prealloc',
                 '/tmp/project',
                 'codex',
-                undefined,
-                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -245,21 +255,18 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
 
             let forwardedExistingId: string | undefined
             let callCount = 0
-            ;(engine as unknown as { rpcGateway: { spawnSession: unknown } }).rpcGateway.spawnSession =
-                async (
-                    ...args: unknown[]
-                ) => {
-                    callCount++
-                    forwardedExistingId = (args[17] ?? args[12]) as string | undefined
-                    return { type: 'success' as const, sessionId: forwardedExistingId! }
-                }
+            ;(engine as unknown as { rpcGateway: { spawnSession: unknown } }).rpcGateway.spawnSession = async (
+                ...args: unknown[]
+            ) => {
+                callCount++
+                forwardedExistingId = (args[15] ?? args[10]) as string | undefined
+                return { type: 'success' as const, sessionId: forwardedExistingId! }
+            }
 
             const result = await engine.spawnSession(
                 'machine-reuse',
                 '/tmp/project',
                 'opencode',
-                undefined,
-                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -303,15 +310,14 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
 
             let forwardedExistingId: string | undefined
             let stopCalls = 0
-            ;(engine as unknown as { rpcGateway: { spawnSession: unknown; stopRunnerSession: unknown } })
-                .rpcGateway.spawnSession = async (
-                    ...args: unknown[]
-                ) => {
-                    forwardedExistingId = (args[17] ?? args[12]) as string | undefined
-                    return { type: 'error' as const, message: 'spawn blew up' }
-                }
-            ;(engine as unknown as { rpcGateway: { stopRunnerSession: unknown } })
-                .rpcGateway.stopRunnerSession = async () => {
+            ;(
+                engine as unknown as { rpcGateway: { spawnSession: unknown; stopRunnerSession: unknown } }
+            ).rpcGateway.spawnSession = async (...args: unknown[]) => {
+                forwardedExistingId = (args[15] ?? args[10]) as string | undefined
+                return { type: 'error' as const, message: 'spawn blew up' }
+            }
+            ;(engine as unknown as { rpcGateway: { stopRunnerSession: unknown } }).rpcGateway.stopRunnerSession =
+                async () => {
                     stopCalls++
                     return 'already_gone'
                 }
@@ -320,8 +326,6 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
                 'machine-fail',
                 '/tmp/project',
                 'claude',
-                undefined,
-                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -364,15 +368,14 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
 
             let forwardedExistingId: string | undefined
             let stopCalls = 0
-            ;(engine as unknown as { rpcGateway: { spawnSession: unknown; stopRunnerSession: unknown } })
-                .rpcGateway.spawnSession = async (
-                    ...args: unknown[]
-                ) => {
-                    forwardedExistingId = (args[17] ?? args[12]) as string | undefined
-                    return { type: 'error' as const, message: 'webhook timeout' }
-                }
-            ;(engine as unknown as { rpcGateway: { stopRunnerSession: unknown } })
-                .rpcGateway.stopRunnerSession = async () => {
+            ;(
+                engine as unknown as { rpcGateway: { spawnSession: unknown; stopRunnerSession: unknown } }
+            ).rpcGateway.spawnSession = async (...args: unknown[]) => {
+                forwardedExistingId = (args[15] ?? args[10]) as string | undefined
+                return { type: 'error' as const, message: 'webhook timeout' }
+            }
+            ;(engine as unknown as { rpcGateway: { stopRunnerSession: unknown } }).rpcGateway.stopRunnerSession =
+                async () => {
                     stopCalls++
                     return 'still_alive'
                 }
@@ -381,8 +384,6 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
                 'machine-fail-alive',
                 '/tmp/project',
                 'claude',
-                undefined,
-                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -430,7 +431,7 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
                 .rpcGateway.spawnSession = async (
                     ...args: unknown[]
                 ) => {
-                    forwardedExistingId = (args[17] ?? args[12]) as string | undefined
+                    forwardedExistingId = (args[15] ?? args[10]) as string | undefined
                     return {
                         type: 'error' as const,
                         message: 'claude is not installed',
@@ -448,8 +449,6 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
                 'machine-preexec',
                 '/tmp/project',
                 'claude',
-                undefined,
-                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -494,7 +493,7 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
                 .rpcGateway.spawnSession = async (
                     ...args: unknown[]
                 ) => {
-                    forwardedExistingId = (args[17] ?? args[12]) as string | undefined
+                    forwardedExistingId = (args[15] ?? args[10]) as string | undefined
                     return {
                         type: 'error' as const,
                         message: 'Directory creation requires approval: /tmp/new-project',
@@ -506,8 +505,6 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
                 'machine-dir-approve',
                 '/tmp/new-project',
                 'claude',
-                undefined,
-                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -551,7 +548,7 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
             let allocatedId: string | undefined
             ;(engine as unknown as { rpcGateway: { spawnSession: unknown } }).rpcGateway.spawnSession =
                 async (...args: unknown[]) => {
-                    allocatedId = (args[17] ?? args[12]) as string | undefined
+                    allocatedId = (args[15] ?? args[10]) as string | undefined
                     // Simulate CLI create/adopt before webhook success
                     const cliTag = crypto.randomUUID()
                     const adopted = engine.adoptPreallocatedSession(
@@ -581,8 +578,6 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
                 'machine-adopt',
                 '/tmp/project',
                 'claude',
-                undefined,
-                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -630,7 +625,7 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
             let stopCalls = 0
             ;(engine as unknown as { rpcGateway: { spawnSession: unknown; stopRunnerSession: unknown } })
                 .rpcGateway.spawnSession = async (...args: unknown[]) => {
-                    forwardedExistingId = (args[17] ?? args[12]) as string | undefined
+                    forwardedExistingId = (args[15] ?? args[10]) as string | undefined
                     // Same shape as rpcGateway catch/timeout: error, childStarted unset.
                     return {
                         type: 'error' as const,
@@ -647,8 +642,6 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
                 'machine-ambiguous',
                 '/tmp/project',
                 'cursor',
-                undefined,
-                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -693,7 +686,7 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
             let allocatedId: string | undefined
             ;(engine as unknown as { rpcGateway: { spawnSession: unknown; stopRunnerSession: unknown } })
                 .rpcGateway.spawnSession = async (...args: unknown[]) => {
-                    allocatedId = (args[17] ?? args[12]) as string | undefined
+                    allocatedId = (args[15] ?? args[10]) as string | undefined
                     // Simulate cursor/codex reopen path: metadata update releases stub tag.
                     const row = store.sessions.getSession(allocatedId!)
                     expect(row?.tag).toMatch(/^machine-spawn:/)
@@ -722,8 +715,6 @@ describe('SyncEngine.spawnSession preallocates HAPI id for fresh machine spawns'
                 'machine-live-protect',
                 '/tmp/project',
                 'cursor',
-                undefined,
-                undefined,
                 undefined,
                 undefined,
                 undefined,

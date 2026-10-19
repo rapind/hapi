@@ -123,7 +123,7 @@ async function runCodexResumeScenario(
     const before = store.sessions.getSession(session.id)!
     const capturedResumeSessionIds: Array<string | undefined> = []
     ;(engine as any).rpcGateway.spawnSession = async (...args: Parameters<SyncEngine['spawnSession']>) => {
-        capturedResumeSessionIds.push(args[8])
+        capturedResumeSessionIds.push(args[7])
         return { type: 'success', sessionId: session.id }
     }
     ;(engine as any).waitForSessionActive = async () => true
@@ -582,12 +582,10 @@ describe('session model', () => {
                 agent: string,
                 model?: string,
                 _modelReasoningEffort?: string,
-                _yolo?: boolean,
                 _sessionType?: string,
                 _worktreeName?: string,
                 _resumeSessionId?: string,
                 _effort?: string,
-                _permissionMode?: string,
                 _serviceTier?: string,
                 existingSessionId?: string,
                 _collaborationMode?: string,
@@ -608,8 +606,6 @@ describe('session model', () => {
                 '/tmp/project',
                 'cursor',
                 'composer-2.5[fast=false]',
-                undefined,
-                undefined,
                 undefined,
                 undefined,
                 undefined,
@@ -1315,7 +1311,6 @@ describe('session model', () => {
                 _agent: string,
                 model?: string,
                 modelReasoningEffort?: string,
-                _yolo?: boolean,
                 _sessionType?: string,
                 _worktreeName?: string,
                 _resumeSessionId?: string,
@@ -1484,7 +1479,6 @@ describe('session model', () => {
                 _agent: string,
                 _model?: string,
                 _modelReasoningEffort?: string,
-                _yolo?: boolean,
                 _sessionType?: 'simple' | 'worktree',
                 _worktreeName?: string,
                 resumeSessionId?: string
@@ -1550,7 +1544,6 @@ describe('session model', () => {
                 _agent: string,
                 _model?: string,
                 _modelReasoningEffort?: string,
-                _yolo?: boolean,
                 _sessionType?: 'simple' | 'worktree',
                 _worktreeName?: string,
                 resumeSessionId?: string
@@ -1630,7 +1623,6 @@ describe('session model', () => {
                 _agent: string,
                 _model?: string,
                 _modelReasoningEffort?: string,
-                _yolo?: boolean,
                 _sessionType?: 'simple' | 'worktree',
                 _worktreeName?: string,
                 resumeSessionId?: string
@@ -1881,74 +1873,9 @@ describe('session model', () => {
         ]).toEqual([[], undefined, outcome.before.metadataVersion, outcome.before.updatedAt])
     })
 
-    it('does not let stale default resume option override persisted Codex yolo', async () => {
-        const store = new Store(':memory:')
-        const engine = new SyncEngine(
-            store,
-            {} as never,
-            new RpcRegistry(),
-            { broadcast() {} } as never
-        )
-
-        try {
-            const session = engine.getOrCreateSession(
-                'session-codex-yolo-resume',
-                {
-                    path: '/tmp/project',
-                    host: 'localhost',
-                    machineId: 'machine-1',
-                    flavor: 'codex',
-                    codexSessionId: 'codex-thread-1',
-                    preferredPermissionMode: 'yolo'
-                },
-                null,
-                'default',
-                'gpt-5'
-            )
-            engine.getOrCreateMachine(
-                'machine-1',
-                { host: 'localhost', platform: 'linux', happyCliVersion: '0.1.0' },
-                null,
-                'default'
-            )
-            engine.handleMachineAlive({ machineId: 'machine-1', time: Date.now() })
-
-            let capturedPermissionMode: string | undefined
-            ;(engine as any).rpcGateway.spawnSession = async (
-                _machineId: string,
-                _directory: string,
-                _agent: string,
-                _model?: string,
-                _modelReasoningEffort?: string,
-                _yolo?: boolean,
-                _sessionType?: string,
-                _worktreeName?: string,
-                _resumeSessionId?: string,
-                _effort?: string,
-                permissionMode?: string
-            ) => {
-                capturedPermissionMode = permissionMode
-                return { type: 'success', sessionId: session.id }
-            }
-            ;(engine as any).waitForSessionActive = async () => true
-
-            const result = await engine.resumeSession(session.id, 'default', { permissionMode: 'default' })
-
-            expect(result).toEqual({ type: 'success', sessionId: session.id })
-            expect(capturedPermissionMode).toBe('yolo')
-        } finally {
-            engine.stop()
-        }
-    })
-
     it('passes stored Copilot agent mode when respawning a resumed Copilot session', async () => {
         const store = new Store(':memory:')
-        const engine = new SyncEngine(
-            store,
-            {} as never,
-            new RpcRegistry(),
-            { broadcast() {} } as never
-        )
+        const engine = new SyncEngine(store, {} as never, new RpcRegistry(), { broadcast() {} } as never)
 
         try {
             const session = engine.getOrCreateSession(
@@ -1980,12 +1907,10 @@ describe('session model', () => {
                 _agent: string,
                 _model?: string,
                 _modelReasoningEffort?: string,
-                _yolo?: boolean,
                 _sessionType?: string,
                 _worktreeName?: string,
                 _resumeSessionId?: string,
                 _effort?: string,
-                _permissionMode?: string,
                 _serviceTier?: string,
                 _existingSessionId?: string,
                 _collaborationMode?: string,
@@ -2043,80 +1968,9 @@ describe('session model', () => {
         }
     })
 
-    it('passes the cached permissionMode when respawning a resumed session', async () => {
-        const store = new Store(':memory:')
-        const engine = new SyncEngine(
-            store,
-            {} as never,
-            new RpcRegistry(),
-            { broadcast() {} } as never
-        )
-
-        try {
-            const session = engine.getOrCreateSession(
-                'session-permission-resume',
-                {
-                    path: '/tmp/project',
-                    host: 'localhost',
-                    machineId: 'machine-1',
-                    flavor: 'claude',
-                    claudeSessionId: 'claude-session-perm'
-                },
-                null,
-                'default',
-                'sonnet'
-            )
-            engine.getOrCreateMachine(
-                'machine-1',
-                { host: 'localhost', platform: 'linux', happyCliVersion: '0.1.0' },
-                null,
-                'default'
-            )
-            engine.handleMachineAlive({ machineId: 'machine-1', time: Date.now() })
-
-            engine.handleSessionAlive({
-                sid: session.id,
-                permissionMode: 'bypassPermissions',
-                time: Date.now()
-            })
-            engine.handleSessionEnd({ sid: session.id, time: Date.now() })
-
-            let capturedPermissionMode: string | undefined
-            ;(engine as any).rpcGateway.spawnSession = async (
-                _machineId: string,
-                _directory: string,
-                _agent: string,
-                _model?: string,
-                _modelReasoningEffort?: string,
-                _yolo?: boolean,
-                _sessionType?: string,
-                _worktreeName?: string,
-                _resumeSessionId?: string,
-                _effort?: string,
-                permissionMode?: string
-            ) => {
-                capturedPermissionMode = permissionMode
-                return { type: 'success', sessionId: session.id }
-            }
-            ;(engine as any).waitForSessionActive = async () => true
-
-            const result = await engine.resumeSession(session.id, 'default')
-
-            expect(result).toEqual({ type: 'success', sessionId: session.id })
-            expect(capturedPermissionMode).toBe('bypassPermissions')
-        } finally {
-            engine.stop()
-        }
-    })
-
     it('resume succeeds when session-alive races ahead of set-session-config and merges spawned session', async () => {
         const store = new Store(':memory:')
-        const engine = new SyncEngine(
-            store,
-            {} as never,
-            new RpcRegistry(),
-            { broadcast() {} } as never
-        )
+        const engine = new SyncEngine(store, {} as never, new RpcRegistry(), { broadcast() {} } as never)
 
         try {
             const oldSession = engine.getOrCreateSession(
@@ -2174,17 +2028,15 @@ describe('session model', () => {
                 _agent: string,
                 _model?: string,
                 _modelReasoningEffort?: string,
-                _yolo?: boolean,
                 _sessionType?: string,
                 _worktreeName?: string,
                 _resumeSessionId?: string,
                 _effort?: string,
-                permissionMode?: string
             ) => {
                 engine.handleSessionAlive({
                     sid: spawnedSessionId,
                     time: Date.now(),
-                    permissionMode: permissionMode as never
+                    permissionMode: 'yolo'
                 })
                 return { type: 'success', sessionId: spawnedSessionId }
             }
@@ -2254,12 +2106,10 @@ describe('session model', () => {
                 _agent: string,
                 _model?: string,
                 _modelReasoningEffort?: string,
-                _yolo?: boolean,
                 _sessionType?: string,
                 _worktreeName?: string,
                 _resumeSessionId?: string,
                 _effort?: string,
-                _permissionMode?: string,
                 _serviceTier?: string,
                 existingSessionId?: string
             ) => {
@@ -2332,12 +2182,10 @@ describe('session model', () => {
                 _agent: string,
                 _model?: string,
                 _modelReasoningEffort?: string,
-                _yolo?: boolean,
                 _sessionType?: string,
                 _worktreeName?: string,
                 _resumeSessionId?: string,
                 _effort?: string,
-                _permissionMode?: string,
                 _serviceTier?: string,
                 existingSessionId?: string
             ) => {
@@ -2372,9 +2220,11 @@ describe('session model', () => {
             engine.handleSessionEnd({ sid: session.id, time: Date.now() })
             let existing: string | undefined
             let merges = 0
-            ;(engine as any).sessionCache.mergeSessions = async () => { merges += 1 }
+            ;(engine as any).sessionCache.mergeSessions = async () => {
+                merges += 1
+            }
             ;(engine as any).rpcGateway.spawnSession = async (...args: Parameters<SyncEngine['spawnSession']>) => {
-                existing = args[12]
+                existing = args[10]
                 engine.handleSessionAlive({ sid: session.id, time: Date.now() })
                 engine.handleSessionReady({ sid: session.id, time: Date.now() })
                 return { type: 'success', sessionId: session.id }
@@ -3615,7 +3465,6 @@ describe('session model', () => {
                 _agent: string,
                 _model?: string,
                 _modelReasoningEffort?: string,
-                _yolo?: boolean,
                 _sessionType?: string,
                 _worktreeName?: string,
                 resumeSessionId?: string

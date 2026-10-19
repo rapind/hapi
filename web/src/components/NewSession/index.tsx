@@ -1,8 +1,16 @@
 import { useSharedCreationPreferences } from './sharedPreferences'
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import {
+    useCallback,
+    useDeferredValue,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type KeyboardEvent as ReactKeyboardEvent
+} from 'react'
 import type { ApiClient } from '@/api/client'
 import type { CodexDuplicateSessionGroup, CodexLocalSessionSummary, Machine, PiLocalSessionSummary } from '@/types/api'
-import type { CodexCollaborationMode, GrokPermissionMode, PermissionMode, CopilotAgentMode } from '@hapi/protocol'
+import type { CodexCollaborationMode, CopilotAgentMode } from '@hapi/protocol'
 import { codexModelAdvertisesFastTier } from '@/components/AssistantChat/codexFastMode'
 import { usePlatform } from '@/hooks/usePlatform'
 import { useMachinePathsExists } from '@/hooks/useMachinePathsExists'
@@ -66,15 +74,11 @@ import { isThinkingLevelSupported } from '@/components/AssistantChat/piThinkingL
 import {
     loadPreferredAgent,
     loadPreferredLaunchSettings,
-    loadPreferredYoloMode,
     resolvePreferredLaunchSettings,
     savePreferredAgent,
     savePreferredLaunchSettings,
-    savePreferredYoloMode,
 } from './preferences'
 import { SessionTypeSelector } from './SessionTypeSelector'
-import { PermissionField } from './PermissionField'
-import { usesNativePermissionSelect, usesSharedPermissionModeState } from '@/lib/codexFamilyPermissionAgents'
 import { CodexSessionSyncDialog } from '@/components/CodexSessionSyncDialog'
 import { PiSessionImportDialog } from '@/components/PiSessionImportDialog'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -109,14 +113,6 @@ export function NewSession(props: {
     const [suppressSuggestions, setSuppressSuggestions] = useState(false)
     const [isDirectoryFocused, setIsDirectoryFocused] = useState(false)
     const [agent, setAgent] = useState<AgentType>(loadPreferredAgent)
-    // Snapshot taken once at mount, before any savePreferredAgent() call this
-    // component makes can overwrite the stored agent. savePreferredAgent()
-    // runs on every agent change (below), so reading loadPreferredAgent()
-    // again later would always equal the current agent and make the
-    // legacyYoloAgent === agent gate at the restore effect below vacuous.
-    const [legacyYoloAgent] = useState(
-        () => (loadPreferredYoloMode() ? loadPreferredAgent() : null)
-    )
     const [model, setModel] = useState('auto')
     const [cursorSelectedBase, setCursorSelectedBase] = useState('auto')
     const pendingCursorBaseRef = useRef<string | null>(null)
@@ -127,9 +123,6 @@ export function NewSession(props: {
     const [codexPromptMode, setCodexPromptMode] = useState<'queue' | 'steer'>('queue')
     const [collaborationMode, setCollaborationMode] = useState<CodexCollaborationMode>('default')
     const [copilotAgentMode, setCopilotAgentMode] = useState<CopilotAgentMode>('interactive')
-    const [yoloMode, setYoloMode] = useState(loadPreferredYoloMode)
-    const [nativePermissionMode, setNativePermissionMode] = useState<PermissionMode>('default')
-    const [grokPermissionMode, setGrokPermissionMode] = useState<GrokPermissionMode>('default')
     const [sessionType, setSessionType] = useState<SessionType>('simple')
     const [worktreeName, setWorktreeName] = useState('')
     const [directoryCreationConfirmed, setDirectoryCreationConfirmed] = useState(false)
@@ -198,8 +191,6 @@ export function NewSession(props: {
         }
         setEffort('auto')
         setModelReasoningEffort('default')
-        setGrokPermissionMode('default')
-        setNativePermissionMode('default')
         setServiceTier('standard')
         setCodexPromptMode('queue')
         setCollaborationMode('default')
@@ -222,10 +213,6 @@ export function NewSession(props: {
             setCodexImportError(null)
         }
     }, [agent])
-
-    useEffect(() => {
-        savePreferredYoloMode(yoloMode)
-    }, [yoloMode])
 
     useEffect(() => {
         if (props.initialDirectory !== undefined) {
@@ -266,20 +253,13 @@ export function NewSession(props: {
         setCursorSelectedBase(draft.cursorSelectedBase)
         setEffort(draft.effort)
         setModelReasoningEffort(draft.modelReasoningEffort)
-        setOpencodeSelectedModel(
-            draft.agent === 'opencode' && draft.model !== 'auto' ? draft.model : null
-        )
+        setOpencodeSelectedModel(draft.agent === 'opencode' && draft.model !== 'auto' ? draft.model : null)
         agyModelPickedByUserRef.current = false
-        setAgySelectedModel(
-            draft.agent === 'agy' && draft.model !== 'auto' ? draft.model : null
-        )
+        setAgySelectedModel(draft.agent === 'agy' && draft.model !== 'auto' ? draft.model : null)
         setServiceTier(draft.serviceTier)
         setCodexPromptMode(draft.codexPromptMode ?? 'queue')
         setCollaborationMode(draft.collaborationMode)
         setCopilotAgentMode(draft.copilotAgentMode)
-        setYoloMode(draft.yoloMode)
-        setNativePermissionMode(draft.nativePermissionMode)
-        setGrokPermissionMode(draft.grokPermissionMode)
         setSessionType(draft.sessionType)
         setWorktreeName(draft.worktreeName)
         clearNewSessionFormDraft()
@@ -695,22 +675,9 @@ export function NewSession(props: {
         [grokModelsState.availableModels]
     )
     const grokEffortOptions = useMemo(
-        () => buildGrokEffortOptions(
-            grokModelsState.availableModels,
-            model,
-            grokModelsState.currentModelId
-        ),
+        () => buildGrokEffortOptions(grokModelsState.availableModels, model, grokModelsState.currentModelId),
         [grokModelsState.availableModels, grokModelsState.currentModelId, model]
     )
-    useEffect(() => {
-        if (
-            agent === 'grok'
-            && grokPermissionMode === 'auto'
-            && grokModelsState.autoPermissionModeSupported === false
-        ) {
-            setGrokPermissionMode('default')
-        }
-    }, [agent, grokPermissionMode, grokModelsState.autoPermissionModeSupported])
     const agyModelsState = useAgyModels({
         api: props.api,
         machineId,
@@ -888,9 +855,6 @@ export function NewSession(props: {
         setOpencodeSelectedModel(undefined)
     }, [agent, machineId, deferredDirectory])
 
-    const usesNativeSelect = usesNativePermissionSelect(agent)
-    const usesSharedPermissionMode = usesSharedPermissionModeState(agent)
-
     useEffect(() => {
         if (!machineId || preserveRestoredDraftRef.current) {
             return
@@ -899,20 +863,20 @@ export function NewSession(props: {
         const saved = sharedPreferences.data?.machines[machineId]?.agents[agent]
         const preferred = resolvePreferredLaunchSettings(
             agent,
-            sharedPreferences.data ? {
-                model: saved?.model ?? 'auto', cursorSelectedBase: 'auto',
-                codexPromptMode: saved?.codexPromptMode,
-                effort: saved?.effort ?? 'auto', modelReasoningEffort: saved?.modelReasoningEffort ?? 'default',
-                permissionMode: saved?.permissionMode ?? undefined
-            } : loadPreferredLaunchSettings(machineId, agent),
-            !sharedPreferences.data && legacyYoloAgent === agent
+            sharedPreferences.data
+                ? {
+                      model: saved?.model ?? 'auto',
+                      cursorSelectedBase: 'auto',
+                      codexPromptMode: saved?.codexPromptMode,
+                      effort: saved?.effort ?? 'auto',
+                      modelReasoningEffort: saved?.modelReasoningEffort ?? 'default'
+                  }
+                : loadPreferredLaunchSettings(machineId, agent)
         )
         if (sharedPreferences.data) {
             setServiceTier(saved?.serviceTier ?? 'standard')
             setCollaborationMode(saved?.collaborationMode ?? 'default')
             setCopilotAgentMode(saved?.copilotAgentMode ?? 'interactive')
-            setYoloMode(saved?.yolo ?? false)
-            setGrokPermissionMode(agent === 'grok' ? (saved?.permissionMode as GrokPermissionMode ?? 'default') : 'default')
             setSessionType(saved?.sessionType ?? 'simple')
             setWorktreeName(saved?.worktreeName ?? '')
         }
@@ -922,31 +886,21 @@ export function NewSession(props: {
         setEffort(preferred.effort)
         setCodexPromptMode(preferred.codexPromptMode ?? 'queue')
         setModelReasoningEffort(preferred.modelReasoningEffort)
-        if (usesSharedPermissionMode) {
-            setNativePermissionMode(preferred.permissionMode ?? 'default')
-        }
-        setOpencodeSelectedModel(
-            agent === 'opencode' && preferred.model !== 'auto' ? preferred.model : null
-        )
+        setOpencodeSelectedModel(agent === 'opencode' && preferred.model !== 'auto' ? preferred.model : null)
         agyModelPickedByUserRef.current = false
-        setAgySelectedModel(
-            agent === 'agy' && preferred.model !== 'auto' ? preferred.model : null
-        )
-    }, [agent, legacyYoloAgent, machineId, usesSharedPermissionMode, sharedPreferences.data])
+        setAgySelectedModel(agent === 'agy' && preferred.model !== 'auto' ? preferred.model : null)
+    }, [agent, machineId, sharedPreferences.data])
 
     useEffect(() => {
         if (
-            agent !== 'grok'
-            || deferredDirectoryExists !== true
-            || grokModelsState.isLoading
-            || grokModelsState.error
+            agent !== 'grok' ||
+            deferredDirectoryExists !== true ||
+            grokModelsState.isLoading ||
+            grokModelsState.error
         ) {
             return
         }
-        if (
-            model !== 'auto'
-            && !grokModelsState.availableModels.some((candidate) => candidate.modelId === model)
-        ) {
+        if (model !== 'auto' && !grokModelsState.availableModels.some((candidate) => candidate.modelId === model)) {
             setModel('auto')
         }
         if (
@@ -1470,9 +1424,6 @@ export function NewSession(props: {
             collaborationMode,
             ...(agent === 'codex' ? { codexPromptMode } : {}),
             copilotAgentMode,
-            yoloMode,
-            nativePermissionMode,
-            grokPermissionMode,
             sessionType,
             worktreeName
         })
@@ -1491,9 +1442,6 @@ export function NewSession(props: {
         collaborationMode,
         codexPromptMode,
         copilotAgentMode,
-        yoloMode,
-        nativePermissionMode,
-        grokPermissionMode,
         sessionType,
         worktreeName,
         trimmedDirectory
@@ -1621,22 +1569,19 @@ export function NewSession(props: {
                 : undefined
             const preferredLaunchSettings = {
                 ...(agent === 'codex' ? { codexPromptMode } : {}),
-                model: agent === 'agy'
-                    ? (agySelectedModel ?? 'auto')
-                    : agent === 'opencode'
-                        ? (opencodeSelectedModel ?? 'auto')
-                        : model,
+                model:
+                    agent === 'agy'
+                        ? (agySelectedModel ?? 'auto')
+                        : agent === 'opencode'
+                          ? (opencodeSelectedModel ?? 'auto')
+                          : model,
                 cursorSelectedBase,
                 effort,
                 modelReasoningEffort,
-                ...(usesSharedPermissionMode ? { permissionMode: nativePermissionMode } : {})
             }
-            const resolvedServiceTier = agent === 'codex' && showCodexFastMode
-                ? serviceTier
-                : undefined
-            const resolvedCollaborationMode = agent === 'codex' && collaborationMode !== 'default'
-                ? collaborationMode
-                : undefined
+            const resolvedServiceTier = agent === 'codex' && showCodexFastMode ? serviceTier : undefined
+            const resolvedCollaborationMode =
+                agent === 'codex' && collaborationMode !== 'default' ? collaborationMode : undefined
 
             if (agent === 'codex' && selectedCodexImportSession) {
                 setIsImportingCodexSession(true)
@@ -1648,7 +1593,7 @@ export function NewSession(props: {
                     modelReasoningEffort: resolvedModelReasoningEffort ?? null,
                     serviceTier: resolvedServiceTier,
                     collaborationMode: resolvedCollaborationMode ?? 'default',
-                    yolo: nativePermissionMode === 'yolo'
+                    yolo: true
                 })
                 if (result.success) {
                     const importedSessionId = result.hapiSessionIds?.[0]
@@ -1657,12 +1602,7 @@ export function NewSession(props: {
                     }
                     // 中文注释：Codex transcript 导入只会创建 Hapi 记录，不会自动启动 agent。
                     // 这里立刻 resume，避免进入会话页时先看到离线，等首条消息才触发启动。
-                    const resumedSessionId = await props.api.resumeSession(
-                        importedSessionId,
-                        nativePermissionMode !== 'default'
-                            ? { permissionMode: nativePermissionMode }
-                            : undefined
-                    )
+                    const resumedSessionId = await props.api.resumeSession(importedSessionId)
                     haptic.notification('success')
                     markCodexSessionsImported([selectedCodexImportSession.id])
                     savePreferredLaunchSettings(machineId, agent, preferredLaunchSettings)
@@ -1710,12 +1650,6 @@ export function NewSession(props: {
                 model: resolvedModel,
                 effort: resolvedEffort,
                 modelReasoningEffort: resolvedModelReasoningEffort,
-                yolo: agent === 'dsh' || usesNativeSelect ? undefined : yoloMode,
-                permissionMode: agent === 'grok'
-                    ? grokPermissionMode
-                    : usesSharedPermissionMode
-                        ? nativePermissionMode
-                        : undefined,
                 sessionType,
                 worktreeName: sessionType === 'worktree' ? (worktreeName.trim() || undefined) : undefined,
                 serviceTier: resolvedServiceTier,
@@ -2023,21 +1957,6 @@ export function NewSession(props: {
                     piSelectedModel={agent === 'pi' ? piSelectedModel : null}
                 />
             ) : null}
-            <PermissionField
-                agent={agent}
-                nativeValue={agent === 'grok' ? grokPermissionMode : nativePermissionMode}
-                yoloMode={yoloMode}
-                autoPermissionModeSupported={agent === 'grok' ? grokModelsState.autoPermissionModeSupported : null}
-                isDisabled={isFormDisabled}
-                onNativeChange={(mode) => {
-                    if (agent === 'grok') {
-                        setGrokPermissionMode(mode as GrokPermissionMode)
-                    } else {
-                        setNativePermissionMode(mode)
-                    }
-                }}
-                onYoloToggle={setYoloMode}
-            />
             {!selectedCodexImportSession ? <CodexPromptModeSelector
                 agent={agent}
                 value={codexPromptMode}

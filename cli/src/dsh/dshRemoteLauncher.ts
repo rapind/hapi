@@ -55,11 +55,7 @@ export class DshRemoteLauncher extends RemoteLauncherBase {
         })
         this.session.sessionId = acpSessionId
 
-        this.permissionHandler = new AcpPermissionHandler(
-            this.session.client,
-            backend,
-            () => undefined
-        )
+        this.permissionHandler = new AcpPermissionHandler(this.session.client, backend, () => 'yolo')
         this.setupAbortHandlers(this.session.client.rpcHandlerManager, {
             onAbort: () => this.handleAbort(),
             onSwitch: () => this.handleExitFromUi()

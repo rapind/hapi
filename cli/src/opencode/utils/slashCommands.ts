@@ -1,4 +1,3 @@
-import { OPENCODE_PERMISSION_MODES } from '@hapi/protocol/modes';
 import type { OpencodePermissionMode } from '@hapi/protocol/types';
 import type { SlashCommand } from '@/modules/common/slashCommands';
 
@@ -28,24 +27,22 @@ export type OpencodeSlashResolution =
     // predecessors finish, then asks the hub to spawn a fresh OpenCode one.
     | { kind: 'clear' }
     | {
-        kind: 'handled';
-        message: string;
-        updates?: {
-            permissionMode?: OpencodePermissionMode;
-            model?: string | null;
-            modelReasoningEffort?: string | null;
-        };
-    }
+          kind: 'handled';
+          message: string;
+          updates?: {
+              model?: string | null;
+              modelReasoningEffort?: string | null;
+          };
+      }
     | {
-        kind: 'replace';
-        text: string;
-        message?: string;
-        updates?: {
-            permissionMode?: OpencodePermissionMode;
-            model?: string | null;
-            modelReasoningEffort?: string | null;
-        };
-    };
+          kind: 'replace';
+          text: string;
+          message?: string;
+          updates?: {
+              model?: string | null;
+              modelReasoningEffort?: string | null;
+          };
+      };
 
 export function resolveOpencodeSlashCommand(
     text: string,
@@ -74,36 +71,8 @@ export function resolveOpencodeSlashCommand(
         };
     }
 
-    if (command === 'plan') {
-        const lowerRest = rest.toLowerCase();
-        if (lowerRest === 'off' || lowerRest === 'default' || lowerRest === 'exit' || lowerRest === 'disable') {
-            return {
-                kind: 'handled',
-                message: 'OpenCode plan mode disabled',
-                updates: { permissionMode: 'default' }
-            };
-        }
-        if (rest) {
-            return {
-                kind: 'replace',
-                text: rest,
-                message: 'OpenCode plan mode enabled',
-                updates: { permissionMode: 'plan' }
-            };
-        }
-        return {
-            kind: 'handled',
-            message: 'OpenCode plan mode enabled',
-            updates: { permissionMode: 'plan' }
-        };
-    }
-
-    if (command === 'default') {
-        return {
-            kind: 'handled',
-            message: 'OpenCode permission mode set to default',
-            updates: { permissionMode: 'default' }
-        };
+    if (command === 'plan' || command === 'default') {
+        return { kind: 'handled', message: 'HAPI permissions are fixed to YOLO.' };
     }
 
     if (command === 'status') {
@@ -153,23 +122,7 @@ export function resolveOpencodeSlashCommand(
     }
 
     if (command === 'permissions' || command === 'permission') {
-        if (!rest) {
-            return {
-                kind: 'handled',
-                message: `OpenCode permission mode: ${state.permissionMode}`
-            };
-        }
-        if (!(OPENCODE_PERMISSION_MODES as readonly string[]).includes(rest)) {
-            return {
-                kind: 'handled',
-                message: `Unknown OpenCode permission mode: ${rest}. Supported: ${OPENCODE_PERMISSION_MODES.join(', ')}.`
-            };
-        }
-        return {
-            kind: 'handled',
-            message: `OpenCode permission mode set to ${rest}`,
-            updates: { permissionMode: rest as OpencodePermissionMode }
-        };
+        return { kind: 'handled', message: 'HAPI permissions are fixed to YOLO.' };
     }
 
     if (command === 'compact') {
@@ -199,15 +152,12 @@ export function resolveOpencodeSlashCommand(
                 '',
                 '- `/help` — show this list',
                 '- `/status` — show current OpenCode session config',
-                '- `/plan [prompt]` — enable plan mode, optionally send prompt',
-                '- `/plan off` — return to default permission mode',
-                '- `/default` — return to default permission mode',
                 '- `/init [extra]` — generate or refresh AGENTS.md for this project',
                 '- `/compact` — compact (summarize) the OpenCode session context (remote sessions only)',
                 '- `/clear` — archive this HAPI session and open a fresh OpenCode session',
                 '',
-                'Model, reasoning effort, and permission mode have dedicated buttons in the composer. ' +
-                'You can still type `/model`, `/reasoning`, or `/permissions` if you prefer.',
+                'Model and reasoning effort have dedicated buttons in the composer. ' +
+                    'You can still type `/model` or `/reasoning` if you prefer.',
                 '',
                 'Custom commands from `~/.config/opencode/command` or `.opencode/command` are expanded before sending.'
             ].join('\n')

@@ -1,3 +1,4 @@
+import { resolveHapiYoloPermissionMode } from '@hapi/protocol';
 import fs from 'fs/promises';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import os from 'os';
@@ -28,7 +29,6 @@ import {
     trackedSharedWrapperPidsWithSiblings,
     wrapperHasActiveSiblingRoots,
 } from '@/runner/sharedSessionStop';
-import { PERMISSION_MODES } from '@hapi/protocol/modes';
 import { RUNNER_CAPABILITIES } from '@hapi/protocol';
 import { withRetry } from '@/utils/time';
 import { isRetryableConnectionError } from '@/utils/errorUtils';
@@ -614,7 +614,6 @@ export async function startRunner(options: { workspaceRoots?: string[] } = {}): 
           childStarted: false,
         };
       }
-      const yolo = options.yolo === true;
       const sessionType = options.sessionType ?? 'simple';
       const worktreeName = options.worktreeName;
       let directoryCreated = false;
@@ -787,7 +786,7 @@ export async function startRunner(options: { workspaceRoots?: string[] } = {}): 
           };
         }
 
-        const args = buildCliArgs(agent, options, yolo);
+        const args = buildCliArgs(agent, options);
 
         // sessionId reserved for future use
         const MAX_TAIL_CHARS = 4000;
@@ -1951,33 +1950,32 @@ export async function startRunner(options: { workspaceRoots?: string[] } = {}): 
   }
 }
 
-export function buildCliArgs(
-  agent: string,
-  options: SpawnSessionOptions,
-  yolo?: boolean
-): string[] {
+export function buildCliArgs(agent: string, options: SpawnSessionOptions): string[] {
   if (agent === 'gemini') {
-    throw new Error('Gemini CLI is no longer supported and cannot be launched (Google sunset the consumer Gemini CLI on 2026-06-18).');
+    throw new Error(
+      'Gemini CLI is no longer supported and cannot be launched (Google sunset the consumer Gemini CLI on 2026-06-18).'
+    );
   }
-  const agentCommand = agent === 'codex'
-    ? 'codex'
-    : agent === 'cursor'
-      ? 'cursor'
-      : agent === 'grok'
-        ? 'grok'
-        : agent === 'kimi'
-          ? 'kimi'
-          : agent === 'copilot'
-            ? 'copilot'
-            : agent === 'opencode'
-            ? 'opencode'
-            : agent === 'dsh'
-              ? 'dsh'
-              : agent === 'pi'
-                ? 'pi'
-                : agent === 'agy'
-                  ? 'agy'
-                  : 'claude';
+  const agentCommand =
+    agent === 'codex'
+      ? 'codex'
+      : agent === 'cursor'
+        ? 'cursor'
+        : agent === 'grok'
+          ? 'grok'
+          : agent === 'kimi'
+            ? 'kimi'
+            : agent === 'copilot'
+              ? 'copilot'
+              : agent === 'opencode'
+                ? 'opencode'
+                : agent === 'dsh'
+                  ? 'dsh'
+                  : agent === 'pi'
+                    ? 'pi'
+                    : agent === 'agy'
+                      ? 'agy'
+                      : 'claude';
   const args = [agentCommand];
   if (options.resumeSessionId) {
     if (agent === 'codex') {
@@ -2033,14 +2031,9 @@ export function buildCliArgs(
   if (options.copilotAgentMode && options.copilotAgentMode !== 'interactive' && agent === 'copilot') {
     args.push('--copilot-agent-mode', options.copilotAgentMode);
   }
-  // Pi RPC mode has no permission switching; never pass these flags to it
-  // (the Pi parser rejects --permission-mode and ignores --yolo).
-  if (agent !== 'pi' && agent !== 'dsh') {
-    if (options.permissionMode && (PERMISSION_MODES as readonly string[]).includes(options.permissionMode)) {
-      args.push('--permission-mode', options.permissionMode);
-    } else if (yolo) {
-      args.push('--yolo');
-    }
+  const permissionMode = resolveHapiYoloPermissionMode(agentCommand);
+  if (permissionMode) {
+    args.push('--permission-mode', permissionMode);
   }
   if (agent === 'cursor' && options.sessionType === 'worktree') {
     // Nested Cursor --worktree inside an existing linked git worktree hangs ACP

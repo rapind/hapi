@@ -19,18 +19,21 @@ import { resolveOpencodeSlashCommand } from './utils/slashCommands';
 import { isRetryableConnectionError } from '@/utils/errorUtils';
 import { withRetry } from '@/utils/time';
 
-export async function runOpencode(opts: {
-    startedBy?: 'runner' | 'terminal';
-    startingMode?: 'local' | 'remote';
-    permissionMode?: PermissionMode;
-    model?: string;
-    modelReasoningEffort?: string | null;
-    resumeSessionId?: string;
-    existingSessionId?: string;
-    /** Fresh machine-spawn stub (`--hapi-session-id`); adopt via bootstrapSession. */
-    reservedSessionId?: string;
-    workingDirectory?: string;
-} = {}): Promise<void> {
+export async function runOpencode(
+    opts: {
+        startedBy?: 'runner' | 'terminal';
+        startingMode?: 'local' | 'remote';
+        permissionMode?: PermissionMode;
+        model?: string;
+        modelReasoningEffort?: string | null;
+        resumeSessionId?: string;
+        existingSessionId?: string;
+        /** Fresh machine-spawn stub (`--hapi-session-id`); adopt via bootstrapSession. */
+        reservedSessionId?: string;
+        workingDirectory?: string;
+    } = {}
+): Promise<void> {
+    opts = { ...opts, permissionMode: 'yolo' };
     const workingDirectory = opts.workingDirectory ?? getInvokedCwd();
     const startedBy = opts.startedBy ?? 'terminal';
 
@@ -41,12 +44,7 @@ export async function runOpencode(opts: {
         opts.startingMode = 'remote';
     }
 
-    const startingMode: 'local' | 'remote' = opts.startingMode
-        ?? (startedBy === 'runner' ? 'remote' : 'local');
-
-    if (opts.permissionMode === 'plan' && startingMode !== 'remote') {
-        throw new Error('OpenCode plan mode is only supported in remote mode');
-    }
+    const startingMode: 'local' | 'remote' = opts.startingMode ?? (startedBy === 'runner' ? 'remote' : 'local');
 
     const initialState: AgentState = {
         controlledByUser: false
@@ -372,9 +370,6 @@ export async function runOpencode(opts: {
 
                 if (slash.kind !== 'passthrough') {
                     if (slash.updates) {
-                        if (slash.updates.permissionMode !== undefined) {
-                            currentPermissionMode = slash.updates.permissionMode;
-                        }
                         if (slash.updates.model !== undefined) {
                             sessionModel = slash.updates.model;
                         }

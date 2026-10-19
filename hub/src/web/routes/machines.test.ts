@@ -109,7 +109,7 @@ describe('machines routes', () => {
         })
     })
 
-    it('forwards Grok Auto permission mode when spawning', async () => {
+    it('does not forward permission choices from machine spawn requests', async () => {
         const machine = createMachine()
         let capturedPermissionMode: string | undefined
         const engine = {
@@ -121,14 +121,11 @@ describe('machines routes', () => {
                 _agent?: string,
                 _model?: string,
                 _modelReasoningEffort?: string,
-                _yolo?: boolean,
                 _sessionType?: string,
                 _worktreeName?: string,
                 _resumeSessionId?: string,
                 _effort?: string,
-                permissionMode?: string
             ) => {
-                capturedPermissionMode = permissionMode
                 return { type: 'success' as const, sessionId: 'session-1' }
             }
         } as Partial<SyncEngine>
@@ -151,7 +148,7 @@ describe('machines routes', () => {
         })
 
         expect(response.status).toBe(200)
-        expect(capturedPermissionMode).toBe('auto')
+        expect(capturedPermissionMode).toBeUndefined()
     })
 
     it('returns Codex models for an online machine', async () => {
@@ -363,8 +360,8 @@ describe('machines routes', () => {
         expect(captured).not.toBeNull()
         // startingMode is the last positional argument, after collaborationMode
         // and copilotAgentMode.
-        expect(captured![15]).toBe('pty')
-        expect(captured![12]).toBeUndefined()
+        expect(captured![13]).toBe('pty')
+        expect(captured![10]).toBeUndefined()
     })
 
     it('forwards AGY spawns without forcing a starting mode', async () => {
@@ -390,7 +387,7 @@ describe('machines routes', () => {
 
         expect(response.status).toBe(200)
         // agy is headless-only now: no hub-side forcing, the CLI defaults to remote.
-        expect(captured![15]).toBeUndefined()
+        expect(captured![13]).toBeUndefined()
     })
 
     it('accepts an explicit remote AGY machine spawn', async () => {
@@ -415,7 +412,7 @@ describe('machines routes', () => {
         })
 
         expect(response.status).toBe(200)
-        expect(captured![15]).toBe('remote')
+        expect(captured![13]).toBe('remote')
     })
 
     it('rejects a non-remote headless-agent machine spawn', async () => {

@@ -1,10 +1,5 @@
 import { CodexPromptModeSettings } from './CodexPromptModeSettings'
-import {
-    getCodexCollaborationModeOptions,
-    getCopilotAgentModeOptions,
-    getPermissionModeOptionsForFlavor,
-    type CopilotAgentMode
-} from '@hapi/protocol'
+import { getCodexCollaborationModeOptions, getCopilotAgentModeOptions, type CopilotAgentMode } from '@hapi/protocol'
 import { ComposerPrimitive, useAui, useAuiState } from '@assistant-ui/react'
 import {
     type ChangeEvent as ReactChangeEvent,
@@ -20,7 +15,7 @@ import {
     useRef,
     useState
 } from 'react'
-import type { AgentState, CodexCollaborationMode, PermissionMode, PiModelSummary } from '@/types/api'
+import type { AgentState, CodexCollaborationMode, PiModelSummary } from '@/types/api'
 import type { Suggestion } from '@/hooks/useActiveSuggestions'
 import type { ConversationStatus } from '@/realtime/types'
 import { useActiveWord } from '@/hooks/useActiveWord'
@@ -241,7 +236,6 @@ export function HappyComposer(props: {
     onUploadDraftSnapshot?: (text: string, attachments: AttachmentDraftInput[]) => void
     canRestoreAttachments?: boolean
     disabled?: boolean
-    permissionMode?: PermissionMode
     collaborationMode?: CodexCollaborationMode
     copilotAgentMode?: CopilotAgentMode
     model?: string | null
@@ -259,7 +253,6 @@ export function HappyComposer(props: {
     contextWindow?: number | null
     /** Model for the context-window heuristic; see StatusBar.contextModel. */
     contextModel?: string | null
-    concurrentClients?: boolean
     agentFlavor?: string | null
     availableModelOptions?: Array<{ value: string | null; label: string }>
     /** Full Pi model data with thinkingLevelMap for provider grouping + thinking level filtering */
@@ -279,7 +272,6 @@ export function HappyComposer(props: {
     resolveModelVariantsForBase?: (baseKey: string) => readonly { value: string; label: string }[]
     onCollaborationModeChange?: (mode: CodexCollaborationMode) => void
     onCopilotAgentModeChange?: (mode: CopilotAgentMode) => void
-    onPermissionModeChange?: (mode: PermissionMode) => void
     onModelChange?: (model: { provider: string; modelId: string } | string | null) => void
     /** Cursor: effort/variant wire id (separate from base model change). */
     onModelEffortChange?: (wireId: string | null) => void
@@ -344,7 +336,6 @@ export function HappyComposer(props: {
     const {
         sessionId,
         disabled = false,
-        permissionMode: rawPermissionMode,
         collaborationMode: rawCollaborationMode,
         copilotAgentMode: rawCopilotAgentMode,
         model: rawModel,
@@ -359,7 +350,6 @@ export function HappyComposer(props: {
         contextCacheRead,
         contextWindow,
         contextModel,
-        concurrentClients = false,
         agentFlavor,
         availableModelOptions,
         piModels,
@@ -372,7 +362,6 @@ export function HappyComposer(props: {
         resolveModelVariantsForBase,
         onCollaborationModeChange,
         onCopilotAgentModeChange,
-        onPermissionModeChange,
         onModelChange,
         onModelEffortChange,
         onModelReasoningEffortChange,
@@ -391,7 +380,6 @@ export function HappyComposer(props: {
     } = props
 
     // Use ?? so missing values fall back to default (destructuring defaults only handle undefined)
-    const permissionMode = rawPermissionMode ?? 'default'
     const collaborationMode = rawCollaborationMode ?? 'default'
     const copilotAgentMode = rawCopilotAgentMode ?? 'interactive'
     const model = rawModel ?? null
@@ -812,10 +800,6 @@ export function HappyComposer(props: {
         api.thread().cancelRun()
     }, [abortDisabled, api, haptic])
 
-    const permissionModeOptions = useMemo(
-        () => getPermissionModeOptionsForFlavor(agentFlavor).filter(option => !concurrentClients || option.mode !== 'safe-yolo'),
-        [agentFlavor, concurrentClients]
-    )
     const collaborationModeOptions = useMemo(
         () => agentFlavor === 'codex' ? getCodexCollaborationModeOptions() : [],
         [agentFlavor]
@@ -892,24 +876,20 @@ export function HappyComposer(props: {
         }
     }, [selectedPiModel, effort, onEffortChange])
     const claudeEffortOptions = useMemo(
-        () => agentFlavor === 'pi'
-            ? getPiThinkingLevelOptions(effort, selectedPiModel?.thinkingLevelMap)
-            : agentFlavor === 'grok' && availableEffortOptions && availableEffortOptions.length > 0
-                ? [
-                    { value: null, label: 'Default' },
-                    ...availableEffortOptions.map((option) => ({
-                        value: option.value,
-                        label: option.name ?? option.value
-                    }))
-                ]
-                : getClaudeComposerEffortOptions(effort),
+        () =>
+            agentFlavor === 'pi'
+                ? getPiThinkingLevelOptions(effort, selectedPiModel?.thinkingLevelMap)
+                : agentFlavor === 'grok' && availableEffortOptions && availableEffortOptions.length > 0
+                  ? [
+                        { value: null, label: 'Default' },
+                        ...availableEffortOptions.map((option) => ({
+                            value: option.value,
+                            label: option.name ?? option.value
+                        }))
+                    ]
+                  : getClaudeComposerEffortOptions(effort),
         [agentFlavor, effort, selectedPiModel, availableEffortOptions]
     )
-    const permissionModes = useMemo(
-        () => permissionModeOptions.map((option) => option.mode),
-        [permissionModeOptions]
-    )
-
     const resetPendingSendIntent = useCallback(() => {
         if (pendingSendIntentRef) pendingSendIntentRef.current = 'default'
     }, [pendingSendIntentRef])
@@ -1096,14 +1076,6 @@ export function HappyComposer(props: {
             }
         }
 
-        if (key === 'Tab' && e.shiftKey && onPermissionModeChange && permissionModes.length > 0) {
-            e.preventDefault()
-            const currentIndex = permissionModes.indexOf(permissionMode)
-            const nextIndex = (currentIndex + 1) % permissionModes.length
-            const nextMode = permissionModes[nextIndex] ?? 'default'
-            onPermissionModeChange(nextMode)
-            haptic('light')
-        }
     }, [
         suggestions,
         selectedIndex,
@@ -1113,9 +1085,6 @@ export function HappyComposer(props: {
         handleSuggestionSelect,
         threadIsRunning,
         handleAbort,
-        onPermissionModeChange,
-        permissionMode,
-        permissionModes,
         canSend,
         handleSend,
         haptic,
@@ -1278,33 +1247,35 @@ export function HappyComposer(props: {
         return () => document.removeEventListener('pointerdown', handlePointerDown, true)
     }, [dismissSettings, showSettings])
 
-    const handleSubmit = useCallback((event?: ReactFormEvent<HTMLFormElement>) => {
-        event?.preventDefault()
-        if (!attachmentsReady) {
-            return
-        }
-    }, [attachmentsReady])
+    const handleSubmit = useCallback(
+        (event?: ReactFormEvent<HTMLFormElement>) => {
+            event?.preventDefault()
+            if (!attachmentsReady) {
+                return
+            }
+        },
+        [attachmentsReady]
+    )
 
-    const handlePermissionChange = useCallback((mode: PermissionMode) => {
-        if (!onPermissionModeChange || controlsDisabled) return
-        onPermissionModeChange(mode)
-        dismissSettings()
-        haptic('light')
-    }, [onPermissionModeChange, controlsDisabled, haptic, dismissSettings])
+    const handleCollaborationChange = useCallback(
+        (mode: CodexCollaborationMode) => {
+            if (!onCollaborationModeChange || controlsDisabled) return
+            onCollaborationModeChange(mode)
+            dismissSettings()
+            haptic('light')
+        },
+        [onCollaborationModeChange, controlsDisabled, haptic, dismissSettings]
+    )
 
-    const handleCollaborationChange = useCallback((mode: CodexCollaborationMode) => {
-        if (!onCollaborationModeChange || controlsDisabled) return
-        onCollaborationModeChange(mode)
-        dismissSettings()
-        haptic('light')
-    }, [onCollaborationModeChange, controlsDisabled, haptic, dismissSettings])
-
-    const handleCopilotAgentModeChange = useCallback((mode: CopilotAgentMode) => {
-        if (!onCopilotAgentModeChange || controlsDisabled) return
-        onCopilotAgentModeChange(mode)
-        dismissSettings()
-        haptic('light')
-    }, [onCopilotAgentModeChange, controlsDisabled, haptic, dismissSettings])
+    const handleCopilotAgentModeChange = useCallback(
+        (mode: CopilotAgentMode) => {
+            if (!onCopilotAgentModeChange || controlsDisabled) return
+            onCopilotAgentModeChange(mode)
+            dismissSettings()
+            haptic('light')
+        },
+        [onCopilotAgentModeChange, controlsDisabled, haptic, dismissSettings]
+    )
 
     const handleModelReasoningEffortChange = useCallback((nextModelReasoningEffort: string | null) => {
         if (!onModelReasoningEffortChange || controlsDisabled) return
@@ -1320,23 +1291,28 @@ export function HappyComposer(props: {
         haptic('light')
     }, [onEffortChange, configurationControlsDisabled, haptic, dismissSettings])
 
-    const handleServiceTierChange = useCallback((nextServiceTier: string | null) => {
-        if (!onServiceTierChange || controlsDisabled) return
-        onServiceTierChange(nextServiceTier)
-        dismissSettings()
-        haptic('light')
-    }, [onServiceTierChange, controlsDisabled, haptic, dismissSettings])
+    const handleServiceTierChange = useCallback(
+        (nextServiceTier: string | null) => {
+            if (!onServiceTierChange || controlsDisabled) return
+            onServiceTierChange(nextServiceTier)
+            dismissSettings()
+            haptic('light')
+        },
+        [onServiceTierChange, controlsDisabled, haptic, dismissSettings]
+    )
 
     // 'standard' (not null) is the explicit Fast-off choice so it persists
     // distinctly from an untouched/account-default session.
-    const fastModeOptions: Array<{ value: string; label: string }> = useMemo(() => [
-        { value: 'standard', label: t('misc.fastModeStandard') },
-        { value: 'fast', label: t('misc.fastModeFast') }
-    ], [t])
+    const fastModeOptions: Array<{ value: string; label: string }> = useMemo(
+        () => [
+            { value: 'standard', label: t('misc.fastModeStandard') },
+            { value: 'fast', label: t('misc.fastModeFast') }
+        ],
+        [t]
+    )
 
     const showCollaborationSettings = Boolean(onCollaborationModeChange && collaborationModeOptions.length > 0)
     const showCopilotAgentModeSettings = Boolean(onCopilotAgentModeChange && copilotAgentModeOptions.length > 0)
-    const showPermissionSettings = Boolean(onPermissionModeChange && permissionModeOptions.length > 0)
     const showModelSettings = agentFlavor === 'pi'
         // Pi models only come from the dynamic piModels catalog; never fall
         // back to the generic synthesized modelOptions rows (they would post a
@@ -1359,19 +1335,20 @@ export function HappyComposer(props: {
         && (!selectedPiModel || selectedPiModel.reasoning === false)
     const showEffortSettings = Boolean(onEffortChange && supportsEffort(agentFlavor) && !piEffortUnavailable)
     const showFastModeSettings = Boolean(onServiceTierChange)
-    const showModelAreaSettings = showModelSettings || showModelEffortSettings || showModelReasoningEffortSettings || showEffortSettings
-    const showPromptModeSettings = agentFlavor === 'codex' && Boolean(props.codexPromptMode && props.onCodexPromptModeChange)
+    const showModelAreaSettings =
+        showModelSettings || showModelEffortSettings || showModelReasoningEffortSettings || showEffortSettings
+    const showPromptModeSettings =
+        agentFlavor === 'codex' && Boolean(props.codexPromptMode && props.onCodexPromptModeChange)
     const showOtherSettings = showFastModeSettings || showCollaborationSettings || showCopilotAgentModeSettings
     const showSettingsButton = Boolean(
-        showPromptModeSettings
-        || showCollaborationSettings
-        || showCopilotAgentModeSettings
-        || showPermissionSettings
-        || showModelSettings
-        || showModelEffortSettings
-        || showModelReasoningEffortSettings
-        || showEffortSettings
-        || showFastModeSettings
+        showPromptModeSettings ||
+        showCollaborationSettings ||
+        showCopilotAgentModeSettings ||
+        showModelSettings ||
+        showModelEffortSettings ||
+        showModelReasoningEffortSettings ||
+        showEffortSettings ||
+        showFastModeSettings
     )
     const showAbortButton = true
     const routesToScratchlist = (props.scratchlistMode ?? false) && pendingSchedule == null
@@ -1413,14 +1390,24 @@ export function HappyComposer(props: {
         const sheetModelEffortSettings = showModelEffortSettings
         const sheetModelReasoningEffortSettings = showModelReasoningEffortSettings
         const sheetEffortSettings = showEffortSettings
-        const sheetPermissionSettings = showPermissionSettings
         const sheetFastModeSettings = showFastModeSettings
         const sheetCollaborationSettings = showCollaborationSettings
         const sheetCopilotAgentModeSettings = showCopilotAgentModeSettings
-        const sheetModelAreaSettings = sheetModelSettings || sheetModelEffortSettings || sheetModelReasoningEffortSettings || sheetEffortSettings
+        const sheetModelAreaSettings =
+            sheetModelSettings || sheetModelEffortSettings || sheetModelReasoningEffortSettings || sheetEffortSettings
         const sheetPromptModeSettings = showPromptModeSettings
         const sheetOtherSettings = sheetFastModeSettings || sheetCollaborationSettings || sheetCopilotAgentModeSettings
-        if (showSettings && (sheetPromptModeSettings || sheetCollaborationSettings || sheetCopilotAgentModeSettings || sheetPermissionSettings || sheetModelSettings || sheetModelEffortSettings || sheetModelReasoningEffortSettings || sheetEffortSettings || sheetFastModeSettings)) {
+        if (
+            showSettings &&
+            (sheetPromptModeSettings ||
+                sheetCollaborationSettings ||
+                sheetCopilotAgentModeSettings ||
+                sheetModelSettings ||
+                sheetModelEffortSettings ||
+                sheetModelReasoningEffortSettings ||
+                sheetEffortSettings ||
+                sheetFastModeSettings)
+        ) {
             return (
                 <div ref={settingsOverlayRef} className={`${overlayPositionClass} w-full`}>
                     <FloatingOverlay maxHeight={320}>
@@ -1628,48 +1615,7 @@ export function HappyComposer(props: {
                             </div>
                         ) : null}
 
-                        {sheetModelAreaSettings && sheetPermissionSettings ? (
-                            <div className="mx-3 h-px bg-[var(--app-divider)]" />
-                        ) : null}
-
-                        {sheetPermissionSettings ? (
-                            <div className="py-2">
-                                <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
-                                    {t('misc.permissionMode')}
-                                </div>
-                                {permissionModeOptions.map((option) => (
-                                    <button
-                                        key={option.mode}
-                                        type="button"
-                                        disabled={controlsDisabled}
-                                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                                            controlsDisabled
-                                                ? 'cursor-not-allowed opacity-50'
-                                                : 'cursor-pointer hover:bg-[var(--app-secondary-bg)]'
-                                            }`}
-                                        onClick={() => handlePermissionChange(option.mode)}
-                                        onMouseDown={(e) => e.preventDefault()}
-                                    >
-                                        <div
-                                            className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
-                                                permissionMode === option.mode
-                                                    ? 'border-[var(--app-link)]'
-                                                    : 'border-[var(--app-hint)]'
-                                                }`}
-                                        >
-                                            {permissionMode === option.mode && (
-                                                <div className="h-2 w-2 rounded-full bg-[var(--app-link)]" />
-                                            )}
-                                        </div>
-                                        <span className={permissionMode === option.mode ? 'text-[var(--app-link)]' : ''}>
-                                            {option.label}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        ) : null}
-
-                        {(sheetPermissionSettings || sheetModelAreaSettings) && sheetOtherSettings ? (
+                        {sheetModelAreaSettings && sheetOtherSettings ? (
                             <div className="mx-3 h-px bg-[var(--app-divider)]" />
                         ) : null}
 
@@ -1820,7 +1766,6 @@ export function HappyComposer(props: {
         selectedPiModel,
         showCollaborationSettings,
         showCopilotAgentModeSettings,
-        showPermissionSettings,
         showModelSettings,
         showModelEffortSettings,
         visibleModelEffortOptions,
@@ -1844,18 +1789,15 @@ export function HappyComposer(props: {
         selectedIndex,
         controlsDisabled,
         collaborationMode,
-        permissionMode,
         model,
         modelReasoningEffort,
         effort,
         displayedServiceTier,
         collaborationModeOptions,
         copilotAgentModeOptions,
-        permissionModeOptions,
         handleCollaborationChange,
         handleCopilotAgentModeChange,
         copilotAgentMode,
-        handlePermissionChange,
         handleModelChange,
         handleCursorModelRowClick,
         handleModelEffortChange,
@@ -2012,7 +1954,6 @@ export function HappyComposer(props: {
                                     modelReasoningEffort={modelReasoningEffort}
                                     effort={effort}
                                     serviceTier={serviceTier}
-                                    permissionMode={permissionMode}
                                     collaborationMode={collaborationMode}
                                     copilotAgentMode={copilotAgentMode}
                                     agentFlavor={agentFlavor}

@@ -3,9 +3,7 @@ import {
     DeleteUploadRequestSchema,
     ForkConversationRequestSchema,
     ImplementCodexPlanRequestSchema,
-    getPermissionModesForFlavor,
     isLiveLifecycleState,
-    isPermissionModeAllowedForFlavor,
     RenameSessionRequestSchema,
     SetSessionPinnedRequestSchema,
     ResumeSessionRequestSchema,
@@ -20,7 +18,6 @@ import {
     SessionModelReasoningEffortRequestSchema,
     SessionServiceTierRequestSchema,
     SessionModelRequestSchema,
-    SessionPermissionModeRequestSchema,
     UpdateSessionSummaryRequestSchema,
     supportsModelChange,
     supportsEffort,
@@ -225,26 +222,19 @@ export function createSessionsRoutes(getSyncEngine: () => SyncEngine | null): Ho
             return c.json({ error: 'Invalid body' }, 400)
         }
 
-        const { permissionMode } = parsed.data
-        if (permissionMode !== undefined) {
-            const flavor = sessionResult.session.metadata?.flavor ?? 'claude'
-            if (!isPermissionModeAllowedForFlavor(permissionMode, flavor)) {
-                return c.json({ error: 'Invalid permission mode for session flavor' }, 400)
-            }
-        }
-
         const namespace = c.get('namespace')
-        const result = await engine.resumeSession(
-            sessionResult.sessionId,
-            namespace,
-            permissionMode !== undefined ? { permissionMode } : undefined
-        )
+        const result = await engine.resumeSession(sessionResult.sessionId, namespace)
         if (result.type === 'error') {
-            const status = result.code === 'no_machine_online' ? 503
-                : result.code === 'access_denied' ? 403
-                    : result.code === 'session_not_found' ? 404
-                        : result.code === 'resume_unavailable' ? 409
-                            : 500
+            const status =
+                result.code === 'no_machine_online'
+                    ? 503
+                    : result.code === 'access_denied'
+                      ? 403
+                      : result.code === 'session_not_found'
+                        ? 404
+                        : result.code === 'resume_unavailable'
+                          ? 409
+                          : 500
             return c.json({ error: result.message, code: result.code }, status)
         }
 
@@ -553,12 +543,18 @@ export function createSessionsRoutes(getSyncEngine: () => SyncEngine | null): Ho
         if (!session.session.active) {
             // All clients intercept /clear and /new. Resume here so they share
             // the normal Runner lifecycle instead of reimplementing it.
-            const result = await engine.resumeSession(sessionId, namespace, { permissionMode: session.session.permissionMode })
+            const result = await engine.resumeSession(sessionId, namespace)
             if (result.type === 'error') {
-                const status = result.code === 'no_machine_online' ? 503
-                    : result.code === 'access_denied' ? 403
-                        : result.code === 'session_not_found' ? 404
-                            : result.code === 'resume_unavailable' ? 409 : 500
+                const status =
+                    result.code === 'no_machine_online'
+                        ? 503
+                        : result.code === 'access_denied'
+                          ? 403
+                          : result.code === 'session_not_found'
+                            ? 404
+                            : result.code === 'resume_unavailable'
+                              ? 409
+                              : 500
                 return c.json({ error: result.message, code: result.code }, status)
             }
             sessionId = result.sessionId
@@ -577,50 +573,10 @@ export function createSessionsRoutes(getSyncEngine: () => SyncEngine | null): Ho
             return sessionResult
         }
 
-        if (sessionResult.session.metadata?.capabilities?.concurrentClients) return c.json({ error: 'Shared sessions do not switch modes', code: 'control_mode_not_applicable' }, 409)
+        if (sessionResult.session.metadata?.capabilities?.concurrentClients)
+            return c.json({ error: 'Shared sessions do not switch modes', code: 'control_mode_not_applicable' }, 409)
         await engine.switchSession(sessionResult.sessionId, 'remote')
         return c.json({ ok: true })
-    })
-
-    app.post('/sessions/:id/permission-mode', async (c) => {
-        const engine = requireSyncEngine(c, getSyncEngine)
-        if (engine instanceof Response) {
-            return engine
-        }
-
-        const sessionResult = requireSessionFromParam(c, engine)
-        if (sessionResult instanceof Response) {
-            return sessionResult
-        }
-
-        const body = await c.req.json().catch(() => null)
-        const parsed = SessionPermissionModeRequestSchema.safeParse(body)
-        if (!parsed.success) {
-            return c.json({ error: 'Invalid body' }, 400)
-        }
-
-        const flavor = sessionResult.session.metadata?.flavor ?? 'claude'
-        const mode = parsed.data.mode
-
-        const allowedModes = getPermissionModesForFlavor(flavor)
-        if (allowedModes.length === 0) {
-            return c.json({ error: 'Permission mode not supported for session flavor' }, 400)
-        }
-
-        if (!isPermissionModeAllowedForFlavor(mode, flavor)) {
-            return c.json({ error: 'Invalid permission mode for session flavor' }, 400)
-        }
-        if (flavor === 'opencode' && mode === 'plan' && sessionResult.session.agentState?.controlledByUser === true && !sessionResult.session.metadata?.capabilities?.concurrentClients) {
-            return c.json({ error: 'OpenCode plan mode is only supported for remote sessions' }, 409)
-        }
-
-        try {
-            await engine.applySessionConfig(sessionResult.sessionId, { permissionMode: mode })
-            return c.json({ ok: true })
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to apply permission mode'
-            return c.json({ error: message }, 409)
-        }
     })
 
     app.post('/sessions/:id/codex-prompt-mode', async (c) => {

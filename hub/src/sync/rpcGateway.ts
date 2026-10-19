@@ -40,7 +40,12 @@ import type {
     UploadFileResponse
 } from '@hapi/protocol/apiTypes'
 import type { Server } from 'socket.io'
-import { SopsSecretResultSchema, type SopsSecretReply, type SopsSecretResult } from '@hapi/protocol'
+import {
+    resolveHapiYoloPermissionMode,
+    SopsSecretResultSchema,
+    type SopsSecretReply,
+    type SopsSecretResult
+} from '@hapi/protocol'
 import type { RpcRegistry } from '../socket/rpcRegistry'
 
 const DEFAULT_RPC_TIMEOUT_MS = 30_000
@@ -221,12 +226,10 @@ export class RpcGateway {
         agent: AgentFlavor = 'claude',
         model?: string,
         modelReasoningEffort?: string,
-        yolo?: boolean,
         sessionType?: 'simple' | 'worktree',
         worktreeName?: string,
         resumeSessionId?: string,
         effort?: string,
-        permissionMode?: PermissionMode,
         serviceTier?: string,
         existingSessionId?: string,
         collaborationMode?: CodexCollaborationMode,
@@ -241,42 +244,37 @@ export class RpcGateway {
     ): Promise<
         | { type: 'success'; sessionId: string }
         | {
-            type: 'error'
-            message: string
-            code?: 'agent_unavailable' | 'outside_workspace_roots'
-            agent?: AgentFlavor
-            /** Explicit false = no OS child; stub safe to delete (#1911 B3). */
-            childStarted?: boolean
-        }
+              type: 'error'
+              message: string
+              code?: 'agent_unavailable' | 'outside_workspace_roots'
+              agent?: AgentFlavor
+              /** Explicit false = no OS child; stub safe to delete (#1911 B3). */
+              childStarted?: boolean
+          }
     > {
         try {
-            const result = await this.machineRpc(
-                machineId,
-                RPC_METHODS.SpawnHappySession,
-                {
-                    type: 'spawn-in-directory',
-                    directory,
-                    agent,
-                    model,
-                    modelReasoningEffort,
-                    yolo,
-                    sessionType,
-                    worktreeName,
-                    resumeSessionId,
-                    effort,
-                    permissionMode,
-                    serviceTier,
-                    existingSessionId,
-                    reservedSessionId,
-                    // Local HTTP / tracking may still read sessionId; prefer
-                    // reserved stub id, then reopen id.
-                    sessionId: reservedSessionId ?? existingSessionId,
-                    collaborationMode,
-                    copilotAgentMode,
-                    startingMode,
-                    forkSession: forkSession === true
-                }
-            )
+            const result = await this.machineRpc(machineId, RPC_METHODS.SpawnHappySession, {
+                type: 'spawn-in-directory',
+                directory,
+                agent,
+                model,
+                modelReasoningEffort,
+                sessionType,
+                worktreeName,
+                resumeSessionId,
+                effort,
+                permissionMode: resolveHapiYoloPermissionMode(agent) ?? undefined,
+                serviceTier,
+                existingSessionId,
+                reservedSessionId,
+                // Local HTTP / tracking may still read sessionId; prefer
+                // reserved stub id, then reopen id.
+                sessionId: reservedSessionId ?? existingSessionId,
+                collaborationMode,
+                copilotAgentMode,
+                startingMode,
+                forkSession: forkSession === true
+            })
             if (result && typeof result === 'object') {
                 const obj = result as Record<string, unknown>
                 if (obj.type === 'success' && typeof obj.sessionId === 'string') {

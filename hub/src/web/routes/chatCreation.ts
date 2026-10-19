@@ -66,15 +66,27 @@ export function createChatCreationRoutes(getEngine: () => SyncEngine | null, dat
         } catch (error) {
             return c.json({ error: error instanceof Error ? error.message : 'Cannot validate launch options' }, 400)
         }
-        const launchOrigin = parent ? { kind: 'agent' as const, parentSessionId: parent.sessionId, createdAt: Date.now() } : undefined
+        const launchOrigin = parent
+            ? { kind: 'agent' as const, parentSessionId: parent.sessionId, createdAt: Date.now() }
+            : undefined
         const result = await engine.spawnSession(
-            resolved.machineId, resolved.directory, resolved.agent,
-            resolved.model ?? undefined, resolved.modelReasoningEffort ?? undefined,
-            resolved.yolo ?? undefined, resolved.sessionType, resolved.worktreeName ?? undefined,
-            undefined, resolved.effort ?? undefined, resolved.permissionMode ?? undefined,
-            resolved.serviceTier ?? undefined, undefined, resolved.collaborationMode ?? undefined,
-            resolved.copilotAgentMode ?? undefined, resolved.startingMode ?? undefined,
-            namespace, resolved.codexPromptMode, { launchOrigin }
+            resolved.machineId,
+            resolved.directory,
+            resolved.agent,
+            resolved.model ?? undefined,
+            resolved.modelReasoningEffort ?? undefined,
+            resolved.sessionType,
+            resolved.worktreeName ?? undefined,
+            undefined,
+            resolved.effort ?? undefined,
+            resolved.serviceTier ?? undefined,
+            undefined,
+            resolved.collaborationMode ?? undefined,
+            resolved.copilotAgentMode ?? undefined,
+            resolved.startingMode ?? undefined,
+            namespace,
+            resolved.codexPromptMode,
+            { launchOrigin }
         )
         if (result.type !== 'success') return c.json(result)
         // A settings write failure must never masquerade as a failed spawn and

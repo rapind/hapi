@@ -3,60 +3,33 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildCliArgs, classifyRecoveredProcessGeneration, createSpawnDeduplicator, releaseRecoveredSpawnDedupe } from './run'
+import {
+    buildCliArgs,
+    classifyRecoveredProcessGeneration,
+    createSpawnDeduplicator,
+    releaseRecoveredSpawnDedupe
+} from './run'
 
 describe('buildCliArgs', () => {
-    it('adds --permission-mode for valid permission mode', () => {
-        const args = buildCliArgs('claude', {
-            directory: '/tmp',
-            permissionMode: 'bypassPermissions',
-        })
-        expect(args).toContain('--permission-mode')
-        expect(args).toContain('bypassPermissions')
-        expect(args).not.toContain('--yolo')
-    })
-
-    it('ignores invalid permission mode and falls back to --yolo', () => {
-        const args = buildCliArgs('claude', {
-            directory: '/tmp',
-            permissionMode: 'not-a-real-mode',
-        }, true)
-        expect(args).not.toContain('--permission-mode')
-        expect(args).toContain('--yolo')
-    })
-
-    it('ignores invalid permission mode without yolo fallback', () => {
-        const args = buildCliArgs('claude', {
-            directory: '/tmp',
-            permissionMode: 'not-a-real-mode',
-        })
-        expect(args).not.toContain('--permission-mode')
-        expect(args).not.toContain('--yolo')
-    })
-
-    it('prefers --permission-mode over --yolo when both present', () => {
-        const args = buildCliArgs('cursor', {
-            directory: '/tmp',
-            permissionMode: 'yolo',
-        }, true)
-        expect(args).toContain('--permission-mode')
-        expect(args).toContain('yolo')
-        // --yolo flag should NOT be added when --permission-mode is used
-        const permIdx = args.indexOf('--permission-mode')
-        const yoloIdx = args.indexOf('--yolo')
-        expect(yoloIdx).toBe(-1)
+    it.each([
+        ['claude', 'bypassPermissions'],
+        ['grok', 'bypassPermissions'],
+        ['agy', 'always-proceed'],
+        ['codex', 'yolo'],
+        ['cursor', 'yolo'],
+        ['copilot', 'yolo'],
+        ['kimi', 'yolo'],
+        ['opencode', 'yolo']
+    ])('forces the native YOLO mode for %s, including restrictive resume settings', (agent, expected) => {
+        for (const permissionMode of [undefined, 'default', 'read-only', 'plan', 'not-a-real-mode']) {
+            const args = buildCliArgs(agent, { directory: '/tmp', permissionMode, resumeSessionId: 'resume-me' })
+            expect(args[args.indexOf('--permission-mode') + 1]).toBe(expected)
+            expect(args).not.toContain('--yolo')
+        }
     })
 
     it('throws for the removed gemini agent (no longer launchable)', () => {
         expect(() => buildCliArgs('gemini', { directory: '/tmp' })).toThrow(/no longer supported/)
-    })
-
-    it('adds --yolo when no permissionMode and yolo is true', () => {
-        const args = buildCliArgs('claude', {
-            directory: '/tmp',
-        }, true)
-        expect(args).toContain('--yolo')
-        expect(args).not.toContain('--permission-mode')
     })
 
     it('passes --model through for opencode (mid-session model change support)', () => {
@@ -133,10 +106,9 @@ describe('buildCliArgs', () => {
             'gpt-5.5',
             '--model-reasoning-effort',
             'low',
+            '--permission-mode', 'yolo',
         ])
     })
-
-
 
     it('passes the preallocated HAPI id to OpenCode without resuming its native session', () => {
         const args = buildCliArgs('opencode', {
@@ -181,17 +153,6 @@ describe('buildCliArgs', () => {
             collaborationMode: 'plan',
         })
         expect(args).not.toContain('--collaboration-mode')
-    })
-
-    it('validates all known permission modes', () => {
-        for (const mode of ['default', 'acceptEdits', 'auto', 'bypassPermissions', 'plan', 'ask', 'debug', 'autoReview', 'read-only', 'safe-yolo', 'yolo']) {
-            const args = buildCliArgs('claude', {
-                directory: '/tmp',
-                permissionMode: mode,
-            })
-            expect(args).toContain('--permission-mode')
-            expect(args).toContain(mode)
-        }
     })
 
     it('passes --cursor-worktree for cursor worktree sessions', () => {
@@ -338,12 +299,18 @@ describe('buildCliArgs', () => {
 
         expect(args).toEqual([
             'grok',
-            '--resume', 'grok-session-1',
-            '--hapi-starting-mode', 'remote',
-            '--started-by', 'runner',
-            '--model', 'grok-4.5',
-            '--effort', 'low',
-            '--permission-mode', 'plan'
+            '--resume',
+            'grok-session-1',
+            '--hapi-starting-mode',
+            'remote',
+            '--started-by',
+            'runner',
+            '--model',
+            'grok-4.5',
+            '--effort',
+            'low',
+            '--permission-mode',
+            'bypassPermissions'
         ])
     })
     it('emits --existing-session-id for agy reopen', () => {
@@ -363,12 +330,15 @@ describe('buildCliArgs', () => {
             existingSessionId: 'existing-hub-id',
             startingMode: 'remote',
             permissionMode: 'read-only'
-        }, true)
+        })
         expect(args).toEqual([
             'dsh',
-            '--hapi-starting-mode', 'remote',
-            '--started-by', 'runner',
-            '--existing-session-id', 'existing-hub-id'
+            '--hapi-starting-mode',
+            'remote',
+            '--started-by',
+            'runner',
+            '--existing-session-id',
+            'existing-hub-id'
         ])
     })
 

@@ -2,24 +2,36 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiClient } from '@/api/client'
 import { readBrowserCreationPreferences, useSharedCreationPreferences } from './sharedPreferences'
-import { savePreferredAgent, savePreferredLaunchSettings, savePreferredYoloMode } from './preferences'
+import { savePreferredAgent, savePreferredLaunchSettings } from './preferences'
 import type { ChatCreationPreferences } from '@hapi/protocol'
 
 beforeEach(() => localStorage.clear())
 
 describe('shared New Chat settings', () => {
-    it('migrates machine-agent scopes and legacy permission semantics', () => {
-        savePreferredAgent('claude'); savePreferredYoloMode(true)
-        savePreferredLaunchSettings('m1', 'codex', { model: 'gpt-test', cursorSelectedBase: 'auto', effort: 'auto', modelReasoningEffort: 'high', permissionMode: 'read-only' })
+    it('migrates machine-agent scopes without permission choices', () => {
+        savePreferredAgent('claude')
+        savePreferredLaunchSettings('m1', 'codex', {
+            model: 'gpt-test',
+            cursorSelectedBase: 'auto',
+            effort: 'auto',
+            modelReasoningEffort: 'high'
+        })
         localStorage.setItem('hapi:recentPaths', JSON.stringify({ m1: ['/repo'] }))
         const migrated = readBrowserCreationPreferences(['m1', 'm2'])
         expect(migrated.machines.m1.directory).toBe('/repo')
-        expect(migrated.machines.m1.agents.codex).toMatchObject({ model: 'gpt-test', modelReasoningEffort: 'high', permissionMode: 'read-only' })
-        expect(migrated.machines.m2.agents.claude.permissionMode).toBe('bypassPermissions')
+        expect(migrated.machines.m1.agents.codex).toMatchObject({ model: 'gpt-test', modelReasoningEffort: 'high' })
+        expect(migrated.machines.m2.agents.claude).not.toHaveProperty('permissionMode')
+        expect(migrated.machines.m2.agents.claude).not.toHaveProperty('yolo')
     })
     it('uses the hub response even when local defaults disagree', async () => {
         savePreferredAgent('claude')
-        const shared: ChatCreationPreferences = { lastAgent: 'codex', lastMachineId: 'm2', machines: { m2: { directory: '/shared', agents: { codex: { serviceTier: 'fast', collaborationMode: 'plan' } } } } }
+        const shared: ChatCreationPreferences = {
+            lastAgent: 'codex',
+            lastMachineId: 'm2',
+            machines: {
+                m2: { directory: '/shared', agents: { codex: { serviceTier: 'fast', collaborationMode: 'plan' } } }
+            }
+        }
         const importCreationPreferences = vi.fn().mockResolvedValue(shared)
         const api = { importCreationPreferences } as unknown as ApiClient
         const { result } = renderHook(() => useSharedCreationPreferences(api, [{ id: 'm2' }]))

@@ -10,7 +10,7 @@ import type { CopilotMode, PermissionMode } from './types';
 import { bootstrapExistingSession, bootstrapSession } from '@/agent/sessionFactory';
 import { registerLocalHandoffHandler } from '@/agent/localHandoff';
 import { createModeChangeHandler, createRunnerLifecycle, setControlledByUser } from '@/agent/runnerLifecycle';
-import { isCopilotAgentMode, isPermissionModeAllowedForFlavor } from '@hapi/protocol';
+import { isCopilotAgentMode } from '@hapi/protocol';
 import { PermissionModeSchema } from '@hapi/protocol/schemas';
 import { formatMessageWithAttachments } from '@/utils/attachmentFormatter';
 import { getInvokedCwd } from '@/utils/invokedCwd';
@@ -37,18 +37,21 @@ export function resolveCopilotQueueModel(model: string | null): string {
     return model ?? 'auto';
 }
 
-export async function runCopilot(opts: {
-    startedBy?: 'runner' | 'terminal';
-    startingMode?: 'local' | 'remote';
-    permissionMode?: PermissionMode;
-    model?: string;
-    copilotAgentMode?: import('@hapi/protocol').CopilotAgentMode;
-    resumeSessionId?: string;
-    existingSessionId?: string;
-    /** Fresh-spawn reserved hub id from `--hapi-session-id` (create/getOrCreate). */
-    reservedSessionId?: string;
-    workingDirectory?: string;
-} = {}): Promise<void> {
+export async function runCopilot(
+    opts: {
+        startedBy?: 'runner' | 'terminal';
+        startingMode?: 'local' | 'remote';
+        permissionMode?: PermissionMode;
+        model?: string;
+        copilotAgentMode?: import('@hapi/protocol').CopilotAgentMode;
+        resumeSessionId?: string;
+        existingSessionId?: string;
+        /** Fresh-spawn reserved hub id from `--hapi-session-id` (create/getOrCreate). */
+        reservedSessionId?: string;
+        workingDirectory?: string;
+    } = {}
+): Promise<void> {
+    opts = { ...opts, permissionMode: 'yolo' };
     const workingDirectory = opts.workingDirectory ?? getInvokedCwd();
     const startedBy = opts.startedBy ?? 'terminal';
 
@@ -162,8 +165,7 @@ export async function runCopilot(opts: {
                 if (slash.kind !== 'passthrough') {
                     recognizedSlash = true;
                     if (sessionWrapperRef.current?.mode === 'local'
-                        && (slash.updates?.permissionMode !== undefined
-                            || slash.updates?.model !== undefined
+                        && (slash.updates?.model !== undefined
                             || slash.updates?.agentMode !== undefined)) {
                         if (localId) {
                             session.emitMessagesConsumed([localId], { clearQueuedThinkingGrace: true });
@@ -183,9 +185,6 @@ export async function runCopilot(opts: {
                             requestedAgentMode,
                             sessionWrapperRef.current
                         );
-                        if (slash.updates.permissionMode !== undefined) {
-                            currentPermissionMode = slash.updates.permissionMode;
-                        }
                         if (slash.updates.model !== undefined) {
                             sessionModel = slash.updates.model;
                             resolvedModel = resolveCopilotQueueModel(sessionModel);
@@ -257,7 +256,7 @@ export async function runCopilot(opts: {
 
     const resolvePermissionMode = (value: unknown): PermissionMode => {
         const parsed = PermissionModeSchema.safeParse(value);
-        if (!parsed.success || !isPermissionModeAllowedForFlavor(parsed.data, 'copilot')) {
+        if (!parsed.success || parsed.data !== 'yolo') {
             throw new Error('Invalid permission mode');
         }
         return parsed.data as PermissionMode;

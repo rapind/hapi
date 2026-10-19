@@ -14,7 +14,6 @@ import type {
     FileSearchResponse,
     MachinesResponse,
     MessagesResponse,
-    PermissionMode,
     PiImportSessionsResponse,
     PiLocalSessionsResponse,
     PushSubscriptionPayload,
@@ -514,20 +513,21 @@ export class ApiClient {
     }
 
     async deleteUploadFile(sessionId: string, path: string): Promise<DeleteUploadResponse> {
-        return await this.request<DeleteUploadResponse>(`/api/sessions/${encodeURIComponent(sessionId)}/upload/delete`, {
-            method: 'POST',
-            body: JSON.stringify({ path })
-        })
+        return await this.request<DeleteUploadResponse>(
+            `/api/sessions/${encodeURIComponent(sessionId)}/upload/delete`,
+            {
+                method: 'POST',
+                body: JSON.stringify({ path })
+            }
+        )
     }
 
-    async resumeSession(sessionId: string, opts?: { permissionMode?: string }): Promise<string> {
+    async resumeSession(sessionId: string): Promise<string> {
         const response = await this.request<{ sessionId: string }>(
             `/api/sessions/${encodeURIComponent(sessionId)}/resume`,
             {
                 method: 'POST',
-                ...(opts?.permissionMode !== undefined && {
-                    body: JSON.stringify({ permissionMode: opts.permissionMode })
-                })
+
             }
         )
         return response.sessionId
@@ -698,13 +698,6 @@ export class ApiClient {
         })
     }
 
-    async setPermissionMode(sessionId: string, mode: PermissionMode): Promise<void> {
-        await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/permission-mode`, {
-            method: 'POST',
-            body: JSON.stringify({ mode })
-        })
-    }
-
     async setCollaborationMode(sessionId: string, mode: CodexCollaborationMode): Promise<void> {
         await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/collaboration-mode`, {
             method: 'POST',
@@ -867,11 +860,9 @@ export class ApiClient {
         agent?: AgentFlavor,
         model?: string,
         modelReasoningEffort?: string,
-        yolo?: boolean,
         sessionType?: 'simple' | 'worktree',
         worktreeName?: string,
         effort?: string,
-        permissionMode?: PermissionMode,
         serviceTier?: 'fast' | 'standard',
         collaborationMode?: CodexCollaborationMode,
         copilotAgentMode?: CopilotAgentMode,
@@ -886,11 +877,9 @@ export class ApiClient {
                 agent,
                 model: model ?? null,
                 modelReasoningEffort: modelReasoningEffort ?? null,
-                yolo: yolo ?? null,
                 sessionType: sessionType ?? 'simple',
                 worktreeName: worktreeName ?? null,
                 effort: effort ?? null,
-                permissionMode: permissionMode ?? null,
                 serviceTier: serviceTier ?? null,
                 collaborationMode: collaborationMode ?? null,
                 copilotAgentMode: copilotAgentMode ?? null,

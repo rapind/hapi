@@ -42,7 +42,7 @@ Source: `hub/src/web/routes/sessions.ts`; request schemas in `shared/src/apiType
 
 | Method & path | Request | Response |
 |---|---|---|
-| `POST /api/sessions/:id/resume` | `{permissionMode?}` (`ResumeSessionRequestSchema`) | `{type: 'success', sessionId}` |
+| `POST /api/sessions/:id/resume` | `{}` (`ResumeSessionRequestSchema`) | `{type: 'success', sessionId}` |
 | `POST /api/sessions/:id/reopen` | `{}` | `{ok: true, sessionId, resumed: boolean, cursorSessionProtocol?}` (`ReopenSessionResponseSchema`); `422 {error, missing[]}` if metadata is incomplete |
 | `POST /api/sessions/:id/abort` | `{}` | `{ok: true}` (active sessions only) |
 | `POST /api/sessions/:id/archive` | `{}` | `{ok: true}` or `{ok: true, alreadyArchived: true}`; 409 for a plain inactive session |
@@ -107,11 +107,10 @@ candidate. `canceled` can instead mean withdrawal after a transport disconnect.
 
 | Method & path | Request | Response |
 |---|---|---|
-| `POST /api/sessions/:id/permissions/:requestId/approve` | `{mode?, allowTools?: string[], decision?, answers?}` | `{ok: true}` |
-| `POST /api/sessions/:id/permissions/:requestId/deny` | `{decision?}` | `{ok: true}` |
+| `POST /api/sessions/:id/permissions/:requestId/approve` | `{allowTools?: string[], decision?, answers?}` | `{ok: true}` |
+| `POST /api/sessions/:id/permissions/:requestId/deny`    | `{decision?}`                                  | `{ok: true}` |
 
 - `decision`: `'approved' | 'approved_for_session' | 'denied' | 'abort'`.
-- `mode`: optionally switch permission mode while approving; validated against the session flavor.
 - `answers` has **two formats**, matching the requesting tool: flat `Record<string, string[]>` (AskUserQuestion) or nested `Record<string, {answers: string[]}>` (request_user_input). Both routes 404 with `Request not found` if the id is not currently pending, and 409 `session_inactive` when the session is inactive.
 
 ### Session config — mode / model / effort (per flavor)
@@ -120,7 +119,6 @@ Source: `hub/src/web/routes/sessions.ts`; flavor gates in `shared/src/modes.ts` 
 
 | Method & path | Request | Applies to |
 |---|---|---|
-| `POST /api/sessions/:id/permission-mode` | `{mode: PermissionMode}` | All flavors except `pi` and `dsh` (per-flavor allowed sets in `modes.ts`) |
 | `POST /api/sessions/:id/model` | `{model: string \| {provider, modelId} \| null}` | Flavors with `supportsModelChange` (not `dsh`); remote-only for codex/cursor/grok |
 | `POST /api/sessions/:id/effort` | `{effort: string \| null}` | claude, grok, pi (`supportsEffort`) |
 | `POST /api/sessions/:id/model-reasoning-effort` | `{modelReasoningEffort: string \| null}` | codex, opencode (remote-only) |
@@ -133,8 +131,9 @@ Source: `hub/src/web/routes/sessions.ts`; flavor gates in `shared/src/modes.ts` 
 ownership mode. `/switch` returns HTTP 409 with
 `code: 'control_mode_not_applicable'`; do not offer takeover. The remote-only
 Codex configuration restrictions above do not apply to these sessions.
-Shared Codex rejects `safe-yolo` even though it remains in the historical
-Codex permission-mode schema; do not offer it for concurrent sessions.
+HAPI launches and resumes sessions with the native YOLO permission mode.
+Permission mode is not a creation or configuration option. Historical session
+records can still contain other permission modes.
 
 Shared `/clear` has no global `supersededBySessionId` change; clients other than
 the caller stay on the original thread. Fork may return an already-bound shared
@@ -188,7 +187,7 @@ Source: `hub/src/web/routes/machines.ts`; schemas `SpawnSessionRequestSchema`, `
 | `GET /api/machines` | — | `{machines: Machine[]}` (online machines in the caller's namespace) |
 | `PATCH /api/machines/:id` | `{displayName}` (trimmed; ≤ 64 chars; empty clears back to hostname) | `{ok: true}` |
 | `GET /api/machines/:id/agent-availability` | — | `{agents: {agent, available, reason?: 'not_found'\|'invalid_configuration'}[]}`; 409 `runner_upgrade_required` on old runners |
-| `POST /api/machines/:id/spawn` | `{directory, agent?, model?, effort?, modelReasoningEffort?, yolo?, permissionMode?, sessionType?: 'simple'\|'worktree', worktreeName?, serviceTier?, collaborationMode?, copilotAgentMode?, startingMode?: 'remote'\|'pty', codexPromptMode?: 'queue'\|'steer'}` | `{type: 'success', sessionId}` \| `{type: 'error', message, code?, agent?}` (agy accepts only `remote`) |
+| `POST /api/machines/:id/spawn` | `{directory, agent?, model?, effort?, modelReasoningEffort?, sessionType?: 'simple'\|'worktree', worktreeName?, serviceTier?, collaborationMode?, copilotAgentMode?, startingMode?: 'remote'\|'pty', codexPromptMode?: 'queue'\|'steer'}` | `{type: 'success', sessionId}` \| `{type: 'error', message, code?, agent?}` (agy accepts only `remote`) |
 | `POST /api/machines/:id/list-directory` | `{path, includeHidden?}` | `{success, entries?: (DirectoryEntry & {isGitRepo?})[], error?}` |
 | `POST /api/machines/:id/paths/exists` | `{paths: string[]}` (≤ 1000) | `{exists: Record<string, boolean>, outsideWorkspaceRoots?: string[]}` |
 | `POST /api/machines/:id/restart-runner` | `{}` | `{message}`; errors carry `code: 'machine_not_found' \| 'machine_offline'` |

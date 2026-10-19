@@ -43,10 +43,15 @@ export function resolveSharedCodex(): CodexCommand {
     return command;
 }
 
-export function sharedLaunchConfig(options: SharedLaunchOptions, cwd: string): {
-    cwd: string; serverArgs: string[]; tuiArgs: string[]; threadParams: Record<string, unknown>;
+export function sharedLaunchConfig(
+    options: SharedLaunchOptions,
+    cwd: string
+): {
+    cwd: string;
+    serverArgs: string[];
+    tuiArgs: string[];
+    threadParams: Record<string, unknown>;
 } {
-    if (options.permissionMode === 'safe-yolo') throw new Error('safe-yolo is not a native shared permission mode. Choose default, read-only, yolo, or native --approve-for-me.');
     const args = options.codexArgs ?? [];
     const serverArgs: string[] = [];
     let tuiArgs: string[] = [];
@@ -122,9 +127,9 @@ export function sharedLaunchConfig(options: SharedLaunchOptions, cwd: string): {
     }
     if (extraDirs.length) config['sandbox_workspace_write.writable_roots'] = extraDirs.map(path => resolve(directory, path));
     if (provider) config.model_provider = provider;
-    const permission = options.permissionMode ? resolveCodexPermissionModeConfig(options.permissionMode) : undefined;
+    const permission = resolveCodexPermissionModeConfig('yolo');
     if (permission) {
-        // Explicit HAPI permission selection wins on every launch surface:
+        // HAPI always uses YOLO on every launch surface:
         // initial thread, attached TUI, and later native /new threads.
         config.approval_policy = permission.approvalPolicy;
         config.sandbox_mode = permission.sandbox;

@@ -104,7 +104,7 @@ describe('Pi conversation-history hub integration', () => {
             let spawnArgs: unknown[] = []
             ;(engine as any).rpcGateway.spawnSession = async (...args: unknown[]) => {
                 spawnArgs = args
-                return { type: 'success', sessionId: args[12] }
+                return { type: 'success', sessionId: args[10] }
             }
             const exactBinds: unknown[][] = []
             ;(engine as any).waitForExactNativeForkBound = async (...args: unknown[]) => {
@@ -138,7 +138,7 @@ describe('Pi conversation-history hub integration', () => {
             })
             expect(exactBinds).toEqual([[result.sessionId, 'pi-clone-native', 'piSessionId', true]])
             expect(spawnArgs[3]).toBeUndefined()
-            expect(spawnArgs[9]).toBeUndefined()
+            expect(spawnArgs[8]).toBeUndefined()
             expect(engine.getSession(result.sessionId)?.model).toBeNull()
             expect(engine.getSession(result.sessionId)?.effort).toBeNull()
         } finally {

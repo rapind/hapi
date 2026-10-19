@@ -1,14 +1,10 @@
 import {
     getCodexCollaborationModeLabel,
     getCopilotAgentModeLabel,
-    getPermissionModeLabel,
-    getPermissionModeTone,
-    isPermissionModeAllowedForFlavor
 } from '@hapi/protocol'
-import type { PermissionModeTone } from '@hapi/protocol'
 import * as Popover from '@radix-ui/react-popover'
 import { useMemo, useState } from 'react'
-import type { AgentState, CodexCollaborationMode, PermissionMode } from '@/types/api'
+import type { AgentState, CodexCollaborationMode } from '@/types/api'
 import type { ConversationStatus } from '@/realtime/types'
 import { getContextBudgetTokens } from '@/chat/modelConfig'
 import {
@@ -38,13 +34,6 @@ const VIBING_MESSAGES = [
     "Transmuting", "Unfurling", "Unravelling", "Vibing", "Wandering", "Whirring",
     "Wibbling", "Wizarding", "Working", "Wrangling"
 ]
-
-const PERMISSION_TONE_CLASSES: Record<PermissionModeTone, string> = {
-    neutral: 'text-[var(--app-hint)]',
-    info: 'text-blue-500',
-    warning: 'text-amber-500',
-    danger: 'text-red-500'
-}
 
 const CONTEXT_WARNING_THRESHOLD_PERCENT = 70
 const CONTEXT_DANGER_THRESHOLD_PERCENT = 90
@@ -211,7 +200,6 @@ export function StatusBar(props: {
     modelReasoningEffort?: string | null
     effort?: string | null
     serviceTier?: string | null
-    permissionMode?: PermissionMode
     collaborationMode?: CodexCollaborationMode
     copilotAgentMode?: import('@hapi/protocol').CopilotAgentMode
     agentFlavor?: string | null
@@ -254,38 +242,17 @@ export function StatusBar(props: {
     }, [props.contextSize, props.contextCacheRead, props.contextWindow, contextHeuristicModel, props.agentFlavor])
     const contextUsedPercentage = contextUsageDetails?.usedPercentage ?? null
 
-    const permissionMode = props.permissionMode
-    // Copilot always shows permission (including Default) so model=auto sessions
-    // still surface the bottom-right mode chip. Other flavors keep Codex-style
-    // "hide default" parity.
-    const displayPermissionMode = permissionMode
-        && isPermissionModeAllowedForFlavor(permissionMode, props.agentFlavor)
-        && (permissionMode !== 'default' || props.agentFlavor === 'copilot')
-        ? permissionMode
-        : null
-
-    const permissionModeLabel = displayPermissionMode ? getPermissionModeLabel(displayPermissionMode) : null
-    const permissionModeTone = displayPermissionMode ? getPermissionModeTone(displayPermissionMode) : null
-    const permissionModeColor = permissionModeTone ? PERMISSION_TONE_CLASSES[permissionModeTone] : 'text-[var(--app-hint)]'
-    const displayCollaborationMode = props.agentFlavor === 'codex' && props.collaborationMode === 'plan'
-        ? props.collaborationMode
-        : null
+    const displayCollaborationMode =
+        props.agentFlavor === 'codex' && props.collaborationMode === 'plan' ? props.collaborationMode : null
     const collaborationModeLabel = displayCollaborationMode
         ? getCodexCollaborationModeLabel(displayCollaborationMode)
         : null
-    const displayCopilotAgentMode = props.agentFlavor === 'copilot'
-        && props.copilotAgentMode
-        && props.copilotAgentMode !== 'interactive'
-        ? props.copilotAgentMode
-        : null
-    const copilotAgentModeLabel = displayCopilotAgentMode
-        ? getCopilotAgentModeLabel(displayCopilotAgentMode)
-        : null
-    const reasoningEffort = getReasoningEffortForFlavor(
-        props.agentFlavor,
-        props.modelReasoningEffort,
-        props.effort
-    )
+    const displayCopilotAgentMode =
+        props.agentFlavor === 'copilot' && props.copilotAgentMode && props.copilotAgentMode !== 'interactive'
+            ? props.copilotAgentMode
+            : null
+    const copilotAgentModeLabel = displayCopilotAgentMode ? getCopilotAgentModeLabel(displayCopilotAgentMode) : null
+    const reasoningEffort = getReasoningEffortForFlavor(props.agentFlavor, props.modelReasoningEffort, props.effort)
     const displaysReasoning = shouldShowReasoningStatusLabel(props.agentFlavor, reasoningEffort)
     const reasoningLabel = displaysReasoning
         ? formatCompactReasoningLabel(reasoningEffort)
@@ -407,19 +374,10 @@ export function StatusBar(props: {
                     </span>
                 ) : null}
                 {collaborationModeLabel ? (
-                    <span className="whitespace-nowrap text-xs text-blue-500">
-                        {collaborationModeLabel}
-                    </span>
+                    <span className="whitespace-nowrap text-xs text-blue-500">{collaborationModeLabel}</span>
                 ) : null}
                 {copilotAgentModeLabel ? (
-                    <span className="whitespace-nowrap text-xs text-blue-500">
-                        {copilotAgentModeLabel}
-                    </span>
-                ) : null}
-                {displayPermissionMode ? (
-                    <span className={`hidden sm:inline whitespace-nowrap text-xs ${permissionModeColor}`}>
-                        {permissionModeLabel}
-                    </span>
+                    <span className="whitespace-nowrap text-xs text-blue-500">{copilotAgentModeLabel}</span>
                 ) : null}
             </div>
         </div>

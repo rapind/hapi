@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ChatCreationPreferencesSchema, CREATABLE_AGENT_FLAVORS, type ChatCreationPreferences, type ChatLaunchSettings } from '@hapi/protocol'
+import {
+    ChatCreationPreferencesSchema,
+    CREATABLE_AGENT_FLAVORS,
+    type ChatCreationPreferences,
+    type ChatLaunchSettings
+} from '@hapi/protocol'
 import type { ApiClient } from '@/api/client'
-import { loadPreferredAgent, loadPreferredLaunchSettings, loadPreferredYoloMode, resolvePreferredLaunchSettings } from './preferences'
-import { usesNativePermissionSelect } from '@/lib/codexFamilyPermissionAgents'
+import { loadPreferredAgent, loadPreferredLaunchSettings, resolvePreferredLaunchSettings } from './preferences'
 
 export function readBrowserCreationPreferences(knownMachineIds: readonly string[] = []): ChatCreationPreferences {
     const machines: ChatCreationPreferences['machines'] = {}
@@ -23,14 +27,15 @@ export function readBrowserCreationPreferences(knownMachineIds: readonly string[
             for (const agent of CREATABLE_AGENT_FLAVORS) {
                 const saved = loadPreferredLaunchSettings(id, agent)
                 if (!saved && agent !== loadPreferredAgent()) continue
-                const prior = resolvePreferredLaunchSettings(agent, saved, loadPreferredAgent() === agent && loadPreferredYoloMode())
+                const prior = resolvePreferredLaunchSettings(agent, saved)
                 const settings: ChatLaunchSettings = {
-                    model: prior.model === 'auto' ? null : prior.model,
-                    permissionMode: prior.permissionMode ?? null,
-                    ...(usesNativePermissionSelect(agent) || ['dsh', 'pi'].includes(agent) ? {} : { yolo: loadPreferredYoloMode() })
+                    model: prior.model === 'auto' ? null : prior.model
                 }
-                if (['claude', 'grok', 'pi'].includes(agent)) settings.effort = prior.effort === 'auto' ? null : prior.effort
-                if (['codex', 'opencode'].includes(agent)) settings.modelReasoningEffort = prior.modelReasoningEffort === 'default' ? null : prior.modelReasoningEffort
+                if (['claude', 'grok', 'pi'].includes(agent))
+                    settings.effort = prior.effort === 'auto' ? null : prior.effort
+                if (['codex', 'opencode'].includes(agent))
+                    settings.modelReasoningEffort =
+                        prior.modelReasoningEffort === 'default' ? null : prior.modelReasoningEffort
                 if (agent === 'codex') settings.codexPromptMode = prior.codexPromptMode ?? 'queue'
                 agents[agent] = settings
             }

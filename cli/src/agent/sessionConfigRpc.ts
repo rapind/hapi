@@ -1,4 +1,4 @@
-import { isPermissionModeAllowedForFlavor, type AgentFlavor } from '@hapi/protocol'
+import { isPermissionModeAllowedForFlavor, resolveHapiYoloPermissionMode, type AgentFlavor } from '@hapi/protocol'
 import { RPC_METHODS } from '@hapi/protocol/rpcMethods'
 import { PermissionModeSchema } from '@hapi/protocol/schemas'
 import type { PermissionMode } from '@hapi/protocol/types'
@@ -27,7 +27,11 @@ export function resolveSessionConfigPermissionMode<TPermissionMode extends Permi
     flavor: AgentFlavor
 ): TPermissionMode {
     const parsed = PermissionModeSchema.safeParse(value)
-    if (!parsed.success || !isPermissionModeAllowedForFlavor(parsed.data, flavor)) {
+    if (
+        !parsed.success ||
+        !isPermissionModeAllowedForFlavor(parsed.data, flavor) ||
+        parsed.data !== resolveHapiYoloPermissionMode(flavor)
+    ) {
         throw new Error('Invalid permission mode')
     }
     return parsed.data as TPermissionMode

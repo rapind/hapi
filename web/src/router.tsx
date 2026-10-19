@@ -489,7 +489,7 @@ function SessionPage() {
             )
         }
         try {
-            const target = api.resumeSession(currentSessionId, { permissionMode: session.permissionMode ?? undefined })
+            const target = api.resumeSession(currentSessionId)
             resolvedSessionRef.current = { source: currentSessionId, target }
             return { sessionId: await target, resumed: true }
         } catch (error) {

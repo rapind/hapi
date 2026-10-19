@@ -51,6 +51,37 @@ function createGateway() {
     }
 }
 
+describe('fixed launch permissions', () => {
+    it.each([
+        ['claude', 'bypassPermissions'],
+        ['grok', 'bypassPermissions'],
+        ['agy', 'always-proceed'],
+        ['codex', 'yolo'],
+        ['cursor', 'yolo'],
+        ['copilot', 'yolo'],
+        ['kimi', 'yolo'],
+        ['opencode', 'yolo'],
+        ['pi', undefined],
+        ['dsh', undefined]
+    ] as const)('sends the native YOLO policy for %s regardless of inherited permissions', async (agent, expected) => {
+        const { gateway, calls } = createGateway()
+        await gateway.spawnSession(
+            'machine-1',
+            '/repo',
+            agent,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            'native-resume-id',
+            undefined
+        )
+        const params = JSON.parse(calls[0]!.params)
+        expect(params.permissionMode).toBe(expected)
+        expect(params.resumeSessionId).toBe('native-resume-id')
+    })
+})
+
 describe('RpcGateway RPC timeouts', () => {
     it('uses the default RPC timeout for regular machine RPCs', async () => {
         const { gateway, timeouts } = createGateway()

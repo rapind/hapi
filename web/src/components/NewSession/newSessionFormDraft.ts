@@ -1,16 +1,10 @@
 import {
     CREATABLE_AGENT_FLAVORS,
-    GROK_PERMISSION_MODES,
-    getLaunchPermissionModesForFlavor,
     normalizeCopilotAgentMode,
-    resolveHapiYoloPermissionMode,
     type CodexCollaborationMode,
     type CopilotAgentMode,
-    type GrokPermissionMode,
-    type PermissionMode
 } from '@hapi/protocol'
 import type { AgentType, LaunchEffort, CodexReasoningEffort, NewSessionServiceTier, SessionType } from './types'
-import { LEGACY_YOLO_BRIDGE_AGENTS } from '@/lib/codexFamilyPermissionAgents'
 
 const DRAFT_STORAGE_KEY = 'hapi:new-session-form-draft'
 
@@ -25,9 +19,6 @@ export type NewSessionFormDraft = {
     serviceTier: NewSessionServiceTier
     collaborationMode: CodexCollaborationMode
     copilotAgentMode: CopilotAgentMode
-    yoloMode: boolean
-    nativePermissionMode: PermissionMode
-    grokPermissionMode: GrokPermissionMode
     sessionType: SessionType
     worktreeName: string
 }
@@ -71,30 +62,10 @@ export function loadNewSessionFormDraft(): NewSessionFormDraft | null {
                 : 'default',
             serviceTier: agentPreserved && parsed.serviceTier === 'fast' ? 'fast' : 'standard',
             collaborationMode: agentPreserved && parsed.collaborationMode === 'plan' ? 'plan' : 'default',
-            copilotAgentMode: agentPreserved
-                ? normalizeCopilotAgentMode(parsed.copilotAgentMode)
-                : 'interactive',
+            copilotAgentMode: agentPreserved ? normalizeCopilotAgentMode(parsed.copilotAgentMode) : 'interactive',
             ...(restoredAgent === 'codex' && (parsed.codexPromptMode === 'queue' || parsed.codexPromptMode === 'steer')
-                ? { codexPromptMode: parsed.codexPromptMode } : {}),
-            yoloMode: Boolean(parsed.yoloMode),
-            nativePermissionMode: (() => {
-                const modes = getLaunchPermissionModesForFlavor(restoredAgent)
-                const parsedMode = parsed.nativePermissionMode as PermissionMode | undefined
-                if (agentPreserved && parsedMode && modes.includes(parsedMode)) {
-                    return parsedMode
-                }
-                const yoloBridgeMode = LEGACY_YOLO_BRIDGE_AGENTS.includes(restoredAgent)
-                    ? resolveHapiYoloPermissionMode(restoredAgent)
-                    : null
-                if (agentPreserved && parsedMode === undefined && parsed.yoloMode && yoloBridgeMode && modes.includes(yoloBridgeMode)) {
-                    return yoloBridgeMode
-                }
-                return 'default'
-            })(),
-            grokPermissionMode: agentPreserved
-                && GROK_PERMISSION_MODES.includes(parsed.grokPermissionMode as GrokPermissionMode)
-                ? parsed.grokPermissionMode as GrokPermissionMode
-                : 'default',
+                ? { codexPromptMode: parsed.codexPromptMode }
+                : {}),
             sessionType: (parsed.sessionType as SessionType | undefined) ?? 'simple',
             worktreeName: typeof parsed.worktreeName === 'string' ? parsed.worktreeName : ''
         }

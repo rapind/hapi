@@ -16,7 +16,6 @@ export interface SpawnSessionOptions {
     model?: string
     effort?: string
     modelReasoningEffort?: string
-    yolo?: boolean
     permissionMode?: string
     serviceTier?: string
     collaborationMode?: 'default' | 'plan'

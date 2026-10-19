@@ -35,7 +35,14 @@ function harness() {
 describe('chat creation and shared preferences', () => {
     it('creates a normal independent row and remembers all successful launch options', async () => {
         const { post, app, store, args } = harness()
-        const response = await post('/sessions/create', { directory: '/repo', agent: 'codex', model: 'gpt-test', modelReasoningEffort: 'high', serviceTier: 'fast', collaborationMode: 'plan', permissionMode: 'read-only', yolo: false })
+        const response = await post('/sessions/create', {
+            directory: '/repo',
+            agent: 'codex',
+            model: 'gpt-test',
+            modelReasoningEffort: 'high',
+            serviceTier: 'fast',
+            collaborationMode: 'plan'
+        })
         expect(response.status).toBe(200)
         const result = await response.json() as { type: string; sessionId: string }
         expect(result.type).toBe('success')
@@ -43,11 +50,24 @@ describe('chat creation and shared preferences', () => {
         expect(session).toBeDefined()
         expect(session.model).toBe('gpt-test')
         expect(session.metadata).toMatchObject({ flavor: 'codex', path: '/repo', machineId: 'machine-1' })
-        const preferences = ChatCreationPreferencesSchema.parse(await (await app.request('/api/new-chat-preferences')).json())
-        expect(preferences.machines['machine-1'].agents.codex).toMatchObject({ serviceTier: 'fast', collaborationMode: 'plan', permissionMode: 'read-only', yolo: false })
+        const preferences = ChatCreationPreferencesSchema.parse(
+            await (await app.request('/api/new-chat-preferences')).json()
+        )
+        expect(preferences.machines['machine-1'].agents.codex).toMatchObject({
+            serviceTier: 'fast',
+            collaborationMode: 'plan'
+        })
         expect((await post('/sessions/create', { model: null, serviceTier: 'standard' })).status).toBe(200)
         expect(args()[3]).toBeUndefined()
-        expect(args()[10]).toBe('read-only')
+        expect(args()[10]).toBeUndefined()
+        expect(preferences.machines['machine-1'].agents.codex).not.toHaveProperty('permissionMode')
+        expect(preferences.machines['machine-1'].agents.codex).not.toHaveProperty('yolo')
+    })
+    it('rejects permission options from both human and agent creation requests', async () => {
+        const { post } = harness()
+        for (const option of [{ yolo: false }, { permissionMode: 'read-only' }]) {
+            expect((await post('/sessions/create', { directory: '/repo', ...option })).status).toBe(400)
+        }
     })
     it('persists and inherits deploy Queue/Steer for Codex without applying it to Claude', async () => {
         const { post, store } = harness()

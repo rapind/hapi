@@ -1,4 +1,3 @@
-import { CODEX_PERMISSION_MODES } from '@hapi/protocol/modes';
 import type { CodexPermissionMode } from '@hapi/protocol/types';
 import type { ReasoningEffort } from '../appServerTypes';
 import type { CodexPersonality, EnhancedMode } from '../loop';
@@ -27,32 +26,30 @@ const UNSUPPORTED_CODEX_BUILTIN_COMMANDS = new Set([
 export type CodexSlashResolution =
     | { kind: 'passthrough' }
     | {
-        kind: 'handled';
-        message: string;
-        updates?: {
-            collaborationMode?: EnhancedMode['collaborationMode'];
-            permissionMode?: CodexPermissionMode;
-            model?: string | null;
-            modelReasoningEffort?: ReasoningEffort | null;
-            serviceTier?: string | null;
-            proactiveMultiAgent?: boolean;
-            personality?: CodexPersonality;
-        };
-    }
+          kind: 'handled';
+          message: string;
+          updates?: {
+              collaborationMode?: EnhancedMode['collaborationMode'];
+              model?: string | null;
+              modelReasoningEffort?: ReasoningEffort | null;
+              serviceTier?: string | null;
+              proactiveMultiAgent?: boolean;
+              personality?: CodexPersonality;
+          };
+      }
     | {
-        kind: 'replace';
-        text: string;
-        message?: string;
-        updates?: {
-            collaborationMode?: EnhancedMode['collaborationMode'];
-            permissionMode?: CodexPermissionMode;
-            model?: string | null;
-            modelReasoningEffort?: ReasoningEffort | null;
-            serviceTier?: string | null;
-            proactiveMultiAgent?: boolean;
-            personality?: CodexPersonality;
-        };
-    }
+          kind: 'replace';
+          text: string;
+          message?: string;
+          updates?: {
+              collaborationMode?: EnhancedMode['collaborationMode'];
+              model?: string | null;
+              modelReasoningEffort?: ReasoningEffort | null;
+              serviceTier?: string | null;
+              proactiveMultiAgent?: boolean;
+              personality?: CodexPersonality;
+          };
+      }
     | {
         kind: 'goal';
         action: 'show' | 'set' | 'pause' | 'resume' | 'clear';
@@ -285,20 +282,7 @@ export function resolveCodexSlashCommand(
     }
 
     if (command === 'permissions' || command === 'permission') {
-        if (!rest) {
-            return { kind: 'handled', message: `Codex permission mode: ${state.permissionMode}` };
-        }
-        if (!(CODEX_PERMISSION_MODES as readonly string[]).includes(rest)) {
-            return {
-                kind: 'handled',
-                message: `Unknown Codex permission mode: ${rest}`
-            };
-        }
-        return {
-            kind: 'handled',
-            message: `Codex permission mode set to ${rest}`,
-            updates: { permissionMode: rest as CodexPermissionMode }
-        };
+        return { kind: 'handled', message: 'HAPI permissions are fixed to YOLO.' };
     }
 
     if (command === 'help') {
@@ -318,7 +302,6 @@ export function resolveCodexSlashCommand(
                 '- `/reasoning [level|default]` — show or set reasoning effort',
                 '- `/personality [friendly|pragmatic|none]` — show or set response style (sticky on thread)',
                 '- `/fast [on|off|status]` — toggle Fast mode (GPT-5.5 / GPT-5.4, ChatGPT login)',
-                '- `/permissions [default|read-only|safe-yolo|yolo]` — show or set permission mode',
                 '',
                 'Custom `/commands` from `.codex/prompts` are expanded before sending.'
             ].join('\n')

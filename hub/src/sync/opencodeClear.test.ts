@@ -78,16 +78,33 @@ describe('SyncEngine.clearOpenCodeSession', () => {
             expect(engine.getSessionByNamespace(source.id, 'default')?.metadata?.opencodeClearOperation).toMatchObject({
                 replacementSessionId: reserved.sessionId, state: 'reserved'
             })
-            expect(engine.confirmOpenCodeClearCleanup(source.id, 'default', currentReplacementId(engine, source.id))).toMatchObject({ type: 'success' })
+            expect(
+                engine.confirmOpenCodeClearCleanup(source.id, 'default', currentReplacementId(engine, source.id))
+            ).toMatchObject({ type: 'success' })
             const metadataBeforeEnd = engine.getSessionByNamespace(source.id, 'default')!.metadata!
             engine.handleSessionEnd({ sid: source.id, time: Date.now(), reason: 'cleared' })
             const storedAfterEnd = store.sessions.getSessionByNamespace(source.id, 'default')!
-            store.sessions.updateSessionMetadata(source.id, { ...metadataBeforeEnd, lifecycleState: 'archived', archiveReason: 'Cleared by /clear' }, storedAfterEnd.metadataVersion, 'default')
-            ;(engine as unknown as { sessionCache: { refreshSession(id: string): unknown } }).sessionCache.refreshSession(source.id)
-            const spawnSession = mock(async (...args: unknown[]) => ({ type: 'success' as const, sessionId: args[12] as string }))
+            store.sessions.updateSessionMetadata(
+                source.id,
+                { ...metadataBeforeEnd, lifecycleState: 'archived', archiveReason: 'Cleared by /clear' },
+                storedAfterEnd.metadataVersion,
+                'default'
+            )
+            ;(
+                engine as unknown as { sessionCache: { refreshSession(id: string): unknown } }
+            ).sessionCache.refreshSession(source.id)
+            const spawnSession = mock(async (...args: unknown[]) => ({
+                type: 'success' as const,
+                sessionId: args[10] as string
+            }))
             setSpawn(engine, spawnSession)
-            await expect(engine.clearOpenCodeSession(source.id, 'default')).resolves.toEqual({ type: 'success', sessionId: reserved.sessionId })
-        } finally { engine.stop() }
+            await expect(engine.clearOpenCodeSession(source.id, 'default')).resolves.toEqual({
+                type: 'success',
+                sessionId: reserved.sessionId
+            })
+        } finally {
+            engine.stop()
+        }
     })
 
     it('atomically redirects messages arriving after reservation to the replacement', async () => {
@@ -117,15 +134,25 @@ describe('SyncEngine.clearOpenCodeSession', () => {
             const reserved = engine.reserveOpenCodeClearSession(source.id, 'default')
             if (reserved.type !== 'success') throw new Error('reservation failed')
             await engine.sendMessage(source.id, { text: 'B after reservation', localId: 'fifo-b' })
-            expect(engine.confirmOpenCodeClearCleanup(source.id, 'default', reserved.sessionId)).toMatchObject({ type: 'success' })
+            expect(engine.confirmOpenCodeClearCleanup(source.id, 'default', reserved.sessionId)).toMatchObject({
+                type: 'success'
+            })
             engine.handleSessionEnd({ sid: source.id, time: Date.now(), reason: 'cleared' })
-            setSpawn(engine, mock(async (...args: unknown[]) => ({ type: 'success' as const, sessionId: args[12] as string })))
+            setSpawn(
+                engine,
+                mock(async (...args: unknown[]) => ({ type: 'success' as const, sessionId: args[10] as string }))
+            )
 
             await (engine as unknown as { reconcileOpenCodeClears(): Promise<void> }).reconcileOpenCodeClears()
 
-            expect(store.messages.getAllMessages(reserved.sessionId).map((message) => message.localId)).toEqual(['fifo-a', 'fifo-b'])
+            expect(store.messages.getAllMessages(reserved.sessionId).map((message) => message.localId)).toEqual([
+                'fifo-a',
+                'fifo-b'
+            ])
             expect(store.messages.getAllMessages(source.id)).toEqual([])
-        } finally { engine.stop() }
+        } finally {
+            engine.stop()
+        }
     })
 
     it('gates replacement delivery during spawn and releases finalized FIFO after linking', async () => {
@@ -141,19 +168,33 @@ describe('SyncEngine.clearOpenCodeSession', () => {
             const reserved = engine.reserveOpenCodeClearSession(source.id, 'default')
             if (reserved.type !== 'success') throw new Error('reservation failed')
             await engine.sendMessage(source.id, { text: 'B after reservation', localId: 'gated-b' })
-            store.messages.addMessage(reserved.sessionId, { text: 'mature but gated' }, 'gated-scheduled', Date.now() - 1)
-            expect(engine.confirmOpenCodeClearCleanup(source.id, 'default', reserved.sessionId)).toMatchObject({ type: 'success' })
+            store.messages.addMessage(
+                reserved.sessionId,
+                { text: 'mature but gated' },
+                'gated-scheduled',
+                Date.now() - 1
+            )
+            expect(engine.confirmOpenCodeClearCleanup(source.id, 'default', reserved.sessionId)).toMatchObject({
+                type: 'success'
+            })
             engine.handleSessionEnd({ sid: source.id, time: Date.now(), reason: 'cleared' })
             let releaseSpawn!: () => void
             let spawnStarted = false
-            const spawnWait = new Promise<void>((resolve) => { releaseSpawn = resolve })
-            setSpawn(engine, mock(async (...args: unknown[]) => {
-                spawnStarted = true
-                await spawnWait
-                return { type: 'success' as const, sessionId: args[12] as string }
-            }))
+            const spawnWait = new Promise<void>((resolve) => {
+                releaseSpawn = resolve
+            })
+            setSpawn(
+                engine,
+                mock(async (...args: unknown[]) => {
+                    spawnStarted = true
+                    await spawnWait
+                    return { type: 'success' as const, sessionId: args[10] as string }
+                })
+            )
 
-            const reconcile = (engine as unknown as { reconcileOpenCodeClears(): Promise<void> }).reconcileOpenCodeClears()
+            const reconcile = (
+                engine as unknown as { reconcileOpenCodeClears(): Promise<void> }
+            ).reconcileOpenCodeClears()
             while (!spawnStarted) await Promise.resolve()
             expect(store.isOpenCodeClearDeliveryGated(reserved.sessionId)).toBe(true)
             engine.handleSessionAlive({ sid: reserved.sessionId, time: Date.now() })
@@ -233,22 +274,40 @@ describe('SyncEngine.clearOpenCodeSession', () => {
     it('recovers cleanup-confirmed clear when the CLI dies before writing archive metadata', async () => {
         const { engine } = createEngine()
         try {
-            const source = engine.getOrCreateSession('crashed-clear-source', {
-                path: '/tmp/project', host: 'host', machineId: 'machine-1', flavor: 'opencode', startedBy: 'runner'
-            }, null, 'default')
+            const source = engine.getOrCreateSession(
+                'crashed-clear-source',
+                {
+                    path: '/tmp/project',
+                    host: 'host',
+                    machineId: 'machine-1',
+                    flavor: 'opencode',
+                    startedBy: 'runner'
+                },
+                null,
+                'default'
+            )
             engine.handleSessionAlive({ sid: source.id, time: Date.now() })
             const reserved = engine.reserveOpenCodeClearSession(source.id, 'default')
             if (reserved.type !== 'success') throw new Error('reservation failed')
-            expect(engine.confirmOpenCodeClearCleanup(source.id, 'default', currentReplacementId(engine, source.id))).toMatchObject({ type: 'success' })
+            expect(
+                engine.confirmOpenCodeClearCleanup(source.id, 'default', currentReplacementId(engine, source.id))
+            ).toMatchObject({ type: 'success' })
             engine.handleSessionEnd({ sid: source.id, time: Date.now(), reason: 'error' })
-            const spawnSession = mock(async (...args: unknown[]) => ({ type: 'success' as const, sessionId: args[12] as string }))
+            const spawnSession = mock(async (...args: unknown[]) => ({
+                type: 'success' as const,
+                sessionId: args[10] as string
+            }))
             setSpawn(engine, spawnSession)
             await (engine as unknown as { reconcileOpenCodeClears(): Promise<void> }).reconcileOpenCodeClears()
             expect(engine.getSessionByNamespace(source.id, 'default')?.metadata).toMatchObject({
-                lifecycleState: 'archived', archiveReason: 'Cleared by /clear', supersededBySessionId: reserved.sessionId
+                lifecycleState: 'archived',
+                archiveReason: 'Cleared by /clear',
+                supersededBySessionId: reserved.sessionId
             })
             expect(spawnSession).toHaveBeenCalledTimes(1)
-        } finally { engine.stop() }
+        } finally {
+            engine.stop()
+        }
     })
 
     it('recovers a persisted pending spawn with the exact replacement identity after restart', async () => {
@@ -264,14 +323,14 @@ describe('SyncEngine.clearOpenCodeSession', () => {
             })
             const spawnSession = mock(async (...args: unknown[]) => ({
                 type: 'success' as const,
-                sessionId: args[12] as string
+                sessionId: args[10] as string
             }))
             setSpawn(engine, spawnSession)
 
             await (engine as unknown as { reconcileOpenCodeClears(): Promise<void> }).reconcileOpenCodeClears()
 
             expect(spawnSession).toHaveBeenCalledTimes(1)
-            expect(spawnSession.mock.calls[0]?.[12]).toBe(replacementSessionId)
+            expect(spawnSession.mock.calls[0]?.[10]).toBe(replacementSessionId)
             expect(engine.getSessionByNamespace(source.id, 'default')?.metadata).toMatchObject({
                 supersededBySessionId: replacementSessionId,
                 opencodeClearOperation: { replacementSessionId, state: 'completed' }
@@ -611,7 +670,7 @@ describe('SyncEngine.clearOpenCodeSession', () => {
                 operationAtSpawn = engine.getSessionByNamespace(source.id, 'default')?.metadata?.opencodeClearOperation
                 return {
                     type: 'success' as const,
-                    sessionId: args[12] as string
+                    sessionId: args[10] as string
                 }
             })
             setSpawn(engine, spawnSession)
@@ -620,7 +679,7 @@ describe('SyncEngine.clearOpenCodeSession', () => {
                 type: 'success',
                 sessionId: expect.any(String)
             })
-            const replacementSessionId = spawnSession.mock.calls[0]?.[12] as string
+            const replacementSessionId = spawnSession.mock.calls[0]?.[10] as string
             expect(replacementSessionId).toEqual(expect.any(String))
             expect(operationAtSpawn?.replacementSessionId).toBe(replacementSessionId)
             expect(replacementSessionId).not.toBe(source.id)
@@ -630,12 +689,10 @@ describe('SyncEngine.clearOpenCodeSession', () => {
                 'opencode',
                 'opencode/model',
                 'high',
-                false,
                 undefined,
                 undefined,
                 undefined,
                 'effort-x',
-                'yolo',
                 undefined,
                 replacementSessionId,
                 undefined,
@@ -663,11 +720,23 @@ describe('SyncEngine.clearOpenCodeSession', () => {
         const { engine } = createEngine()
         try {
             const first = createClearSource(engine)
-            const second = engine.getOrCreateSession('another-clear-source', {
-                path: '/tmp/another-project', host: 'host', machineId: 'machine-1', flavor: 'opencode',
-                lifecycleState: 'archived', archiveReason: 'Cleared by /clear'
-            }, null, 'default')
-            const spawnSession = mock(async (...args: unknown[]) => ({ type: 'success' as const, sessionId: args[12] as string }))
+            const second = engine.getOrCreateSession(
+                'another-clear-source',
+                {
+                    path: '/tmp/another-project',
+                    host: 'host',
+                    machineId: 'machine-1',
+                    flavor: 'opencode',
+                    lifecycleState: 'archived',
+                    archiveReason: 'Cleared by /clear'
+                },
+                null,
+                'default'
+            )
+            const spawnSession = mock(async (...args: unknown[]) => ({
+                type: 'success' as const,
+                sessionId: args[10] as string
+            }))
             setSpawn(engine, spawnSession)
 
             const firstResult = await engine.clearOpenCodeSession(first.id, 'default')
@@ -688,18 +757,24 @@ describe('SyncEngine.clearOpenCodeSession', () => {
             const firstSpawn = mock(async () => ({ type: 'error' as const, message: 'runner unavailable' }))
             setSpawn(engine, firstSpawn)
             await expect(engine.clearOpenCodeSession(source.id, 'default')).resolves.toMatchObject({
-                type: 'error', code: 'spawn_failed'
+                type: 'error',
+                code: 'spawn_failed'
             })
 
-            const pendingId = engine.getSessionByNamespace(source.id, 'default')?.metadata?.opencodeClearOperation?.replacementSessionId
+            const pendingId = engine.getSessionByNamespace(source.id, 'default')?.metadata?.opencodeClearOperation
+                ?.replacementSessionId
             expect(pendingId).toEqual(expect.any(String))
             if (!pendingId) throw new Error('expected durable replacement id')
-            const secondSpawn = mock(async (...args: unknown[]) => ({ type: 'success' as const, sessionId: args[12] as string }))
+            const secondSpawn = mock(async (...args: unknown[]) => ({
+                type: 'success' as const,
+                sessionId: args[10] as string
+            }))
             setSpawn(engine, secondSpawn)
             await expect(engine.clearOpenCodeSession(source.id, 'default')).resolves.toEqual({
-                type: 'success', sessionId: pendingId
+                type: 'success',
+                sessionId: pendingId
             })
-            expect(secondSpawn.mock.calls[0]?.[12]).toBe(pendingId)
+            expect(secondSpawn.mock.calls[0]?.[10]).toBe(pendingId)
         } finally {
             engine.stop()
         }
@@ -746,8 +821,16 @@ describe('SyncEngine.clearOpenCodeSession', () => {
             const source = createClearSource(engine)
             const events: Array<{ type: string, sessionId?: string }> = []
             engine.subscribe((event) => events.push(event))
-            const scheduled = store.messages.addMessage(source.id, { text: 'send later' }, 'scheduled-clear', Date.now() + 60_000)
-            const spawnSession = mock(async (...args: unknown[]) => ({ type: 'success' as const, sessionId: args[12] as string }))
+            const scheduled = store.messages.addMessage(
+                source.id,
+                { text: 'send later' },
+                'scheduled-clear',
+                Date.now() + 60_000
+            )
+            const spawnSession = mock(async (...args: unknown[]) => ({
+                type: 'success' as const,
+                sessionId: args[10] as string
+            }))
             setSpawn(engine, spawnSession)
 
             const result = await engine.clearOpenCodeSession(source.id, 'default')
@@ -774,7 +857,10 @@ describe('SyncEngine.clearOpenCodeSession', () => {
             store.messages.addMessage(source.id, { text: 'scheduled transfer' }, 'scheduled-after-clear', Date.now() + 60_000)
             const events: Array<{ type: string, sessionId?: string, localIds?: string[] }> = []
             engine.subscribe((event) => events.push(event))
-            setSpawn(engine, mock(async (...args: unknown[]) => ({ type: 'success' as const, sessionId: args[12] as string })))
+            setSpawn(
+                engine,
+                mock(async (...args: unknown[]) => ({ type: 'success' as const, sessionId: args[10] as string }))
+            )
 
             const result = await engine.clearOpenCodeSession(source.id, 'default')
             if (result.type !== 'success') throw new Error('expected successful clear')
@@ -803,9 +889,14 @@ describe('SyncEngine.clearOpenCodeSession', () => {
             store.messages.addMessage(source.id, { text: 'stale source copy' }, 'duplicate-local-id')
             store.messages.addMessage(source.id, { text: 'unique immediate' }, 'unique-immediate')
             store.messages.addMessage(source.id, { text: 'unique scheduled' }, 'unique-scheduled', Date.now() + 60_000)
-            expect(engine.confirmOpenCodeClearCleanup(source.id, 'default', reserved.sessionId)).toMatchObject({ type: 'success' })
+            expect(engine.confirmOpenCodeClearCleanup(source.id, 'default', reserved.sessionId)).toMatchObject({
+                type: 'success'
+            })
             engine.handleSessionEnd({ sid: source.id, time: Date.now(), reason: 'cleared' })
-            setSpawn(engine, mock(async (...args: unknown[]) => ({ type: 'success' as const, sessionId: args[12] as string })))
+            setSpawn(
+                engine,
+                mock(async (...args: unknown[]) => ({ type: 'success' as const, sessionId: args[10] as string }))
+            )
 
             await (engine as unknown as { reconcileOpenCodeClears(): Promise<void> }).reconcileOpenCodeClears()
 

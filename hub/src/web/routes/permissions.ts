@@ -1,5 +1,3 @@
-import { isPermissionModeAllowedForFlavor } from '@hapi/protocol'
-import { PermissionModeSchema } from '@hapi/protocol/schemas'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { PermissionRequestNotFoundError } from '../../sync/rpcGateway'
@@ -17,7 +15,6 @@ const answersSchema = z.union([
 ])
 
 const approveBodySchema = z.object({
-    mode: PermissionModeSchema.optional(),
     allowTools: z.array(z.string()).optional(),
     decision: decisionSchema.optional(),
     answers: answersSchema.optional()
@@ -55,18 +52,11 @@ export function createPermissionsRoutes(getSyncEngine: () => SyncEngine | null):
             return c.json({ error: 'Request not found' }, 404)
         }
 
-        const mode = parsed.data.mode
-        if (mode !== undefined) {
-            const flavor = session.metadata?.flavor ?? 'claude'
-            if (!isPermissionModeAllowedForFlavor(mode, flavor)) {
-                return c.json({ error: 'Invalid permission mode for session flavor' }, 400)
-            }
-        }
         const allowTools = parsed.data.allowTools
         const decision = parsed.data.decision
         const answers = parsed.data.answers
         try {
-            await engine.approvePermission(sessionId, requestId, mode, allowTools, decision, answers)
+            await engine.approvePermission(sessionId, requestId, undefined, allowTools, decision, answers)
         } catch (error) {
             if (error instanceof PermissionRequestNotFoundError) {
                 return c.json({ error: error.message }, 409)

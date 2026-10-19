@@ -7,7 +7,6 @@ import {
     loadPreferredLaunchSettings,
     savePreferredAgent,
     savePreferredLaunchSettings,
-    savePreferredYoloMode
 } from './preferences'
 
 const mocks = vi.hoisted(() => ({
@@ -218,25 +217,6 @@ vi.mock('./MachineSelector', () => ({
     )
 }))
 vi.mock('./SessionTypeSelector', () => ({ SessionTypeSelector: () => null }))
-vi.mock('./PermissionField', () => ({
-    PermissionField: (props: {
-        agent: string
-        nativeValue: string
-        yoloMode: boolean
-        isDisabled: boolean
-        onNativeChange: (mode: string) => void
-        onYoloToggle: (value: boolean) => void
-    }) => (
-        <>
-            <button type="button" data-testid="permission-mode" onClick={() => props.onNativeChange('yolo')}>
-                {props.nativeValue}
-            </button>
-            <button type="button" data-testid="permission-mode-plan" onClick={() => props.onNativeChange('plan')}>
-                {props.nativeValue}
-            </button>
-        </>
-    )
-}))
 vi.mock('./CopilotAgentModeSelector', () => ({ CopilotAgentModeSelector: () => null }))
 vi.mock('./OpencodeModelSelector', () => ({
     OpencodeModelSelector: (props: { selectedModel: string | null | undefined; onModelChange: (model: string | null) => void }) => (
@@ -384,13 +364,32 @@ describe('NewSession launch preferences', () => {
         expect(mocks.spawnSession).not.toHaveBeenCalled()
     })
 
+    it('creates without exposing or sending permission choices', async () => {
+        render(
+            <NewSession
+                api={api}
+                machines={[machine]}
+                initialMachineId="machine-1"
+                initialDirectory="C:\\repo"
+                onSuccess={mocks.onSuccess}
+                onCancel={() => {}}
+            />
+        )
+        await waitFor(() => expect(screen.getByTestId('create')).toBeEnabled())
+        expect(screen.queryByText('misc.permissionMode')).not.toBeInTheDocument()
+        expect(screen.queryByText('newSession.yolo')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByTestId('create'))
+        await waitFor(() => expect(mocks.spawnSession).toHaveBeenCalled())
+        expect(mocks.spawnSession.mock.calls[0][0]).not.toHaveProperty('permissionMode')
+        expect(mocks.spawnSession.mock.calls[0][0]).not.toHaveProperty('yolo')
+    })
+
     it('restores the last successful model and reasoning effort for the machine and agent', async () => {
         savePreferredLaunchSettings('machine-1', 'codex', {
             model: 'gpt-5.6-sol',
             cursorSelectedBase: 'auto',
             effort: 'auto',
             modelReasoningEffort: 'xhigh',
-            permissionMode: 'safe-yolo'
         })
 
         render(
@@ -407,49 +406,6 @@ describe('NewSession launch preferences', () => {
         await waitFor(() => {
             expect(screen.getByTestId('model')).toHaveTextContent('gpt-5.6-sol')
             expect(screen.getByTestId('reasoning')).toHaveTextContent('xhigh')
-            expect(screen.getByTestId('permission-mode')).toHaveTextContent('default')
-        })
-    })
-
-    it('does not migrate a legacy YOLO value owned by a non-Codex agent', async () => {
-        savePreferredAgent('claude')
-        savePreferredYoloMode(true)
-
-        render(
-            <NewSession
-                api={api}
-                machines={[machine]}
-                initialMachineId="machine-1"
-                initialDirectory="C:\\repo"
-                onSuccess={mocks.onSuccess}
-                onCancel={() => {}}
-            />
-        )
-
-        fireEvent.click(screen.getByDisplayValue('codex'))
-
-        await waitFor(() => {
-            expect(screen.getByTestId('permission-mode')).toHaveTextContent('default')
-        })
-    })
-
-    it('migrates a legacy YOLO value when Codex was the preferred agent', async () => {
-        savePreferredAgent('codex')
-        savePreferredYoloMode(true)
-
-        render(
-            <NewSession
-                api={api}
-                machines={[machine]}
-                initialMachineId="machine-1"
-                initialDirectory="C:\\repo"
-                onSuccess={mocks.onSuccess}
-                onCancel={() => {}}
-            />
-        )
-
-        await waitFor(() => {
-            expect(screen.getByTestId('permission-mode')).toHaveTextContent('yolo')
         })
     })
 
@@ -681,43 +637,76 @@ describe('NewSession launch preferences', () => {
         expect(loadPreferredLaunchSettings('machine-1', 'codex')).toBeNull()
         fireEvent.click(screen.getByTestId('model'))
         fireEvent.click(screen.getByTestId('reasoning'))
-        fireEvent.click(screen.getByTestId('permission-mode'))
         expect(loadPreferredLaunchSettings('machine-1', 'codex')).toBeNull()
-        fireEvent.change(screen.getByRole('combobox', { name: 'newSession.codexPromptMode' }), { target: { value: 'steer' } })
+        fireEvent.change(screen.getByRole('combobox', { name: 'newSession.codexPromptMode' }), {
+            target: { value: 'steer' }
+        })
         fireEvent.click(screen.getByTestId('create'))
 
         await waitFor(() => expect(mocks.onSuccess).toHaveBeenCalledWith('session-1'))
-        expect(mocks.spawnSession).toHaveBeenCalledWith(expect.objectContaining({ permissionMode: 'yolo', codexPromptMode: 'steer' }))
+        expect(mocks.spawnSession).toHaveBeenCalledWith(expect.objectContaining({ codexPromptMode: 'steer' }))
         expect(loadPreferredLaunchSettings('machine-1', 'codex')).toEqual({
             model: 'gpt-5.6-terra',
             cursorSelectedBase: 'auto',
             effort: 'auto',
             modelReasoningEffort: 'max',
-            permissionMode: 'yolo', codexPromptMode: 'steer'
+            codexPromptMode: 'steer'
         })
     })
 
     it('restores the AGY model from a browse-return draft', async () => {
         savePreferredAgent('agy')
         saveNewSessionFormDraft({
-            agent: 'agy', model: 'gemini-3.6-flash-low', cursorSelectedBase: 'auto', machineId: 'machine-1',
-            effort: 'auto', modelReasoningEffort: 'default', serviceTier: 'standard', collaborationMode: 'default',
-            copilotAgentMode: 'interactive', yoloMode: false, nativePermissionMode: 'default',
-            grokPermissionMode: 'default', sessionType: 'simple', worktreeName: ''
+            agent: 'agy',
+            model: 'gemini-3.6-flash-low',
+            cursorSelectedBase: 'auto',
+            machineId: 'machine-1',
+            effort: 'auto',
+            modelReasoningEffort: 'default',
+            serviceTier: 'standard',
+            collaborationMode: 'default',
+            copilotAgentMode: 'interactive',
+            sessionType: 'simple',
+            worktreeName: ''
         })
-        render(<NewSession api={api} machines={[machine]} initialMachineId="machine-1" initialDirectory="C:\repo" onSuccess={mocks.onSuccess} onCancel={() => {}} />)
+        render(
+            <NewSession
+                api={api}
+                machines={[machine]}
+                initialMachineId="machine-1"
+                initialDirectory="C:\repo"
+                onSuccess={mocks.onSuccess}
+                onCancel={() => {}}
+            />
+        )
         await waitFor(() => expect(screen.getByTestId('agy-model')).toHaveTextContent('gemini-3.6-flash-low'))
     })
 
     it('falls back to Default when a browse-return AGY model is no longer advertised', async () => {
         savePreferredAgent('agy')
         saveNewSessionFormDraft({
-            agent: 'agy', model: 'removed-model', cursorSelectedBase: 'auto', machineId: 'machine-1',
-            effort: 'auto', modelReasoningEffort: 'default', serviceTier: 'standard', collaborationMode: 'default',
-            copilotAgentMode: 'interactive', yoloMode: false, nativePermissionMode: 'default',
-            grokPermissionMode: 'default', sessionType: 'simple', worktreeName: ''
+            agent: 'agy',
+            model: 'removed-model',
+            cursorSelectedBase: 'auto',
+            machineId: 'machine-1',
+            effort: 'auto',
+            modelReasoningEffort: 'default',
+            serviceTier: 'standard',
+            collaborationMode: 'default',
+            copilotAgentMode: 'interactive',
+            sessionType: 'simple',
+            worktreeName: ''
         })
-        render(<NewSession api={api} machines={[machine]} initialMachineId="machine-1" initialDirectory="C:\repo" onSuccess={mocks.onSuccess} onCancel={() => {}} />)
+        render(
+            <NewSession
+                api={api}
+                machines={[machine]}
+                initialMachineId="machine-1"
+                initialDirectory="C:\repo"
+                onSuccess={mocks.onSuccess}
+                onCancel={() => {}}
+            />
+        )
         await waitFor(() => expect(screen.getByTestId('agy-model')).toHaveTextContent('auto'))
     })
 
@@ -746,91 +735,24 @@ describe('NewSession launch preferences', () => {
 
     it('blocks Create while a remembered AGY model is awaiting catalog validation', async () => {
         savePreferredAgent('agy')
-        savePreferredLaunchSettings('machine-1', 'agy', { model: 'gemini-3.6-flash-low', cursorSelectedBase: 'auto', effort: 'auto', modelReasoningEffort: 'default' })
+        savePreferredLaunchSettings('machine-1', 'agy', {
+            model: 'gemini-3.6-flash-low',
+            cursorSelectedBase: 'auto',
+            effort: 'auto',
+            modelReasoningEffort: 'default'
+        })
         mocks.agyModelsLoading = true
-        render(<NewSession api={api} machines={[machine]} initialMachineId="machine-1" initialDirectory="C:\repo" onSuccess={mocks.onSuccess} onCancel={() => {}} />)
+        render(
+            <NewSession
+                api={api}
+                machines={[machine]}
+                initialMachineId="machine-1"
+                initialDirectory="C:\repo"
+                onSuccess={mocks.onSuccess}
+                onCancel={() => {}}
+            />
+        )
         await waitFor(() => expect(screen.getByTestId('create')).toBeDisabled())
-    })
-
-    it('does not forward the global YOLO preference to managed DSH ACP', async () => {
-        savePreferredAgent('dsh')
-        savePreferredYoloMode(true)
-        mocks.spawnSession.mockResolvedValue({ type: 'success', sessionId: 'dsh-session' })
-        render(<NewSession api={api} machines={[machine]} initialMachineId="machine-1" initialDirectory="C:\\repo" onSuccess={mocks.onSuccess} onCancel={() => {}} />)
-
-        fireEvent.click(screen.getByTestId('create'))
-        await waitFor(() => expect(mocks.onSuccess).toHaveBeenCalledWith('dsh-session'))
-        expect(mocks.spawnSession).toHaveBeenCalledWith(expect.objectContaining({
-            agent: 'dsh',
-            yolo: undefined,
-            permissionMode: undefined
-        }))
-    })
-
-    it('lets Claude create with a chosen permission mode instead of the global YOLO toggle', async () => {
-        savePreferredAgent('claude')
-        mocks.spawnSession.mockResolvedValue({ type: 'success', sessionId: 'claude-session' })
-        render(<NewSession api={api} machines={[machine]} initialMachineId="machine-1" initialDirectory="C:\\repo" onSuccess={mocks.onSuccess} onCancel={() => {}} />)
-
-        fireEvent.click(screen.getByTestId('permission-mode-plan'))
-        fireEvent.click(screen.getByTestId('create'))
-
-        await waitFor(() => expect(mocks.onSuccess).toHaveBeenCalledWith('claude-session'))
-        expect(mocks.spawnSession).toHaveBeenCalledWith(expect.objectContaining({
-            agent: 'claude',
-            yolo: undefined,
-            permissionMode: 'plan'
-        }))
-    })
-
-    it('does not carry a permission mode picked under another flavor into the Claude spawn payload', async () => {
-        savePreferredAgent('codex')
-        mocks.spawnSession.mockResolvedValue({ type: 'success', sessionId: 'claude-session' })
-        render(<NewSession api={api} machines={[machine]} initialMachineId="machine-1" initialDirectory="C:\\repo" onSuccess={mocks.onSuccess} onCancel={() => {}} />)
-
-        // Starts as codex; picking the mocked native-select button sets the
-        // shared nativePermissionMode state to 'yolo', a value 'claude' does
-        // not carry in its own permission catalog.
-        await waitFor(() => expect(screen.getByDisplayValue('codex')).toBeChecked())
-        fireEvent.click(screen.getByTestId('permission-mode'))
-        fireEvent.click(screen.getByDisplayValue('claude'))
-        await waitFor(() => expect(screen.getByDisplayValue('claude')).toBeChecked())
-        fireEvent.click(screen.getByTestId('create'))
-
-        await waitFor(() => expect(mocks.onSuccess).toHaveBeenCalledWith('claude-session'))
-        expect(mocks.spawnSession).toHaveBeenCalledWith(expect.objectContaining({
-            agent: 'claude',
-            permissionMode: 'default'
-        }))
-    })
-
-    it('migrates a legacy YOLO value owned by Claude to bypassPermissions', async () => {
-        savePreferredAgent('claude')
-        savePreferredYoloMode(true)
-
-        render(<NewSession api={api} machines={[machine]} initialMachineId="machine-1" initialDirectory="C:\\repo" onSuccess={mocks.onSuccess} onCancel={() => {}} />)
-
-        await waitFor(() => {
-            expect(screen.getByTestId('permission-mode')).toHaveTextContent('bypassPermissions')
-        })
-    })
-
-    it('does not preselect bypassPermissions for Claude from a legacy YOLO value owned by another flavor', async () => {
-        // hapi:newSession:yolo is a flavor-agnostic global key. The legacyYoloAgent
-        // snapshot (captured once at mount, see index.tsx) is what stops a YOLO
-        // toggle left on under cursor from silently preselecting bypassPermissions
-        // the next time Claude is picked.
-        savePreferredAgent('cursor')
-        savePreferredYoloMode(true)
-
-        render(<NewSession api={api} machines={[machine]} initialMachineId="machine-1" initialDirectory="C:\\repo" onSuccess={mocks.onSuccess} onCancel={() => {}} />)
-
-        await waitFor(() => expect(screen.getByDisplayValue('cursor')).toBeChecked())
-        fireEvent.click(screen.getByDisplayValue('claude'))
-
-        await waitFor(() => {
-            expect(screen.getByTestId('permission-mode')).toHaveTextContent('default')
-        })
     })
 
     it('keeps an explicit OpenCode Default selection instead of restoring a concrete model', async () => {
@@ -1154,9 +1076,6 @@ describe('NewSession launch preferences', () => {
             serviceTier: 'standard',
             collaborationMode: 'default',
             copilotAgentMode: 'interactive',
-            yoloMode: false,
-            nativePermissionMode: 'default',
-            grokPermissionMode: 'default',
             sessionType: 'simple',
             worktreeName: ''
         })

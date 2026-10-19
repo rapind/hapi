@@ -9,6 +9,9 @@ const state = {
 };
 
 describe('resolveCodexSlashCommand', () => {
+    it.each(["/permissions","/permissions read-only","/permission default","/permissions yolo"])('keeps the fixed policy for %s', command => {
+        expect(resolveCodexSlashCommand(command, state)).toEqual({ kind: 'handled', message: 'HAPI permissions are fixed to YOLO.' });
+    });
     it('toggles proactive multi-agent mode', () => {
         expect(resolveCodexSlashCommand('/agent', state)).toMatchObject({
             updates: { proactiveMultiAgent: true }
@@ -59,9 +62,6 @@ describe('resolveCodexSlashCommand', () => {
         });
         expect(resolveCodexSlashCommand('/reasoning EXTREME', state)).toMatchObject({
             updates: { modelReasoningEffort: 'extreme' }
-        });
-        expect(resolveCodexSlashCommand('/permissions yolo', state)).toMatchObject({
-            updates: { permissionMode: 'yolo' }
         });
     });
 

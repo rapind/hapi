@@ -246,7 +246,7 @@ describe('sessions routes', () => {
         } }), {
             resumeSession: async (id, namespace, opts) => {
                 calls.push('resume')
-                expect([id, namespace, opts]).toEqual(['session-1', 'default', { permissionMode: 'read-only' }])
+                expect([id, namespace, opts]).toEqual(['session-1', 'default', undefined])
                 return { type: 'success', sessionId: 'resumed-session' }
             },
             clearConversation: async (id, namespace) => {
@@ -1109,106 +1109,32 @@ describe('sessions routes', () => {
         expect(response.status).toBe(400)
     })
 
-    it('rejects OpenCode plan mode changes for local sessions', async () => {
-        const session = createSession({
-            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'opencode' },
-            agentState: {
-                controlledByUser: true,
-                requests: {},
-                completedRequests: {}
-            }
-        })
-        const { app, applySessionConfigCalls } = createApp(session)
-
+    it('does not expose a permission-mode change endpoint', async () => {
+        const { app, applySessionConfigCalls } = createApp(createSession())
         const response = await app.request('/api/sessions/session-1/permission-mode', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ mode: 'plan' })
         })
-
-        expect(response.status).toBe(409)
-        expect(await response.json()).toEqual({
-            error: 'OpenCode plan mode is only supported for remote sessions'
-        })
+        expect(response.status).toBe(404)
         expect(applySessionConfigCalls).toEqual([])
     })
 
-    it('applies OpenCode plan mode changes for remote sessions', async () => {
-        const session = createSession({
-            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'opencode' }
-        })
-        const { app, applySessionConfigCalls } = createApp(session)
-
-        const response = await app.request('/api/sessions/session-1/permission-mode', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ mode: 'plan' })
-        })
-
-        expect(response.status).toBe(200)
-        expect(await response.json()).toEqual({ ok: true })
-        expect(applySessionConfigCalls).toEqual([
-            ['session-1', { permissionMode: 'plan' }]
-        ])
-    })
-
-    it('applies permission mode changes for inactive sessions', async () => {
-        const session = createSession({
-            active: false,
-            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'claude' }
-        })
-        const { app, applySessionConfigCalls } = createApp(session)
-
-        const response = await app.request('/api/sessions/session-1/permission-mode', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ mode: 'bypassPermissions' })
-        })
-
-        expect(response.status).toBe(200)
-        expect(await response.json()).toEqual({ ok: true })
-        expect(applySessionConfigCalls).toEqual([
-            ['session-1', { permissionMode: 'bypassPermissions' }]
-        ])
-    })
-
-    it('rejects unsupported permission mode for flavor via resume body', async () => {
-        const session = createSession({
-            active: false,
-            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'codex' }
-        })
-        const { app } = createApp(session)
-
-        const response = await app.request('/api/sessions/session-1/resume', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ permissionMode: 'bypassPermissions' })
-        })
-
-        expect(response.status).toBe(400)
-    })
-
-    it('passes permissionMode from resume body to resumeSession', async () => {
-        const session = createSession({
-            active: false,
-            metadata: { path: '/tmp/project', host: 'localhost', flavor: 'claude' }
-        })
+    it('resumes without forwarding permission choices', async () => {
         let capturedResumeOpts: { permissionMode?: string } | undefined
-        const { app } = createApp(session, {
-            resumeSession: async (sessionId, _namespace, resumeOpts) => {
-                capturedResumeOpts = resumeOpts
+        const { app } = createApp(createSession({ active: false }), {
+            resumeSession: async (sessionId, _namespace, opts) => {
+                capturedResumeOpts = opts
                 return { type: 'success', sessionId }
             }
         })
-
         const response = await app.request('/api/sessions/session-1/resume', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ permissionMode: 'bypassPermissions' })
+            body: JSON.stringify({ permissionMode: 'read-only' })
         })
-
         expect(response.status).toBe(200)
-        expect(capturedResumeOpts).toEqual({ permissionMode: 'bypassPermissions' })
+        expect(capturedResumeOpts).toBeUndefined()
     })
 
     it('returns 409 when resume token is unavailable', async () => {

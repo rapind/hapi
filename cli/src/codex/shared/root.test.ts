@@ -315,10 +315,11 @@ describe('shared steering availability', () => {
         const f = await fixture();
         const requests = vi.spyOn(f.root.client, 'request');
         const heartbeat = vi.spyOn(f.root.session, 'keepAlive');
-        const updates = f.updateState.mock.calls.length;
         vi.useFakeTimers();
 
         await f.root.activate();
+        const updates = f.updateState.mock.calls.length;
+        requests.mockClear();
         await vi.advanceTimersByTimeAsync(5 * 60_000);
 
         expect(heartbeat).toHaveBeenCalled();

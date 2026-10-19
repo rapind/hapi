@@ -217,26 +217,19 @@ describe('runOpencode set-session-config handler', () => {
         await runOpencode({ ...parsed, workingDirectory: '/tmp/project' });
 
         expect(harness.bootstrapArgs).toEqual([]);
-        expect(harness.bootstrapExistingArgs).toEqual([{
-            sessionId: 'live-hub-row',
-            flavor: 'opencode',
-            startedBy: 'runner',
-            workingDirectory: '/tmp/project'
-        }]);
+        expect(harness.bootstrapExistingArgs).toEqual([
+            {
+                sessionId: 'live-hub-row',
+                flavor: 'opencode',
+                startedBy: 'runner',
+                workingDirectory: '/tmp/project'
+            }
+        ]);
     });
 
-    it('rejects plan mode for local OpenCode startup', async () => {
-        await expect(runOpencode({ permissionMode: 'plan' })).rejects.toThrow(
-            'OpenCode plan mode is only supported in remote mode'
-        );
-        expect(harness.opencodeLoopArgs).toEqual([]);
-    });
-
-    it('allows plan mode for remote OpenCode startup', async () => {
-        await runOpencode({ permissionMode: 'plan', startingMode: 'remote' });
-
-        expect(harness.opencodeLoopArgs[0]?.permissionMode).toBe('plan');
-        expect(harness.opencodeLoopArgs[0]?.startingMode).toBe('remote');
+    it.each(['local', 'remote'] as const)('forces YOLO for %s startup despite a saved plan mode', async startingMode => {
+        await runOpencode({ permissionMode: 'plan', startingMode });
+        expect(harness.opencodeLoopArgs[0]?.permissionMode).toBe('yolo');
     });
 
     it('applies model change via set-session-config RPC', async () => {
@@ -293,9 +286,9 @@ describe('runOpencode set-session-config handler', () => {
         await runOpencode({});
 
         const handler = getConfigHandler();
-        const result = await handler({ permissionMode: 'default' }) as Record<string, unknown>;
+        const result = await handler({ permissionMode: 'yolo' }) as Record<string, unknown>;
         const applied = result.applied as Record<string, unknown>;
-        expect(applied.permissionMode).toBe('default');
+        expect(applied.permissionMode).toBe('yolo');
         expect(applied).not.toHaveProperty('model');
     });
 
@@ -308,18 +301,11 @@ describe('runOpencode set-session-config handler', () => {
         expect(applied.permissionMode).toBe('yolo');
     });
 
-    it('accepts plan mode via set-session-config RPC', async () => {
+    it('rejects permission changes away from YOLO', async () => {
         await runOpencode({});
-
-        const handler = getConfigHandler();
-        const result = await handler({ permissionMode: 'plan' }) as Record<string, unknown>;
-        const applied = result.applied as Record<string, unknown>;
-
-        expect(applied.permissionMode).toBe('plan');
-        expect(mockOpencodeSession.setPermissionMode).toHaveBeenLastCalledWith('plan');
+        await expect(getConfigHandler()({ permissionMode: 'plan' })).rejects.toThrow('Invalid permission mode');
+        expect(mockOpencodeSession.setPermissionMode).not.toHaveBeenCalledWith('plan');
     });
-
-
 
     it('accepts model reasoning effort via set-session-config RPC', async () => {
         await runOpencode({});

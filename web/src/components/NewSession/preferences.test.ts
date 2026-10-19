@@ -2,11 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
     loadPreferredAgent,
     loadPreferredLaunchSettings,
-    loadPreferredYoloMode,
     resolvePreferredLaunchSettings,
     savePreferredAgent,
     savePreferredLaunchSettings,
-    savePreferredYoloMode,
 } from './preferences'
 
 describe('NewSession preferences', () => {
@@ -22,14 +20,15 @@ describe('NewSession preferences', () => {
         savePreferredLaunchSettings('one', 'codex', settings)
         savePreferredLaunchSettings('one', 'claude', settings)
         expect(loadPreferredLaunchSettings('one', 'codex')?.codexPromptMode).toBe('steer')
-        expect(resolvePreferredLaunchSettings('codex', loadPreferredLaunchSettings('one', 'codex'), false).codexPromptMode).toBe('steer')
+        expect(
+            resolvePreferredLaunchSettings('codex', loadPreferredLaunchSettings('one', 'codex')).codexPromptMode
+        ).toBe('steer')
         expect(loadPreferredLaunchSettings('two', 'codex')).toBeNull()
         expect(loadPreferredLaunchSettings('one', 'claude')?.codexPromptMode).toBeUndefined()
     })
 
     it('loads defaults when storage is empty', () => {
         expect(loadPreferredAgent()).toBe('claude')
-        expect(loadPreferredYoloMode()).toBe(false)
     })
 
     it('loads saved values from storage', () => {
@@ -37,7 +36,6 @@ describe('NewSession preferences', () => {
         localStorage.setItem('hapi:newSession:yolo', 'true')
 
         expect(loadPreferredAgent()).toBe('codex')
-        expect(loadPreferredYoloMode()).toBe(true)
     })
 
     it('falls back to default agent on invalid stored value', () => {
@@ -48,10 +46,8 @@ describe('NewSession preferences', () => {
 
     it('persists new values to storage', () => {
         savePreferredAgent('gemini')
-        savePreferredYoloMode(true)
 
         expect(localStorage.getItem('hapi:newSession:agent')).toBe('gemini')
-        expect(localStorage.getItem('hapi:newSession:yolo')).toBe('true')
     })
 
     it('round-trips launch settings per machine and agent', () => {
@@ -60,7 +56,6 @@ describe('NewSession preferences', () => {
             cursorSelectedBase: 'auto',
             effort: 'auto',
             modelReasoningEffort: 'xhigh',
-            permissionMode: 'read-only'
         })
         savePreferredLaunchSettings('machine-1', 'claude', {
             model: 'opus',
@@ -80,7 +75,6 @@ describe('NewSession preferences', () => {
             cursorSelectedBase: 'auto',
             effort: 'auto',
             modelReasoningEffort: 'xhigh',
-            permissionMode: 'read-only'
         })
         expect(loadPreferredLaunchSettings('machine-1', 'claude')).toEqual({
             model: 'opus',
@@ -94,16 +88,6 @@ describe('NewSession preferences', () => {
             effort: 'auto',
             modelReasoningEffort: 'max'
         })
-    })
-
-    it('drops stale Safe Yolo preferences for new Codex sessions', () => {
-        const stale = { model: 'auto', cursorSelectedBase: 'auto', effort: 'auto',
-            modelReasoningEffort: 'default', permissionMode: 'safe-yolo' } as const
-        savePreferredLaunchSettings('machine-1', 'codex', stale)
-        const loaded = loadPreferredLaunchSettings('machine-1', 'codex')
-        expect(loaded?.permissionMode).toBe('default')
-        expect(resolvePreferredLaunchSettings('codex', loaded, true).permissionMode).toBe('default')
-        expect(resolvePreferredLaunchSettings('codex', stale, true).permissionMode).toBe('default')
     })
 
     it('returns null when no launch settings were saved for the target', () => {
@@ -147,17 +131,18 @@ describe('NewSession preferences', () => {
     })
 
     it('falls back when remembered static Claude options are no longer available', () => {
-        expect(resolvePreferredLaunchSettings('claude', {
-            model: 'retired-model',
-            cursorSelectedBase: 'auto',
-            effort: 'ultra',
-            modelReasoningEffort: 'default'
-        })).toEqual({
+        expect(
+            resolvePreferredLaunchSettings('claude', {
+                model: 'retired-model',
+                cursorSelectedBase: 'auto',
+                effort: 'ultra',
+                modelReasoningEffort: 'default'
+            })
+        ).toEqual({
             model: 'auto',
             cursorSelectedBase: 'auto',
             effort: 'auto',
             modelReasoningEffort: 'default',
-            permissionMode: 'default'
         })
     })
 
@@ -167,13 +152,11 @@ describe('NewSession preferences', () => {
             cursorSelectedBase: 'auto',
             effort: 'auto',
             modelReasoningEffort: 'xhigh',
-            permissionMode: 'read-only'
         })).toEqual({
             model: 'gpt-5.6-sol',
             cursorSelectedBase: 'auto',
             effort: 'auto',
             modelReasoningEffort: 'xhigh',
-            permissionMode: 'read-only'
         })
     })
 
@@ -191,71 +174,7 @@ describe('NewSession preferences', () => {
             cursorSelectedBase: 'auto',
             effort: 'auto',
             modelReasoningEffort: 'default',
-            permissionMode: 'default'
         })
-    })
-
-    it('falls back when a remembered permission mode is invalid for the agent', () => {
-        expect(resolvePreferredLaunchSettings('codex', {
-            model: 'auto',
-            cursorSelectedBase: 'auto',
-            effort: 'auto',
-            modelReasoningEffort: 'default',
-            permissionMode: 'bypassPermissions'
-        })).toEqual({
-            model: 'auto',
-            cursorSelectedBase: 'auto',
-            effort: 'auto',
-            modelReasoningEffort: 'default',
-            permissionMode: 'default'
-        })
-    })
-
-    it('migrates the legacy YOLO preference for Codex only', () => {
-        savePreferredYoloMode(true)
-
-        expect(resolvePreferredLaunchSettings('codex', null, true).permissionMode).toBe('yolo')
-        expect(resolvePreferredLaunchSettings('copilot', null, true).permissionMode).toBe('default')
-        expect(resolvePreferredLaunchSettings('codex', null, false).permissionMode).toBe('default')
-    })
-
-    it('migrates the legacy YOLO preference for Claude to bypassPermissions', () => {
-        expect(resolvePreferredLaunchSettings('claude', null, true).permissionMode).toBe('bypassPermissions')
-        expect(resolvePreferredLaunchSettings('claude', null, false).permissionMode).toBe('default')
-    })
-
-    it('round-trips a Claude permission mode through storage', () => {
-        savePreferredLaunchSettings('machine-1', 'claude', {
-            model: 'auto',
-            cursorSelectedBase: 'auto',
-            effort: 'auto',
-            modelReasoningEffort: 'default',
-            permissionMode: 'plan'
-        })
-
-        expect(loadPreferredLaunchSettings('machine-1', 'claude')).toEqual({
-            model: 'auto',
-            cursorSelectedBase: 'auto',
-            effort: 'auto',
-            modelReasoningEffort: 'default',
-            permissionMode: 'plan'
-        })
-    })
-
-    it.each([
-        ['kimi', 'safe-yolo'],
-        ['opencode', 'plan']
-    ] as const)('restores remembered permission modes for %s', (agent, permissionMode) => {
-        savePreferredLaunchSettings('machine-1', agent, {
-            model: 'auto',
-            cursorSelectedBase: 'auto',
-            effort: 'auto',
-            modelReasoningEffort: 'default',
-            permissionMode
-        })
-
-        const preferred = loadPreferredLaunchSettings('machine-1', agent)
-        expect(resolvePreferredLaunchSettings(agent, preferred).permissionMode).toBe(permissionMode)
     })
 
     it('drops an OpenCode reasoning value that is not offered at launch', () => {
@@ -269,7 +188,6 @@ describe('NewSession preferences', () => {
             cursorSelectedBase: 'auto',
             effort: 'auto',
             modelReasoningEffort: 'default',
-            permissionMode: 'default'
         })
     })
 })

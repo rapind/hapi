@@ -12,7 +12,6 @@ describe('agent config descriptors', () => {
         expect(descriptor.fields.map((field) => [field.id, field.section])).toEqual([
             ['model', 'model'],
             ['effort', 'effort'],
-            ['permission', 'permission'],
             ['serviceTier', 'settings'],
             ['collaborationMode', 'settings']
         ])
@@ -20,42 +19,19 @@ describe('agent config descriptors', () => {
 
     test('models Cursor variant as a dependent model field rather than a page-specific control', () => {
         const descriptor = getAgentConfigDescriptor('cursor')
-        expect(descriptor.fields).toContainEqual(expect.objectContaining({
-            id: 'model',
-            kind: 'dependent-select',
-            optionSource: 'machine'
-        }))
+        expect(descriptor.fields).toContainEqual(
+            expect.objectContaining({
+                id: 'model',
+                kind: 'dependent-select',
+                optionSource: 'machine'
+            })
+        )
     })
 
-    test('reports DSH permission as managed by its ACP composition', () => {
-        const descriptor = getAgentConfigDescriptor('dsh')
-        expect(descriptor.fields).toEqual([expect.objectContaining({
-            id: 'permission',
-            kind: 'status',
-            availability: 'managed'
-        })])
-        expect(resolveHapiYoloPermissionMode('dsh')).toBeNull()
-    })
-
-    test('reports Pi permission as managed rather than pretending YOLO applies', () => {
-        const descriptor = getAgentConfigDescriptor('pi')
-        expect(descriptor.fields).toContainEqual(expect.objectContaining({
-            id: 'permission',
-            kind: 'status',
-            availability: 'managed'
-        }))
-        expect(descriptor.fields).toContainEqual(expect.objectContaining({
-            id: 'model',
-            kind: 'grouped-select',
-            optionSource: 'machine',
-            availability: 'both'
-        }))
-        expect(descriptor.fields).toContainEqual(expect.objectContaining({
-            id: 'effort',
-            optionSource: 'static',
-            availability: 'both'
-        }))
-        expect(resolveHapiYoloPermissionMode('pi')).toBeNull()
+    test('does not advertise permission controls for any agent', () => {
+        for (const descriptor of getBuiltinAgentConfigDescriptors()) {
+            expect(descriptor.fields.some(field => field.id === 'permission')).toBe(false)
+        }
     })
 
     test('maps HAPI YOLO to each supported agent native permission mode', () => {
@@ -68,24 +44,28 @@ describe('agent config descriptors', () => {
     })
 
     test('validates descriptors received from a runner', () => {
-        expect(AgentConfigDescriptorSchema.safeParse({
-            flavor: 'example-agent',
-            fields: [{
-                id: 'model',
-                section: 'model',
-                kind: 'grouped-select',
-                optionSource: 'directory',
-                availability: 'both'
-            }]
-        }).success).toBe(true)
+        expect(
+            AgentConfigDescriptorSchema.safeParse({
+                flavor: 'example-agent',
+                fields: [
+                    {
+                        id: 'model',
+                        section: 'model',
+                        kind: 'grouped-select',
+                        optionSource: 'directory',
+                        availability: 'both'
+                    }
+                ]
+            }).success
+        ).toBe(true)
     })
 
-    test('every builtin descriptor validates and carries a permission field', () => {
+    test('every builtin descriptor validates without permission fields', () => {
         const descriptors = getBuiltinAgentConfigDescriptors()
         expect(descriptors.length).toBeGreaterThan(0)
         for (const descriptor of descriptors) {
             expect(AgentConfigDescriptorSchema.safeParse(descriptor).success).toBe(true)
-            expect(descriptor.fields.some((field) => field.id === 'permission')).toBe(true)
+            expect(descriptor.fields.some((field) => field.id === 'permission')).toBe(false)
         }
     })
 })

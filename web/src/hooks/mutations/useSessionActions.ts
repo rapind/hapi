@@ -1,11 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { isPermissionModeAllowedForFlavor } from '@hapi/protocol'
 import type { ApiClient } from '@/api/client'
-import type { CodexCollaborationMode, CopilotAgentMode, PermissionMode, SessionResponse, SessionsResponse } from '@/types/api'
+import type { CodexCollaborationMode, CopilotAgentMode, SessionResponse, SessionsResponse } from '@/types/api'
 import type { ReopenSessionResponse, MessageDeliveryMode } from '@hapi/protocol/apiTypes'
 import { queryKeys } from '@/lib/query-keys'
 import { clearMessageWindow } from '@/lib/message-window-store'
-import { isKnownFlavor } from '@hapi/protocol'
 
 export const sessionModelMutationKey = (sessionId: string) => ['session-model', sessionId] as const
 
@@ -19,7 +17,6 @@ export function useSessionActions(
     archiveSession: () => Promise<void>
     reopenSession: () => Promise<ReopenSessionResponse>
     switchSession: () => Promise<void>
-    setPermissionMode: (mode: PermissionMode) => Promise<void>
     setCollaborationMode: (mode: CodexCollaborationMode) => Promise<void>
     setCopilotAgentMode: (mode: CopilotAgentMode) => Promise<void>
     setModel: (model: { provider: string; modelId: string } | string | null) => Promise<void>
@@ -126,19 +123,6 @@ export function useSessionActions(
                 throw new Error('Session unavailable')
             }
             await api.switchSession(sessionId)
-        },
-        onSuccess: () => void invalidateSession(),
-    })
-
-    const permissionMutation = useMutation({
-        mutationFn: async (mode: PermissionMode) => {
-            if (!api || !sessionId) {
-                throw new Error('Session unavailable')
-            }
-            if (isKnownFlavor(agentFlavor) && !isPermissionModeAllowedForFlavor(mode, agentFlavor)) {
-                throw new Error('Invalid permission mode for session flavor')
-            }
-            await api.setPermissionMode(sessionId, mode)
         },
         onSuccess: () => void invalidateSession(),
     })
@@ -295,7 +279,6 @@ export function useSessionActions(
         archiveSession: archiveMutation.mutateAsync,
         reopenSession: reopenMutation.mutateAsync,
         switchSession: switchMutation.mutateAsync,
-        setPermissionMode: permissionMutation.mutateAsync,
         setCollaborationMode: collaborationMutation.mutateAsync,
         setCopilotAgentMode: copilotAgentModeMutation.mutateAsync,
         setModel: modelMutation.mutateAsync,
@@ -312,7 +295,6 @@ export function useSessionActions(
             || archiveMutation.isPending
             || reopenMutation.isPending
             || switchMutation.isPending
-            || permissionMutation.isPending
             || collaborationMutation.isPending
             || copilotAgentModeMutation.isPending
             || modelMutation.isPending

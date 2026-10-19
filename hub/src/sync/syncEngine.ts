@@ -7,7 +7,7 @@
  * - No E2E encryption; data is stored as JSON in SQLite
  */
 
-import { isKnownFlavor, isLiveLifecycleState, isSteeringSupportedForSession, type LocalResumeTarget, type ResumableSession, type SessionEndReason } from '@hapi/protocol'
+import { resolveHapiYoloPermissionMode, isKnownFlavor, isLiveLifecycleState, isSteeringSupportedForSession, type LocalResumeTarget, type ResumableSession, type SessionEndReason } from '@hapi/protocol'
 import {
     cliBinaryUpdatedOnDisk,
     isMachineCapabilitySkewed,
@@ -1558,12 +1558,10 @@ export class SyncEngine {
                 flavor,
                 forkModel,
                 source.modelReasoningEffort ?? undefined,
-                undefined,
                 'simple',
                 undefined,
                 rpcResult.nativeSessionId,
                 forkEffort,
-                source.permissionMode,
                 source.serviceTier ?? undefined,
                 childId,
                 source.collaborationMode,
@@ -2144,6 +2142,11 @@ export class SyncEngine {
         }
     ): Promise<void> {
         const session = this.sessionCache.getSession(sessionId)
+        if (config.permissionMode !== undefined) {
+            const fixedMode = resolveHapiYoloPermissionMode(session?.metadata?.flavor ?? 'claude')
+            if (!fixedMode) throw new Error('Permissions are managed by the agent')
+            config = { ...config, permissionMode: fixedMode }
+        }
         if (!session?.active) {
             // For inactive sessions, update the in-memory cache directly without
             // an RPC call — the CLI is not running yet. The updated value will be
@@ -2192,12 +2195,10 @@ export class SyncEngine {
         agent: AgentFlavor = 'claude',
         model?: string,
         modelReasoningEffort?: string,
-        yolo?: boolean,
         sessionType?: 'simple' | 'worktree',
         worktreeName?: string,
         resumeSessionId?: string,
         effort?: string,
-        permissionMode?: PermissionMode,
         serviceTier?: string,
         existingSessionId?: string,
         collaborationMode?: CodexCollaborationMode,
@@ -2250,12 +2251,10 @@ export class SyncEngine {
                 agent,
                 model,
                 modelReasoningEffort,
-                yolo,
                 sessionType,
                 worktreeName,
                 resumeSessionId,
                 effort,
-                permissionMode,
                 serviceTier,
                 // Fresh prealloc stubs must not go down reopen (--existing-session-id):
                 // Codex would demand a thread binding that does not exist yet (#1911).
@@ -2573,12 +2572,10 @@ export class SyncEngine {
             'opencode',
             source.model ?? undefined,
             source.modelReasoningEffort ?? undefined,
-            false,
             undefined,
             undefined,
             undefined,
             source.effort ?? undefined,
-            source.permissionMode ?? metadata.preferredPermissionMode,
             source.serviceTier ?? undefined,
             operation.replacementSessionId,
             source.collaborationMode
@@ -3152,7 +3149,7 @@ export class SyncEngine {
         }
     }
 
-    async resumeSession(sessionId: string, namespace: string, opts?: { permissionMode?: PermissionMode }): Promise<ResumeSessionResult> {
+    async resumeSession(sessionId: string, namespace: string): Promise<ResumeSessionResult> {
         const access = this.sessionCache.resolveSessionAccess(sessionId, namespace)
         if (!access.ok) {
             return {
@@ -3299,12 +3296,6 @@ export class SyncEngine {
             }
         }
 
-        const metadataPermissionMode = session.metadata?.preferredPermissionMode
-        const preferredPermissionMode = metadataPermissionMode === 'yolo' && opts?.permissionMode === 'default'
-            ? metadataPermissionMode
-            : opts?.permissionMode
-                ?? session.permissionMode
-                ?? metadataPermissionMode
         const resumedStartingMode =
             (session.agentState as { startingMode?: 'local' | 'remote' | 'pty' } | null)?.startingMode === 'pty'
                 ? 'pty'
@@ -3362,10 +3353,8 @@ export class SyncEngine {
                 session.modelReasoningEffort ?? undefined,
                 undefined,
                 undefined,
-                undefined,
                 resumeToken,
                 session.effort ?? undefined,
-                preferredPermissionMode,
                 session.serviceTier ?? undefined,
                 access.sessionId,
                 session.collaborationMode ?? undefined,
