@@ -1897,7 +1897,7 @@ export function HappyComposer(props: {
                                             onSelect={handleSelect}
                                             onKeyDown={handleKeyDown}
                                             onPaste={handlePaste}
-                                            className="composer-textarea min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-base leading-snug text-[var(--app-composer-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                            className="composer-textarea min-h-[calc(1lh+0.25rem)] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-base leading-snug text-[var(--app-composer-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                         />
                                     )}
                                 </div>

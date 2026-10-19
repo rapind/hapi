@@ -7,6 +7,9 @@ import { AssistantRuntimeProvider, useLocalRuntime } from '@assistant-ui/react'
 import { HappyComposer } from '../src/components/AssistantChat/HappyComposer'
 import { I18nProvider } from '../src/lib/i18n-context'
 import { applyGlobalSelectAll } from '../src/components/SessionChat'
+import { initializeFontScale } from '../src/hooks/useFontScale'
+
+initializeFontScale()
 
 declare global {
     interface Window {
