@@ -14,6 +14,7 @@ type LocalLaunchFailure = {
 };
 
 export class Session extends AgentSessionBase<EnhancedMode> {
+    steerQueuedMessage: ((localId: string) => Promise<{ steered: boolean; error?: string }>) | null = null;
     readonly claudeEnvVars?: Record<string, string>;
     claudeArgs?: string[];
     readonly mcpServers: Record<string, any>;

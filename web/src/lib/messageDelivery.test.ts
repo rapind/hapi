@@ -38,7 +38,7 @@ describe('resolveMessageDeliveryMode', () => {
         intent: 'default' as const,
     }
 
-    it.each(['codex', 'pi', 'cursor'] as const)('always steers fresh active %s sends', flavor => {
+    it.each(['claude', 'codex', 'pi', 'cursor'] as const)('always steers fresh active %s sends', flavor => {
         expect(resolveMessageDeliveryMode({ ...base, metadata: { flavor } })).toBe('steer')
     })
 
@@ -50,7 +50,7 @@ describe('resolveMessageDeliveryMode', () => {
         { isSessionThinking: false },
         { scheduledAt: 1 },
         { routesToScratchlist: true },
-        { metadata: { flavor: 'claude' as const } },
+        { metadata: { flavor: 'kimi' as const } },
         { metadata: { flavor: 'cursor' as const, cursorSessionProtocol: 'stream-json' as const } },
     ])('defers idle, scheduled, scratchlist and unsupported sends: %j', override => {
         expect(resolveMessageDeliveryMode({ ...base, ...override })).toBe('queue')

@@ -2,7 +2,7 @@
 
 Checked 2026-10-19. GitHub states below come from the live API.
 
-Yes, current Claude Code can receive instructions during an active tool workflow. HAPI's remote Claude integration currently withholds subsequent input until the entire turn returns a `result`. Two open upstream HAPI PRs address that gap.
+Yes, current Claude Code can receive instructions during an active tool workflow. The upstream HAPI integration inspected here withheld subsequent input until the entire turn returned a `result`. This fork now uses native lifecycle acknowledgments to steer compatible immediate messages automatically.
 
 ## What Claude supports
 
@@ -31,12 +31,41 @@ The runtime tests above are contributor reports, not independently reproduced he
 
 ## Local integration and recommendation
 
-Claude Code 2.1.303 is installed locally. HAPI already supplies stream-json input through `PushableAsyncIterable` in `cli/src/claude/sdk/query.ts`. `cli/src/claude/claudeRemote.ts` only calls `scheduleNextMessage()` after a `result`, and `shared/src/modes.ts` excludes Claude from its steering catalog.
+Claude Code 2.1.303 is installed locally. HAPI already supplies stream-json input through `PushableAsyncIterable` in `cli/src/claude/sdk/query.ts`. The integration now exposes a separate live input path while ordinary queued delivery remains available for commands and incompatible modes. Claude is included in the steering capability catalog.
 
 The owner's policy is to steer ordinary interactive and orchestrator messages automatically whenever the agent supports it, matching the existing always-YOLO policy. Do not add a Queue/Steer choice to New Chat, model settings or the status line. Scheduled delivery, replay, incompatible active modes and unsupported transports may require durable deferral.
 
-A future Claude integration should use the native stream-json input channel. PR #2008 provides useful transport and lifecycle work, but its manual Steer UI does not match this policy. Delivery acknowledgment, abort recovery, pending follow-up turns and automatic orchestrator delivery need review before adoption. Validate both tool-boundary absorption and the race where input arrives after the final tool call; transport acceptance alone does not prove the model has read a message.
+The local implementation adapts #2008's native input channel and lifecycle tracking. It requires observed lifecycle support before enabling steering. A write alone never counts as consumption. Refusals restore the reserved message, while uncertain writes stay held for explicit resolution. A completed original turn is not replayed after a later steering failure. A pending follow-up has a 30-second acknowledgment deadline after a result; expiration stops that process and holds unresolved input as uncertain.
 
-The inspected #2008 implementation tags prompts with UUIDs and observes `command_lifecycle` acknowledgments. On CLIs that have not reported lifecycle events, its fallback treats a successful input write as accepted. That fallback cannot establish when Claude consumed the prompt. The author reports testing with 2.1.296; no minimum version for lifecycle acknowledgments was verified here. HAPI uses its own SDK wrapper, so installing a newer Agent SDK package alone would not implement this behavior.
+A live check against Claude Code 2.1.303 sent an instruction during a running tool call. Claude emitted queued, started and completed events for the new prompt, replaced the next action, and finished with one result. The test file contained FIRST and STEERED; the unwanted WRONG action did not run. Deterministic tests also cover the actual HAPI input/output stream and the launcher queue boundary, including result races, uncertain delivery and output-flush failure. No SDK dependency migration, preference UI or extra delivery-intent field was added.
 
-This task researches Claude integration only. No Claude implementation, automatic adoption or cherry-pick is authorized by this note.
+## Which PR to use
+
+Use #2008 as a reference for a small adaptation. It has substantially less production code and fits the existing queue reservations. Neither PR is ready to take wholesale under the owner's always-steer policy.
+
+The comparison uses the complete file diffs fetched from GitHub, with these immutable heads:
+
+| | [#2008 at `4c22ab4`](https://github.com/tiann/hapi/commit/4c22ab471e767804784525fa2ef8740f5906d907) | [#1351 at `feb7017`](https://github.com/tiann/hapi/commit/feb70174798df546512ebd9096768c94ddead945) |
+| --- | --- | --- |
+| Full head SHA | `4c22ab471e767804784525fa2ef8740f5906d907` | `feb70174798df546512ebd9096768c94ddead945` |
+| Changed files | 11 | 22 |
+| Added/deleted lines | 890 / 28 | 913 / 28 |
+| Added test lines | 627 | 431 |
+| Added production/docs lines | 263 | 482 |
+| Product surface | Existing Steer RPC and capability flag; no web code, new preference or environment variable | New `steer` wire boolean, composer preference, localStorage hook, alternate shortcuts, environment opt-in and session ingress hook |
+| Delivery tracking | UUIDs, lifecycle acknowledgments, queue reservations and pending steers across results | Direct input write, immediate acknowledgment and addition to the current batch for crash replay |
+
+Counts include comments and type declarations. The full PR totals hide the difference: most of #2008 is tests, while #1351 adds nearly twice as many non-test lines.
+
+The useful part of #2008 is in [claudeRemote.ts](https://github.com/tiann/hapi/blob/4c22ab471e767804784525fa2ef8740f5906d907/cli/src/claude/claudeRemote.ts) and [claudeRemoteLauncher.ts](https://github.com/tiann/hapi/blob/4c22ab471e767804784525fa2ef8740f5906d907/cli/src/claude/claudeRemoteLauncher.ts): preserve a pending message until Claude reports it started, keep the session busy across a result when another prompt is waiting, and avoid replaying the original completed turn after a later failure. A `started` acknowledgment means Claude invoked the input; it does not mean Claude completed the requested work. HAPI's custom SDK already forwards these events, so an SDK dependency migration is unnecessary.
+
+Static inspection found these risks in #2008; they were not reproduced against a live Claude process:
+
+- `onDropped` restores every unstarted reservation on process teardown, including writes whose acknowledgment may have been lost. An explicit rejection and an unknown transport outcome need different handling. Replaying the latter can duplicate a prompt Claude already persisted. The queue already supports an indeterminate reservation state, but this path does not use it.
+- `startSteer` removes a pending entry before awaiting `onStarted`. If the launcher's output flush rejects, the error is logged and the reservation can remain dispatching with no pending entry to settle it. Keep ownership until settlement succeeds or record a recoverable outcome.
+- Before any lifecycle event has arrived, the fallback immediately treats a write as consumed. That also skips follow-up-turn gating. A verified capability requirement would be cleaner than silently claiming the older transport has equivalent guarantees.
+- A prompt reported as `queued` is waited on without a deadline if its later acknowledgment never arrives. Only prompts with no lifecycle report age out, after two results. This differs from the PR description's bounded-wait claim.
+
+#1351's smaller transport function leaves more correctness work: it does not track lifecycle acknowledgments or steers that become separate follow-up turns. Its `onReady` still clears the single in-flight batch at the first result. It also bypasses queue reservations and acknowledges delivery before Claude confirms consumption. The abort guard prevents new input after cancellation, but does not prove recovery for previously written input that Claude has not started. Its [session hook](https://github.com/tiann/hapi/blob/feb70174798df546512ebd9096768c94ddead945/cli/src/claude/session.ts), new wire boolean and [113-line preference hook](https://github.com/tiann/hapi/blob/feb70174798df546512ebd9096768c94ddead945/web/src/hooks/useComposerSteerBehavior.ts) add machinery this fork does not need.
+
+Adapt #2008's input channel and lifecycle tracking into the automatic delivery path established by local commit `ebbbe08b`. Keep compatible-mode and isolated-command guards, acknowledgment ordering, result-boundary tracking and recovery tests. Omit manual-button gating, preferences, alternate shortcuts, environment switches and a second delivery-intent field. Tighten uncertain-outcome and settlement handling before enabling Claude's capability. Test multiple steers, a steer after the final tool call, lost acknowledgments, abort/crash recovery and flush failure. The comparison itself made no application changes; the local implementation described above followed it.

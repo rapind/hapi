@@ -482,6 +482,10 @@ export async function runClaude(options: StartOptions = {}): Promise<void> {
             disallowedTools: messageDisallowedTools
         };
         messageQueue.push(formattedText, enhancedMode, localId);
+        const steer = currentSessionRef.current?.steerQueuedMessage;
+        if (message.meta?.deliveryMode === 'steer' && localId && steer) {
+            void steer(localId).catch(error => logger.debug('[claude] Automatic steering failed', error));
+        }
         logger.debugLargeJson('User message pushed to queue:', message)
     };
     session.onUserMessage((...args) => {
@@ -512,6 +516,8 @@ export async function runClaude(options: StartOptions = {}): Promise<void> {
         logger.debug(`[claude] cancelByLocalId(${localId}): ${removed ? 'removed' : 'not found (best-effort)'}`);
         return removed;
     });
+
+    session.onRetryQueuedMessage(localId => messageQueue.releaseIndeterminateReservation(localId));
 
     const resolvePermissionMode = (value: unknown): PermissionMode => {
         const parsed = PermissionModeSchema.safeParse(value);

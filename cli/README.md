@@ -298,6 +298,22 @@ When changing agent bootstrap, handoff, or shared-session plumbing:
 - Ordinary wrappers export `HAPI_SESSION_ID` after bootstrap. Shared Codex uses a per-root MCP bridge and `shell_environment_policy.set.HAPI_SESSION_ID`; never put one root's ID into the shared app-server environment. Implementation: `src/codex/shared/root.ts`, `src/codex/shared/runtime.ts`.
 - Gemini remains a historical wire flavor, not a launchable integration. Use the [supported-agent guide](../docs/guide/agents.md) for the launchable set.
 
+## Claude steering
+
+Remote Claude sessions automatically receive compatible follow-up messages during
+an active turn, including messages from `ping_peer`. Claude reads them at a tool
+boundary or runs them as a follow-up turn. There is no Queue/Steer setting.
+
+HAPI enables steering after the CLI reports native command lifecycle events.
+A write to stdin does not count as consumption: Claude must acknowledge that the
+prompt started. Explicit refusals return to the queue; a lost acknowledgment or
+process exit leaves the message uncertain for explicit retry or cancellation.
+After a turn ends, an unacknowledged follow-up gets 30 seconds to start before
+HAPI stops that process and holds the input as uncertain. Slash commands,
+compaction, incompatible session settings and CLIs without lifecycle events use
+the ordinary queue. Native mid-turn redirection was verified with Claude Code
+2.1.303.
+
 ## Storage
 
 Data is stored in `~/.hapi/` (or `$HAPI_HOME`):

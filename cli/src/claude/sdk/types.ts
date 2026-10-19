@@ -16,6 +16,7 @@ export interface SDKMessage {
 
 export interface SDKUserMessage extends SDKMessage {
     type: 'user'
+    uuid?: string
     parent_tool_use_id?: string
     /**
      * Set by Claude Code on user-role messages it injects itself (skill bodies,

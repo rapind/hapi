@@ -1253,7 +1253,7 @@ describe('MessageService.sendMessage deliveryMode', () => {
         store.close()
     })
 
-    it.each(['pi', 'cursor'] as const)('automatically steers peer input for %s', async flavor => {
+    it.each(['claude', 'pi', 'cursor'] as const)('automatically steers peer input for %s', async flavor => {
         const store = makeStore()
         const session = store.sessions.getOrCreateSession('auto-peer', {
             path: '/tmp', host: 'localhost', flavor, ...(flavor === 'cursor' ? { cursorSessionProtocol: 'acp' } : {})
@@ -1292,7 +1292,7 @@ describe('MessageService.sendMessage deliveryMode', () => {
         store.close()
     })
 
-    it.each(['claude', 'opencode'])('keeps omitted delivery mode queued for unsupported %s', async flavor => {
+    it.each(['kimi', 'opencode'])('keeps omitted delivery mode queued for unsupported %s', async flavor => {
         const store = makeStore()
         const session = store.sessions.getOrCreateSession('other-agent', {
             path: '/tmp', host: 'localhost', flavor, codexPromptMode: 'steer'

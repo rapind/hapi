@@ -2,6 +2,7 @@ import { EnhancedMode, PermissionMode } from "./loop";
 import { query, type QueryOptions as Options, type SDKMessage, type SDKSystemMessage, AbortError, SDKUserMessage } from '@/claude/sdk'
 import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { parseSpecialCommand } from "@/parsers/specialCommands";
 import { logger } from "@/lib";
 import { PushableAsyncIterable } from "@/utils/PushableAsyncIterable";
@@ -12,6 +13,13 @@ import { PermissionResult } from "./sdk/types";
 import { getHapiBlobsDir } from "@/constants/uploadPaths";
 import { getDefaultClaudeCodePath } from "./sdk/utils";
 import { filterCatalogAffectingClaudeArgs } from "./sdk/metadataExtractor";
+
+export type SteerCallbacks = {
+    onStarted: () => void | Promise<void>;
+    onRejected: () => void | Promise<void>;
+    onIndeterminate: () => void | Promise<void>;
+};
+export type SteerFunction = (message: string, callbacks: SteerCallbacks) => boolean;
 
 export async function claudeRemote(opts: {
 
@@ -39,7 +47,9 @@ export async function claudeRemote(opts: {
     onMessage: (message: SDKMessage) => void,
     onFirstResult?: (initialMessage: string) => void,
     onCompletionEvent?: (message: string) => void,
-    onSessionReset?: () => void
+    onSessionReset?: () => void,
+    onResult?: () => void,
+    onSteerableChange?: (steer: SteerFunction | null) => void
 }) {
     const debugPrefix = '[claudeRemote][async-debug]';
 
@@ -105,6 +115,39 @@ export async function claudeRemote(opts: {
     let awaitingForkInit = forkSession;
 
     const messages = new PushableAsyncIterable<SDKUserMessage>();
+    let turnActive = false;
+    let lifecycleReported = false;
+    let steeringEnabled = false;
+    let awaitingSteers = false;
+    let steerAckTimer: ReturnType<typeof setTimeout> | undefined;
+    let primaryPromptUuid: string | null = null;
+    const pendingSteers = new Map<string, SteerCallbacks>();
+    const publishSteerable = () => {
+        const enabled = turnActive && lifecycleReported && !isCompactCommand;
+        if (enabled === steeringEnabled) return;
+        steeringEnabled = enabled;
+        opts.onSteerableChange?.(enabled ? steer : null);
+    };
+    const setTurnActive = (active: boolean) => {
+        turnActive = active;
+        publishSteerable();
+    };
+    const pushUserMessage = (content: string, uuid = randomUUID()) => {
+        messages.push({ type: 'user', uuid, message: { role: 'user', content } });
+        return uuid;
+    };
+    const steer: SteerFunction = (content, callbacks) => {
+        if (!steeringEnabled || opts.signal?.aborted || messages.done) return false;
+        const uuid = randomUUID();
+        pendingSteers.set(uuid, callbacks);
+        try {
+            pushUserMessage(content, uuid);
+            return true;
+        } catch {
+            pendingSteers.delete(uuid);
+            return false;
+        }
+    };
 
     const applyInitialTurn = async (): Promise<{ message: string; mode: EnhancedMode } | null> => {
         let next: { message: string; mode: EnhancedMode } | null;
@@ -145,13 +188,8 @@ export async function claudeRemote(opts: {
         }
 
         mode = next.mode;
-        messages.push({
-            type: 'user',
-            message: {
-                role: 'user',
-                content: next.message,
-            },
-        });
+        primaryPromptUuid = pushUserMessage(next.message);
+        setTurnActive(true);
         return next;
     };
 
@@ -256,7 +294,8 @@ export async function claudeRemote(opts: {
                     return;
                 }
                 mode = next.mode;
-                messages.push({ type: 'user', message: { role: 'user', content: next.message } });
+                primaryPromptUuid = pushUserMessage(next.message);
+                setTurnActive(true);
                 logger.debug(
                     `${debugPrefix} nextMessage resolved fetchId=${fetchId} elapsedMs=${Date.now() - startedAt} ` +
                     `messageLength=${next.message.length} permissionMode=${next.mode.permissionMode}`
@@ -356,18 +395,54 @@ export async function claudeRemote(opts: {
                 }
             }
 
+            if (message.type === 'command_lifecycle' && typeof message.command_uuid === 'string') {
+                const uuid = message.command_uuid;
+                if (uuid === primaryPromptUuid || pendingSteers.has(uuid)) {
+                    lifecycleReported = true;
+                    publishSteerable();
+                }
+                const pending = pendingSteers.get(uuid);
+                const started = message.state === 'started' || message.state === 'completed';
+                const rejected = message.state === 'cancelled' || message.state === 'discarded' || message.state === 'refused';
+                if (pending && (started || rejected)) {
+                    await (started ? pending.onStarted() : pending.onRejected());
+                    pendingSteers.delete(uuid);
+                    if (message.state === 'started') {
+                        clearTimeout(steerAckTimer);
+                        awaitingSteers = false;
+                        setTurnActive(true);
+                        updateThinking(true);
+                    } else if (awaitingSteers && pendingSteers.size === 0) {
+                        awaitingSteers = false;
+                        clearTimeout(steerAckTimer);
+                        updateThinking(false);
+                        await opts.onReady();
+                        scheduleNextMessage();
+                    }
+                }
+            }
+
             // Handle result messages
             if (message.type === 'result') {
                 resultSeq += 1;
+                opts.onResult?.();
+                setTurnActive(false);
+                if (resultSeq === 1 && specialCommand.type === null && initial) {
+                    opts.onFirstResult?.(initial.message);
+                }
+                if (pendingSteers.size > 0) {
+                    awaitingSteers = true;
+                    clearTimeout(steerAckTimer);
+                    steerAckTimer = setTimeout(() => {
+                        messages.setError(new Error('Claude did not acknowledge queued steering input after turn completion'));
+                    }, 30_000);
+                    continue;
+                }
                 updateThinking(false);
                 logger.debug(
                     `${debugPrefix} result #${resultSeq} received; scheduling next user message ` +
                     `(nextInFlight=${nextMessageFetchInFlight}, inputEnded=${inputEnded})`
                 );
-
-                if (resultSeq === 1 && specialCommand.type === null && initial) {
-                    opts.onFirstResult?.(initial.message);
-                }
 
                 let completionEvent: string | undefined;
                 if (isCompactCommand) {
@@ -405,6 +480,7 @@ export async function claudeRemote(opts: {
         }
         logger.debug(`${debugPrefix} response stream exhausted`);
     } catch (e) {
+        messages.setError(e instanceof Error ? e : new Error(String(e)));
         if (e instanceof AbortError) {
             logger.debug(`[claudeRemote] Aborted`);
             // Ignore
@@ -417,6 +493,14 @@ export async function claudeRemote(opts: {
             `${debugPrefix} finally ` +
             `(streamMessages=${streamMessageSeq}, results=${resultSeq}, nextFetches=${nextMessageFetchSeq}, inputEnded=${inputEnded})`
         );
+        clearTimeout(steerAckTimer);
+        setTurnActive(false);
+        messages.end();
+        const outcomes = await Promise.allSettled([...pendingSteers.values()].map(async pending => pending.onIndeterminate()));
+        for (const outcome of outcomes) {
+            if (outcome.status === 'rejected') logger.debug('[claudeRemote] Steering settlement failed', outcome.reason);
+        }
+        pendingSteers.clear();
         updateThinking(false);
     }
 }
