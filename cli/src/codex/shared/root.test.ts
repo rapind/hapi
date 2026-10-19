@@ -118,6 +118,32 @@ async function completePlan(f: Awaited<ReturnType<typeof fixture>>, status = 'co
     return codexPlanProposalId('thread', turn.id, 'plan-item');
 }
 
+describe('native settings confirmation', () => {
+    it('starts with already-confirmed permissions when native no-op updates emit no notification', async () => {
+        vi.useFakeTimers();
+        const f = await fixture();
+        f.root.acceptSettings({ model: 'mock', approvalPolicy: 'never', sandbox: { type: 'dangerFullAccess' } });
+        const request = f.root.client.request.bind(f.root.client);
+        vi.spyOn(f.root.client, 'request').mockImplementation((method, params) =>
+            method === 'thread/settings/update' ? Promise.resolve({}) : request(method, params));
+        const result = f.root.activate().then(() => 'ready', (error: Error) => error.message);
+        await vi.advanceTimersByTimeAsync(15_001);
+        expect(await result).toBe('ready');
+    });
+
+    it('does not treat an unconfirmed permission change as ready', async () => {
+        vi.useFakeTimers();
+        const f = await fixture();
+        f.root.acceptSettings({ model: 'mock', approvalPolicy: 'on-request', sandbox: { type: 'workspaceWrite' } });
+        const request = f.root.client.request.bind(f.root.client);
+        vi.spyOn(f.root.client, 'request').mockImplementation((method, params) =>
+            method === 'thread/settings/update' ? Promise.resolve({}) : request(method, params));
+        const result = f.root.activate().then(() => 'ready', (error: Error) => error.message);
+        await vi.advanceTimersByTimeAsync(15_001);
+        expect(await result).toBe('Native settings update is not confirmed; reconnect before retrying');
+    });
+});
+
 describe('ordinary Codex follow-ups', () => {
     it.each(['success', 'rejected', 'uncertain'] as const)('handles a %s steer without duplicate delivery', async outcome => {
         const f = await fixture();

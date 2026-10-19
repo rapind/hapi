@@ -407,6 +407,13 @@ export class SharedCodexRoot {
                 developer_instructions: null
             } } } : {})
         };
+        // Native no-op updates emit no notification. The start/resume snapshot
+        // already confirms these values under the start/resume field names.
+        if (settingsMatch({
+            ...this.settingsNative,
+            sandboxPolicy: this.settingsNative.sandboxPolicy ?? this.settingsNative.sandbox,
+            effort: this.settingsNative.effort ?? this.settingsNative.reasoningEffort
+        }, params)) return { applied: this.settings };
         let changed!: () => void;
         let timer: ReturnType<typeof setTimeout> | undefined;
         const accepted = new Promise<void>((resolve, reject) => {
