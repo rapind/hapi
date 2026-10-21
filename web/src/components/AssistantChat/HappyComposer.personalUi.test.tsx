@@ -69,6 +69,16 @@ describe('Personal composer', () => {
         expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
     })
 
+    it('keeps focus in the field while a send is in flight', () => {
+        const { rerender } = render(<Preview onVoiceToggle={vi.fn()} />)
+        const input = screen.getByRole('textbox') as HTMLTextAreaElement
+        input.focus()
+        rerender(<Preview onVoiceToggle={vi.fn()} disabled />)
+        expect(input).toHaveAttribute('readonly')
+        expect(input).not.toBeDisabled()
+        expect(document.activeElement).toBe(input)
+    })
+
     it('does not refocus the field or move an earlier selection when controls become available', () => {
         const onVoiceToggle = vi.fn()
         const { rerender } = render(<Preview onVoiceToggle={onVoiceToggle} />)

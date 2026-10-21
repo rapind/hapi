@@ -1874,8 +1874,9 @@ export function HappyComposer(props: {
                                             <textarea
                                                 rows={1}
                                                 placeholder=""
-                                                disabled={controlsDisabled}
-                                                className="composer-textarea h-full min-h-0 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-base leading-snug text-[var(--app-composer-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                                readOnly={controlsDisabled}
+                                                aria-disabled={controlsDisabled}
+                                                className="composer-textarea h-full min-h-0 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-base leading-snug text-[var(--app-composer-fg)] placeholder-[var(--app-hint)] focus:outline-none read-only:cursor-not-allowed read-only:opacity-50"
                                             />
                                         </ComposerPrimitive.Input>
                                     ) : (
@@ -1887,7 +1888,8 @@ export function HappyComposer(props: {
                                             unstable_focusOnScrollToBottom={false}
                                             unstable_focusOnThreadSwitched={false}
                                             placeholder=""
-                                            disabled={controlsDisabled}
+                                            readOnly={controlsDisabled}
+                                            aria-disabled={controlsDisabled}
                                             rows={1}
                                             minRows={1}
                                             maxRows={5}
@@ -1897,7 +1899,7 @@ export function HappyComposer(props: {
                                             onSelect={handleSelect}
                                             onKeyDown={handleKeyDown}
                                             onPaste={handlePaste}
-                                            className="composer-textarea min-h-[calc(1lh+0.25rem)] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-base leading-snug text-[var(--app-composer-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                            className="composer-textarea min-h-[calc(1lh+0.25rem)] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-base leading-snug text-[var(--app-composer-fg)] placeholder-[var(--app-hint)] focus:outline-none read-only:cursor-not-allowed read-only:opacity-50"
                                         />
                                     )}
                                 </div>
