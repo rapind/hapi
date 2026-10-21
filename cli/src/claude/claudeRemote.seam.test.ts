@@ -119,7 +119,7 @@ it('writes a steer before the current result and acknowledges only when Claude s
     spawnMock.mockReturnValueOnce(child)
     process.env.HAPI_CLAUDE_PATH = 'claude'
     const { claudeRemote } = await import('./claudeRemote')
-    const inputs: Array<{ uuid: string; message: { content: string } }> = []
+    const inputs: Array<{ uuid: string; priority?: string; message: { content: string } }> = []
     child.stdin.on('data', data => {
         for (const line of data.toString().trim().split('\n')) inputs.push(JSON.parse(line))
     })
@@ -142,6 +142,8 @@ it('writes a steer before the current result and acknowledges only when Claude s
         expect(steer!('change direction', { onStarted, onRejected: vi.fn(), onIndeterminate: vi.fn() })).toBe(true)
         await vi.waitFor(() => expect(inputs).toHaveLength(2))
         expect(inputs[1].message.content).toBe('change direction')
+        expect(inputs[0].priority).toBeUndefined()
+        expect(inputs[1].priority).toBe('now')
         expect(onStarted).not.toHaveBeenCalled()
         child.stdout.write(JSON.stringify({ type: 'command_lifecycle', command_uuid: inputs[1].uuid, state: 'started' }) + '\n')
         await vi.waitFor(() => expect(onStarted).toHaveBeenCalledOnce())
@@ -205,6 +207,30 @@ it('keeps a queued follow-up busy across results and becomes ready after explici
     } finally {
         await harness.close()
     }
+})
+
+it('runs a now-priority steer that cuts the active turn as the next turn', async () => {
+    // Event order observed from Claude Code 2.1.306: the cut turn ends with an
+    // empty result, the original prompt is cancelled, then the steer starts.
+    const harness = await steeringHarness()
+    const callbacks = { onStarted: vi.fn(), onRejected: vi.fn(), onIndeterminate: vi.fn() }
+    try {
+        harness.steer!('change direction', callbacks)
+        await vi.waitFor(() => expect(harness.inputs).toHaveLength(2))
+        const uuid = harness.inputs[1].uuid
+        harness.event({ type: 'command_lifecycle', command_uuid: uuid, state: 'queued' })
+        harness.event({ type: 'result', subtype: 'success', result: '' })
+        harness.event({ type: 'command_lifecycle', command_uuid: harness.inputs[0].uuid, state: 'cancelled' })
+        harness.event({ type: 'command_lifecycle', command_uuid: uuid, state: 'started' })
+        await vi.waitFor(() => expect(callbacks.onStarted).toHaveBeenCalledOnce())
+        expect(harness.onReady).not.toHaveBeenCalled()
+        harness.event({ type: 'result', subtype: 'success' })
+        harness.event({ type: 'command_lifecycle', command_uuid: uuid, state: 'completed' })
+        await vi.waitFor(() => expect(harness.onReady).toHaveBeenCalledOnce())
+        expect(harness.onResult).toHaveBeenCalledTimes(2)
+        expect(callbacks.onRejected).not.toHaveBeenCalled()
+        expect(callbacks.onIndeterminate).not.toHaveBeenCalled()
+    } finally { await harness.close() }
 })
 
 it('holds unacknowledged steering as uncertain instead of hanging or replaying it', async () => {

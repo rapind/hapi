@@ -484,7 +484,12 @@ export async function runClaude(options: StartOptions = {}): Promise<void> {
         messageQueue.push(formattedText, enhancedMode, localId);
         const steer = currentSessionRef.current?.steerQueuedMessage;
         if (message.meta?.deliveryMode === 'steer' && localId && steer) {
-            void steer(localId).catch(error => logger.debug('[claude] Automatic steering failed', error));
+            void steer(localId).then(
+                result => {
+                    if (!result.steered) logger.debug(`[claude] Automatic steering declined for ${localId}: ${result.error ?? 'unknown reason'}`);
+                },
+                error => logger.debug('[claude] Automatic steering failed', error)
+            );
         }
         logger.debugLargeJson('User message pushed to queue:', message)
     };

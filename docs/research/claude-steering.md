@@ -39,6 +39,15 @@ The local implementation adapts #2008's native input channel and lifecycle track
 
 A live check against Claude Code 2.1.303 sent an instruction during a running tool call. Claude emitted queued, started and completed events for the new prompt, replaced the next action, and finished with one result. The test file contained FIRST and STEERED; the unwanted WRONG action did not run. Deterministic tests also cover the actual HAPI input/output stream and the launcher queue boundary, including result races, uncertain delivery and output-flush failure. No SDK dependency migration, preference UI or extra delivery-intent field was added.
 
+A foreground subagent counts as one tool call, so a plain steer waits until the whole subagent returns. Live HAPI logs showed delays of 55 to 158 seconds, each one behind subagent work. Claude Code accepts `priority: "now" | "next" | "later"` on stream-json user messages. Checks against 2.1.306 compared the two:
+
+| Case | No priority | `priority: "now"` |
+| --- | --- | --- |
+| Foreground subagent making four 12-second Bash calls, steer at 20s | Steer started at 60s, after all four steps, inside the same turn | Steer started at 21s, when the current step finished. The subagent was killed and its turn ended with an empty `result`; the original prompt reported `cancelled`, then the steer started as the next turn |
+| Main-thread 45-second foreground Bash | Not measured | The Bash call ran to completion; Claude then cut the turn the same way |
+
+`now` does not interrupt a running tool call; it cuts the turn at the next tool boundary, including a boundary inside a subagent. HAPI sends every steer with `now`. The existing lifecycle tracking already covered a steer that starts after a `result`.
+
 ## Which PR to use
 
 Use #2008 as a reference for a small adaptation. It has substantially less production code and fits the existing queue reservations. Neither PR is ready to take wholesale under the owner's always-steer policy.

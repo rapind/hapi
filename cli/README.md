@@ -301,8 +301,15 @@ When changing agent bootstrap, handoff, or shared-session plumbing:
 ## Claude steering
 
 Remote Claude sessions automatically receive compatible follow-up messages during
-an active turn, including messages from `ping_peer`. Claude reads them at a tool
-boundary or runs them as a follow-up turn. There is no Queue/Steer setting.
+an active turn, including messages from `ping_peer`. There is no Queue/Steer
+setting.
+
+HAPI sends each steer with `priority: "now"`, the stream-json equivalent of
+Claude Code's send-now shortcut. Claude lets the running tool call finish, then
+cuts the turn and runs the steer as the next turn. That includes a foreground
+subagent: Claude stops it after its current tool call, and its unfinished work
+is lost. Without `now`, Claude held the message until the whole subagent
+returned, which could take minutes.
 
 HAPI enables steering after the CLI reports native command lifecycle events.
 A write to stdin does not count as consumption: Claude must acknowledge that the
@@ -311,8 +318,7 @@ process exit leaves the message uncertain for explicit retry or cancellation.
 After a turn ends, an unacknowledged follow-up gets 30 seconds to start before
 HAPI stops that process and holds the input as uncertain. Slash commands,
 compaction, incompatible session settings and CLIs without lifecycle events use
-the ordinary queue. Native mid-turn redirection was verified with Claude Code
-2.1.303.
+the ordinary queue. The `now` turn cut was verified with Claude Code 2.1.306.
 
 ## Storage
 

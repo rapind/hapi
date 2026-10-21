@@ -18,6 +18,8 @@ export interface SDKUserMessage extends SDKMessage {
     type: 'user'
     uuid?: string
     parent_tool_use_id?: string
+    /** `now` makes Claude cut the active turn at its next tool boundary, including inside a foreground subagent. */
+    priority?: 'now' | 'next' | 'later'
     /**
      * Set by Claude Code on user-role messages it injects itself (skill bodies,
      * compact continuation summaries) rather than relaying from the human. The

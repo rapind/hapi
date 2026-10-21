@@ -132,8 +132,8 @@ export async function claudeRemote(opts: {
         turnActive = active;
         publishSteerable();
     };
-    const pushUserMessage = (content: string, uuid = randomUUID()) => {
-        messages.push({ type: 'user', uuid, message: { role: 'user', content } });
+    const pushUserMessage = (content: string, uuid = randomUUID(), priority?: SDKUserMessage['priority']) => {
+        messages.push({ type: 'user', uuid, ...(priority && { priority }), message: { role: 'user', content } });
         return uuid;
     };
     const steer: SteerFunction = (content, callbacks) => {
@@ -141,7 +141,7 @@ export async function claudeRemote(opts: {
         const uuid = randomUUID();
         pendingSteers.set(uuid, callbacks);
         try {
-            pushUserMessage(content, uuid);
+            pushUserMessage(content, uuid, 'now');
             return true;
         } catch {
             pendingSteers.delete(uuid);
